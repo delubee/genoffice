@@ -607,6 +607,7 @@ fn resolves_in_cell_rich_value_pictures() {
     assert!(result.cells.iter().any(|cell| {
         cell.row == 1
             && cell.column == 2
+            && cell.is_error
             && matches!(&cell.value, Some(CellValue::String(text)) if text == "#DIV/0!")
     }));
 
@@ -5005,4 +5006,18 @@ fn encrypted_workbook_reports_password_protection() {
         message.contains("password-protected"),
         "expected a password-protection explanation, got: {message}"
     );
+}
+
+#[test]
+fn preserves_error_kind_separately_from_literal_error_text() {
+    let worksheet = r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="e"><v>#REF!</v></c><c r="B1" t="inlineStr"><is><t>#REF!</t></is></c></row></sheetData></worksheet>"#;
+    let mut entries = rich_data_fixture_entries();
+    entries.retain(|(name, _)| *name != "xl/worksheets/sheet1.xml");
+    entries.push(("xl/worksheets/sheet1.xml", worksheet));
+    let (_dir, path) = open_fixture(&entries);
+    let mut sessions = WorkbookSessions::new();
+    let metadata = sessions.open(&path).unwrap();
+    let result = sessions.read_range(&metadata.session_id, "sheet-1", &CellRange { start_row: 0, end_row: 0, start_column: 0, end_column: 1 }).unwrap();
+    assert!(result.cells.iter().find(|cell| cell.column == 0).unwrap().is_error);
+    assert!(!result.cells.iter().find(|cell| cell.column == 1).unwrap().is_error);
 }

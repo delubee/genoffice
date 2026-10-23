@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": false, "declaration": true, "emitDeclarationOnly": false, "outDir": "dist", "rootDir": "src" },
+  "include": ["src"],
+  "exclude": ["tests", "vitest.config.ts"]
+}

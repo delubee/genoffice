@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "version": "1.143.0",
+  "skillVersion": "0.1.0",
+  "workspacePath": "/home/github/genoffice/apps/vscode-office/test-workspace",
+  "installedPath": "/home/github/genoffice/apps/vscode-office/test-workspace/.github/skills/genoffice-workbook",
+  "toolsRegistered": true,
+  "userChangesDetected": true,
+  "outsideWorkspaceRejected": true,
+  "modelDiscovery": "not verified",
+  "confirmationRejectionInRealChat": "not verified",
+  "checkedAt": "2026-10-22T14:48:32.369Z"
+}

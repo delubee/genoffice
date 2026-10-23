@@ -1375,6 +1375,7 @@ impl CellBuilder {
             row: self.row,
             column: self.column,
             value,
+            is_error: self.cell_type.as_deref() == Some("e") && !picture,
             array_ref: if formula.is_some() {
                 self.array_ref
             } else {

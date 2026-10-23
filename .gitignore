@@ -20,6 +20,11 @@ electron-builder.env
 .idea/
 .claude/
 
+# Local agent tooling; product skills remain versioned source resources.
+/.agents/skills/
+/.codex/skills/
+/.github/skills/
+
 # Local build artifacts dropped in the repo root
 /*.dmg
 /*.exe
@@ -31,6 +36,17 @@ electron-builder.env
 
 .cursor/rules/git-remote.mdc
 __pycache__/
+.venv/
+venv/
+*.pyc
+*.tmp
+target/
+coverage/
+**/.vscode-test/
+**/playwright-report/
+/apps/vscode-office/test-workspace/
+*.vsix
+.genoffice/work/
 /notes/
 /MEMORY.md
 
@@ -41,3 +57,14 @@ __pycache__/
 # One-off verification tests kept while chasing a fix; promote to a real test
 # file (or delete) instead of committing them under this name.
 _scratch-*
+
+/apps/vscode-office/tests/fixtures/api-probe/index.cjs
+/packages/sheets-editor/test-results/browser/
+
+/apps/vscode-office/native/
+/apps/vscode-office/test-fixtures/generated/
+
+# Platform extension packages and copied legal notices
+apps/vscode-office/artifacts/
+apps/vscode-office/LICENSE
+apps/vscode-office/THIRD-PARTY-NOTICES.txt

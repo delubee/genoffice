@@ -852,5 +852,8 @@ function replaceCell(
   cell: CellState,
 ): void {
   const sheet = findSheet(snapshot, sheetId)
-  replaceSheet(snapshot, { ...sheet, cells: { ...sheet.cells, [address]: cell } })
+  // Every caller owns a structuredClone made by plan() or apply(). Copying the
+  // complete dictionary per cell makes a 1,000-cell batch quadratic in workbook
+  // size; mutating that private working copy preserves external snapshot isolation.
+  ;(sheet.cells as Record<string, CellState>)[address] = cell
 }

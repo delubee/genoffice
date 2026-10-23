@@ -1,0 +1,719 @@
+{
+  "passed": true,
+  "platform": "linux-x64",
+  "checkedAt": "2026-10-22T11:16:52.366Z",
+  "durationMs": 669997,
+  "cells": 100000,
+  "batchCount": 100,
+  "retainedHistoryBytes": 85856435,
+  "sourceAndReopenedResultSha256": "16a768b34c15ec19096b8d338b2bd453f512a9c1bb931c7b017bdfb691956650",
+  "cancelledAfterThree": {
+    "committedCount": 3000,
+    "remainingCount": 97000,
+    "undoRestoredManualRoot": true
+  },
+  "privateCopySurvivedPublicMutation": true,
+  "receipts": [
+    {
+      "cursor": 0,
+      "revision": 8,
+      "completedCount": 1000,
+      "remainingCount": 99000,
+      "durationMs": 142
+    },
+    {
+      "cursor": 1,
+      "revision": 9,
+      "completedCount": 2000,
+      "remainingCount": 98000,
+      "durationMs": 214
+    },
+    {
+      "cursor": 2,
+      "revision": 10,
+      "completedCount": 3000,
+      "remainingCount": 97000,
+      "durationMs": 303
+    },
+    {
+      "cursor": 3,
+      "revision": 11,
+      "completedCount": 4000,
+      "remainingCount": 96000,
+      "durationMs": 415
+    },
+    {
+      "cursor": 4,
+      "revision": 12,
+      "completedCount": 5000,
+      "remainingCount": 95000,
+      "durationMs": 549
+    },
+    {
+      "cursor": 5,
+      "revision": 13,
+      "completedCount": 6000,
+      "remainingCount": 94000,
+      "durationMs": 614
+    },
+    {
+      "cursor": 6,
+      "revision": 14,
+      "completedCount": 7000,
+      "remainingCount": 93000,
+      "durationMs": 666
+    },
+    {
+      "cursor": 7,
+      "revision": 15,
+      "completedCount": 8000,
+      "remainingCount": 92000,
+      "durationMs": 839
+    },
+    {
+      "cursor": 8,
+      "revision": 16,
+      "completedCount": 9000,
+      "remainingCount": 91000,
+      "durationMs": 940
+    },
+    {
+      "cursor": 9,
+      "revision": 17,
+      "completedCount": 10000,
+      "remainingCount": 90000,
+      "durationMs": 1068
+    },
+    {
+      "cursor": 10,
+      "revision": 18,
+      "completedCount": 11000,
+      "remainingCount": 89000,
+      "durationMs": 1019
+    },
+    {
+      "cursor": 11,
+      "revision": 19,
+      "completedCount": 12000,
+      "remainingCount": 88000,
+      "durationMs": 1127
+    },
+    {
+      "cursor": 12,
+      "revision": 20,
+      "completedCount": 13000,
+      "remainingCount": 87000,
+      "durationMs": 1293
+    },
+    {
+      "cursor": 13,
+      "revision": 21,
+      "completedCount": 14000,
+      "remainingCount": 86000,
+      "durationMs": 1483
+    },
+    {
+      "cursor": 14,
+      "revision": 22,
+      "completedCount": 15000,
+      "remainingCount": 85000,
+      "durationMs": 1392
+    },
+    {
+      "cursor": 15,
+      "revision": 23,
+      "completedCount": 16000,
+      "remainingCount": 84000,
+      "durationMs": 1415
+    },
+    {
+      "cursor": 16,
+      "revision": 24,
+      "completedCount": 17000,
+      "remainingCount": 83000,
+      "durationMs": 1592
+    },
+    {
+      "cursor": 17,
+      "revision": 25,
+      "completedCount": 18000,
+      "remainingCount": 82000,
+      "durationMs": 1629
+    },
+    {
+      "cursor": 18,
+      "revision": 26,
+      "completedCount": 19000,
+      "remainingCount": 81000,
+      "durationMs": 1633
+    },
+    {
+      "cursor": 19,
+      "revision": 27,
+      "completedCount": 20000,
+      "remainingCount": 80000,
+      "durationMs": 1739
+    },
+    {
+      "cursor": 20,
+      "revision": 28,
+      "completedCount": 21000,
+      "remainingCount": 79000,
+      "durationMs": 1984
+    },
+    {
+      "cursor": 21,
+      "revision": 29,
+      "completedCount": 22000,
+      "remainingCount": 78000,
+      "durationMs": 2231
+    },
+    {
+      "cursor": 22,
+      "revision": 30,
+      "completedCount": 23000,
+      "remainingCount": 77000,
+      "durationMs": 2383
+    },
+    {
+      "cursor": 23,
+      "revision": 31,
+      "completedCount": 24000,
+      "remainingCount": 76000,
+      "durationMs": 2530
+    },
+    {
+      "cursor": 24,
+      "revision": 32,
+      "completedCount": 25000,
+      "remainingCount": 75000,
+      "durationMs": 2504
+    },
+    {
+      "cursor": 25,
+      "revision": 33,
+      "completedCount": 26000,
+      "remainingCount": 74000,
+      "durationMs": 2381
+    },
+    {
+      "cursor": 26,
+      "revision": 34,
+      "completedCount": 27000,
+      "remainingCount": 73000,
+      "durationMs": 2432
+    },
+    {
+      "cursor": 27,
+      "revision": 35,
+      "completedCount": 28000,
+      "remainingCount": 72000,
+      "durationMs": 2744
+    },
+    {
+      "cursor": 28,
+      "revision": 36,
+      "completedCount": 29000,
+      "remainingCount": 71000,
+      "durationMs": 3138
+    },
+    {
+      "cursor": 29,
+      "revision": 37,
+      "completedCount": 30000,
+      "remainingCount": 70000,
+      "durationMs": 3683
+    },
+    {
+      "cursor": 30,
+      "revision": 38,
+      "completedCount": 31000,
+      "remainingCount": 69000,
+      "durationMs": 3016
+    },
+    {
+      "cursor": 31,
+      "revision": 39,
+      "completedCount": 32000,
+      "remainingCount": 68000,
+      "durationMs": 2954
+    },
+    {
+      "cursor": 32,
+      "revision": 40,
+      "completedCount": 33000,
+      "remainingCount": 67000,
+      "durationMs": 3054
+    },
+    {
+      "cursor": 33,
+      "revision": 41,
+      "completedCount": 34000,
+      "remainingCount": 66000,
+      "durationMs": 3149
+    },
+    {
+      "cursor": 34,
+      "revision": 42,
+      "completedCount": 35000,
+      "remainingCount": 65000,
+      "durationMs": 3351
+    },
+    {
+      "cursor": 35,
+      "revision": 43,
+      "completedCount": 36000,
+      "remainingCount": 64000,
+      "durationMs": 3116
+    },
+    {
+      "cursor": 36,
+      "revision": 44,
+      "completedCount": 37000,
+      "remainingCount": 63000,
+      "durationMs": 3321
+    },
+    {
+      "cursor": 37,
+      "revision": 45,
+      "completedCount": 38000,
+      "remainingCount": 62000,
+      "durationMs": 3536
+    },
+    {
+      "cursor": 38,
+      "revision": 46,
+      "completedCount": 39000,
+      "remainingCount": 61000,
+      "durationMs": 3513
+    },
+    {
+      "cursor": 39,
+      "revision": 47,
+      "completedCount": 40000,
+      "remainingCount": 60000,
+      "durationMs": 3573
+    },
+    {
+      "cursor": 40,
+      "revision": 48,
+      "completedCount": 41000,
+      "remainingCount": 59000,
+      "durationMs": 3839
+    },
+    {
+      "cursor": 41,
+      "revision": 49,
+      "completedCount": 42000,
+      "remainingCount": 58000,
+      "durationMs": 4200
+    },
+    {
+      "cursor": 42,
+      "revision": 50,
+      "completedCount": 43000,
+      "remainingCount": 57000,
+      "durationMs": 4162
+    },
+    {
+      "cursor": 43,
+      "revision": 51,
+      "completedCount": 44000,
+      "remainingCount": 56000,
+      "durationMs": 4321
+    },
+    {
+      "cursor": 44,
+      "revision": 52,
+      "completedCount": 45000,
+      "remainingCount": 55000,
+      "durationMs": 4226
+    },
+    {
+      "cursor": 45,
+      "revision": 53,
+      "completedCount": 46000,
+      "remainingCount": 54000,
+      "durationMs": 5528
+    },
+    {
+      "cursor": 46,
+      "revision": 54,
+      "completedCount": 47000,
+      "remainingCount": 53000,
+      "durationMs": 5028
+    },
+    {
+      "cursor": 47,
+      "revision": 55,
+      "completedCount": 48000,
+      "remainingCount": 52000,
+      "durationMs": 4723
+    },
+    {
+      "cursor": 48,
+      "revision": 56,
+      "completedCount": 49000,
+      "remainingCount": 51000,
+      "durationMs": 4783
+    },
+    {
+      "cursor": 49,
+      "revision": 57,
+      "completedCount": 50000,
+      "remainingCount": 50000,
+      "durationMs": 4898
+    },
+    {
+      "cursor": 50,
+      "revision": 58,
+      "completedCount": 51000,
+      "remainingCount": 49000,
+      "durationMs": 4786
+    },
+    {
+      "cursor": 51,
+      "revision": 59,
+      "completedCount": 52000,
+      "remainingCount": 48000,
+      "durationMs": 4942
+    },
+    {
+      "cursor": 52,
+      "revision": 60,
+      "completedCount": 53000,
+      "remainingCount": 47000,
+      "durationMs": 5046
+    },
+    {
+      "cursor": 53,
+      "revision": 61,
+      "completedCount": 54000,
+      "remainingCount": 46000,
+      "durationMs": 5430
+    },
+    {
+      "cursor": 54,
+      "revision": 62,
+      "completedCount": 55000,
+      "remainingCount": 45000,
+      "durationMs": 5204
+    },
+    {
+      "cursor": 55,
+      "revision": 63,
+      "completedCount": 56000,
+      "remainingCount": 44000,
+      "durationMs": 5429
+    },
+    {
+      "cursor": 56,
+      "revision": 64,
+      "completedCount": 57000,
+      "remainingCount": 43000,
+      "durationMs": 5662
+    },
+    {
+      "cursor": 57,
+      "revision": 65,
+      "completedCount": 58000,
+      "remainingCount": 42000,
+      "durationMs": 7612
+    },
+    {
+      "cursor": 58,
+      "revision": 66,
+      "completedCount": 59000,
+      "remainingCount": 41000,
+      "durationMs": 6521
+    },
+    {
+      "cursor": 59,
+      "revision": 67,
+      "completedCount": 60000,
+      "remainingCount": 40000,
+      "durationMs": 6458
+    },
+    {
+      "cursor": 60,
+      "revision": 68,
+      "completedCount": 61000,
+      "remainingCount": 39000,
+      "durationMs": 5995
+    },
+    {
+      "cursor": 61,
+      "revision": 69,
+      "completedCount": 62000,
+      "remainingCount": 38000,
+      "durationMs": 6273
+    },
+    {
+      "cursor": 62,
+      "revision": 70,
+      "completedCount": 63000,
+      "remainingCount": 37000,
+      "durationMs": 6519
+    },
+    {
+      "cursor": 63,
+      "revision": 71,
+      "completedCount": 64000,
+      "remainingCount": 36000,
+      "durationMs": 7304
+    },
+    {
+      "cursor": 64,
+      "revision": 72,
+      "completedCount": 65000,
+      "remainingCount": 35000,
+      "durationMs": 6592
+    },
+    {
+      "cursor": 65,
+      "revision": 73,
+      "completedCount": 66000,
+      "remainingCount": 34000,
+      "durationMs": 6352
+    },
+    {
+      "cursor": 66,
+      "revision": 74,
+      "completedCount": 67000,
+      "remainingCount": 33000,
+      "durationMs": 6953
+    },
+    {
+      "cursor": 67,
+      "revision": 75,
+      "completedCount": 68000,
+      "remainingCount": 32000,
+      "durationMs": 6849
+    },
+    {
+      "cursor": 68,
+      "revision": 76,
+      "completedCount": 69000,
+      "remainingCount": 31000,
+      "durationMs": 6975
+    },
+    {
+      "cursor": 69,
+      "revision": 77,
+      "completedCount": 70000,
+      "remainingCount": 30000,
+      "durationMs": 6958
+    },
+    {
+      "cursor": 70,
+      "revision": 78,
+      "completedCount": 71000,
+      "remainingCount": 29000,
+      "durationMs": 7436
+    },
+    {
+      "cursor": 71,
+      "revision": 79,
+      "completedCount": 72000,
+      "remainingCount": 28000,
+      "durationMs": 7698
+    },
+    {
+      "cursor": 72,
+      "revision": 80,
+      "completedCount": 73000,
+      "remainingCount": 27000,
+      "durationMs": 7465
+    },
+    {
+      "cursor": 73,
+      "revision": 81,
+      "completedCount": 74000,
+      "remainingCount": 26000,
+      "durationMs": 7520
+    },
+    {
+      "cursor": 74,
+      "revision": 82,
+      "completedCount": 75000,
+      "remainingCount": 25000,
+      "durationMs": 8253
+    },
+    {
+      "cursor": 75,
+      "revision": 83,
+      "completedCount": 76000,
+      "remainingCount": 24000,
+      "durationMs": 8275
+    },
+    {
+      "cursor": 76,
+      "revision": 84,
+      "completedCount": 77000,
+      "remainingCount": 23000,
+      "durationMs": 7652
+    },
+    {
+      "cursor": 77,
+      "revision": 85,
+      "completedCount": 78000,
+      "remainingCount": 22000,
+      "durationMs": 7539
+    },
+    {
+      "cursor": 78,
+      "revision": 86,
+      "completedCount": 79000,
+      "remainingCount": 21000,
+      "durationMs": 8576
+    },
+    {
+      "cursor": 79,
+      "revision": 87,
+      "completedCount": 80000,
+      "remainingCount": 20000,
+      "durationMs": 7971
+    },
+    {
+      "cursor": 80,
+      "revision": 88,
+      "completedCount": 81000,
+      "remainingCount": 19000,
+      "durationMs": 8397
+    },
+    {
+      "cursor": 81,
+      "revision": 89,
+      "completedCount": 82000,
+      "remainingCount": 18000,
+      "durationMs": 9271
+    },
+    {
+      "cursor": 82,
+      "revision": 90,
+      "completedCount": 83000,
+      "remainingCount": 17000,
+      "durationMs": 9224
+    },
+    {
+      "cursor": 83,
+      "revision": 91,
+      "completedCount": 84000,
+      "remainingCount": 16000,
+      "durationMs": 8394
+    },
+    {
+      "cursor": 84,
+      "revision": 92,
+      "completedCount": 85000,
+      "remainingCount": 15000,
+      "durationMs": 8497
+    },
+    {
+      "cursor": 85,
+      "revision": 93,
+      "completedCount": 86000,
+      "remainingCount": 14000,
+      "durationMs": 8408
+    },
+    {
+      "cursor": 86,
+      "revision": 94,
+      "completedCount": 87000,
+      "remainingCount": 13000,
+      "durationMs": 9127
+    },
+    {
+      "cursor": 87,
+      "revision": 95,
+      "completedCount": 88000,
+      "remainingCount": 12000,
+      "durationMs": 8354
+    },
+    {
+      "cursor": 88,
+      "revision": 96,
+      "completedCount": 89000,
+      "remainingCount": 11000,
+      "durationMs": 9902
+    },
+    {
+      "cursor": 89,
+      "revision": 97,
+      "completedCount": 90000,
+      "remainingCount": 10000,
+      "durationMs": 9124
+    },
+    {
+      "cursor": 90,
+      "revision": 98,
+      "completedCount": 91000,
+      "remainingCount": 9000,
+      "durationMs": 9331
+    },
+    {
+      "cursor": 91,
+      "revision": 99,
+      "completedCount": 92000,
+      "remainingCount": 8000,
+      "durationMs": 9703
+    },
+    {
+      "cursor": 92,
+      "revision": 100,
+      "completedCount": 93000,
+      "remainingCount": 7000,
+      "durationMs": 9664
+    },
+    {
+      "cursor": 93,
+      "revision": 101,
+      "completedCount": 94000,
+      "remainingCount": 6000,
+      "durationMs": 9224
+    },
+    {
+      "cursor": 94,
+      "revision": 102,
+      "completedCount": 95000,
+      "remainingCount": 5000,
+      "durationMs": 10208
+    },
+    {
+      "cursor": 95,
+      "revision": 103,
+      "completedCount": 96000,
+      "remainingCount": 4000,
+      "durationMs": 10692
+    },
+    {
+      "cursor": 96,
+      "revision": 104,
+      "completedCount": 97000,
+      "remainingCount": 3000,
+      "durationMs": 10137
+    },
+    {
+      "cursor": 97,
+      "revision": 105,
+      "completedCount": 98000,
+      "remainingCount": 2000,
+      "durationMs": 9374
+    },
+    {
+      "cursor": 98,
+      "revision": 106,
+      "completedCount": 99000,
+      "remainingCount": 1000,
+      "durationMs": 9588
+    },
+    {
+      "cursor": 99,
+      "revision": 107,
+      "completedCount": 100000,
+      "remainingCount": 0,
+      "durationMs": 11111
+    }
+  ],
+  "scope": "Actual Node session/import/save and Rust reopening; this test does not measure Webview latency."
+}

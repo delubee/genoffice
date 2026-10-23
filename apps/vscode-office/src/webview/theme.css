@@ -1,0 +1,88 @@
+:root {
+  --surface: var(--vscode-editor-background);
+  --text: var(--vscode-editor-foreground);
+  --chrome: var(--vscode-sideBar-background);
+  --border: var(--vscode-panel-border);
+  --hover: var(--vscode-toolbar-hoverBackground);
+  --input: var(--vscode-input-background);
+  --error: var(--vscode-errorForeground);
+}
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+body {
+  background: var(--surface);
+  color: var(--text);
+  font: var(--vscode-font-size) var(--vscode-font-family);
+}
+.workbook-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.workbook-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px;
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border);
+}
+.workbook-toolbar button,
+.workbook-toolbar input,
+.workbook-toolbar select {
+  color: var(--text);
+  background: var(--input);
+  border: 1px solid var(--border);
+  padding: 4px 6px;
+  font: inherit;
+}
+.workbook-toolbar button:hover {
+  background: var(--hover);
+}
+.workbook-toolbar input {
+  width: 100px;
+}
+.workbook-content {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.workbook-grid {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+.workbook-charts {
+  width: min(34vw, 380px);
+  overflow: auto;
+  border-left: 1px solid var(--border);
+  background: var(--chrome);
+}
+.workbook-charts section {
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.workbook-charts svg {
+  width: 100%;
+}
+.workbook-charts input,
+.workbook-charts select,
+.workbook-charts button {
+  max-width: 100%;
+  color: var(--text);
+  background: var(--input);
+  border: 1px solid var(--border);
+  padding: 4px;
+  font: inherit;
+}
+.workbook-error {
+  padding: 6px;
+  color: var(--error);
+  background: var(--surface);
+}

@@ -3,14 +3,14 @@
 /// sorting, or moving a large range — journal every affected cell, so this
 /// must accommodate whole-sheet-scale edit sets. Shared by the zod save
 /// schema and the preload's hand-rolled validator (which stays zod-free).
-export const MAX_SAVE_EDITS = 1_000_000
+export { MAX_SAVE_EDITS } from '@genoffice/xlsx-gateway/shared/workbook-limits'
 
 /// Above this, the renderer stages edits through the chunked transfer
 /// instead of the inline request: live object graphs cross the context
 /// bridge property by property (~38s for a million edits measured on an M-
 /// series laptop), while the transfer's JSON-string chunks cross as flat
 /// strings in milliseconds.
-export const SAVE_EDITS_INLINE_MAX = 10_000
+export { SAVE_EDITS_INLINE_MAX } from '@genoffice/xlsx-gateway/shared/workbook-limits'
 
 /// Chunked save-edit transfer: the renderer uploads the edits as
 /// JSON-serialized slices of SAVE_EDITS_CHUNK_MAX edits (a flat string per
@@ -19,15 +19,15 @@ export const SAVE_EDITS_INLINE_MAX = 10_000
 /// absolute ceiling is MAX_SAVE_EDITS_TOTAL — roughly "one bulk action over
 /// an entire very large sheet"; past that the bottleneck is main-process
 /// memory, not transport.
-export const SAVE_EDITS_CHUNK_MAX = 100_000
-export const MAX_SAVE_EDITS_TOTAL = 10_000_000
+export { SAVE_EDITS_CHUNK_MAX } from '@genoffice/xlsx-gateway/shared/workbook-limits'
+export { MAX_SAVE_EDITS_TOTAL } from '@genoffice/xlsx-gateway/shared/workbook-limits'
 /// Byte-scale sanity cap on one serialized chunk (typical 100k-edit chunks
 /// serialize to ~10–20MB; styles and rich runs can grow them further).
-export const SAVE_EDITS_CHUNK_JSON_MAX = 256_000_000
+export { SAVE_EDITS_CHUNK_JSON_MAX } from '@genoffice/xlsx-gateway/shared/workbook-limits'
 
 /// Upper bound on one CSV export's serialized text (shared by the zod schema
 /// and the preload validator, like MAX_SAVE_EDITS above).
-export const MAX_CSV_EXPORT_CHARS = 64_000_000
+export { MAX_CSV_EXPORT_CHARS } from '@genoffice/xlsx-gateway/shared/workbook-limits'
 
 /// AI create_document caps (shared by the zod schema and the preload
 /// validator). xlsx/csv content carries a worksheet's serialized CSV and is
@@ -43,7 +43,7 @@ export const MAX_PDF_TEMPLATE_CHARS = 12_000_000
 
 /// VML shape id of a header/footer picture slot: left/center/right ×
 /// header/footer, with an EVEN or FIRST suffix for the page variants.
-export const HEADER_FOOTER_PICTURE_POSITION = /^[LCR][HF](EVEN|FIRST)?$/
+export { HEADER_FOOTER_PICTURE_POSITION } from '@genoffice/xlsx-gateway/shared/workbook-limits'
 
 export const IPC_CHANNELS = {
   selectWorkbook: 'workbook:select',
