@@ -19,6 +19,8 @@ import {
 } from './domain'
 import type { WorkbookSource } from './ports'
 import { logicalSheet } from './sheet-map'
+import { indexedFeatures } from './source-features'
+import { workbookMergeRangesResultSchema } from '@genoffice/xlsx-gateway/shared/workbook-protocol'
 
 const sourceCells = z.object({
   cells: z.array(
@@ -107,6 +109,8 @@ export async function readCurrentRange(input: {
   range: string
   signal?: AbortSignal
   limit?: number
+  /** Presentation includes merge geometry and off-page anchor values. */
+  includeMerges?: boolean
 }) {
   const { state, source } = input,
     sheet = logicalSheet(state, input.logicalSheetId),
@@ -241,5 +245,32 @@ export async function readCurrentRange(input: {
       )
     return { address, ...structuredClone(record), displayValue }
   })
-  return { stateId: state.stateId, logicalSheetId: sheet.id, range: input.range, cells }
+  const result = { stateId: state.stateId, logicalSheetId: sheet.id, range: input.range, cells }
+  if (!input.includeMerges) return result
+  const features = sheet.originalSheetId
+    ? await indexedFeatures(source, input.sessionId, sheet.originalSheetId, input.signal)
+    : { indexingComplete: true, merges: [] }
+  const { merges } = workbookMergeRangesResultSchema.parse({
+    indexingComplete: features.indexingComplete,
+    merges: features.merges ?? [],
+  })
+  // Coordinate-changing edits on merged sheets are rejected by the candidate
+  // interpreter. Source merge coordinates therefore remain current coordinates.
+  for (const merge of merges) {
+    if (
+      merge.startRow > bounds.endRow ||
+      merge.endRow < bounds.startRow ||
+      merge.startColumn > bounds.endColumn ||
+      merge.endColumn < bounds.startColumn
+    )
+      continue
+    if (merge.startRow >= bounds.startRow && merge.startColumn >= bounds.startColumn) continue
+    const anchor = await readCurrentRange({
+      ...input,
+      includeMerges: false,
+      range: formatAddress(merge.startRow, merge.startColumn),
+    })
+    cells.push(...anchor.cells)
+  }
+  return { ...result, merges }
 }

@@ -1,7 +1,7 @@
 import * as assert from 'node:assert/strict'
 import * as vscode from 'vscode'
 import { suite, test } from 'mocha'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile, realpath } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 
 suite('Product workspace skill commands', () => {
@@ -29,7 +29,7 @@ suite('Product workspace skill commands', () => {
       assert.equal(result!.status, 'installed')
       assert.equal(
         result!.targetDirectory,
-        join(root.fsPath, '.github', 'skills', 'genoffice-workbook'),
+        await realpath(join(root.fsPath, '.github', 'skills', 'genoffice-workbook')),
       )
       const status = await inspect()
       controlledDigest = status.currentDigest

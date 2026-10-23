@@ -1,4 +1,7 @@
 export const zh = {
+  appearance: '界面风格',
+  excelAppearance: 'Excel 风格',
+  vscodeAppearance: '跟随 VS Code',
   title: '工作簿',
   undo: '撤销',
   redo: '重做',

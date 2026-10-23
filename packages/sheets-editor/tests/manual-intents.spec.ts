@@ -254,3 +254,106 @@ test('basic formulas compute visibly after committed edits and update with their
     await page.evaluate(() => (window as any).toolbar.dispose())
   }
 })
+
+test('Excel style stays light and switching chrome preserves the current workbook', async ({
+  page,
+}) => {
+  await page.goto(base)
+  await page.evaluate(async () => {
+    document.body.classList.add('vscode-dark')
+    document.documentElement.style.setProperty('--vscode-editor-background', '#191919')
+    const { mountManualToolbar } = await import(
+      /* @vite-ignore */ String('/packages/sheets-editor/tests/fixtures/manual-toolbar.tsx')
+    )
+    ;(window as any).toolbar = await mountManualToolbar(true)
+  })
+  try {
+    const style = page.getByRole('combobox', { name: 'Interface style', exact: true })
+    await expect(style).toHaveValue('excel')
+    await page.waitForTimeout(350)
+    await page.screenshot({ path: test.info().outputPath('excel-style.png') })
+    expect(await page.evaluate(() => (window as any).toolbar.darkTheme())).toBe(false)
+    await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+    await page.evaluate(() => (window as any).toolbar.edit())
+    const before = await page.evaluate(() => (window as any).toolbar.snapshot())
+    await style.selectOption('vscode')
+    await expect.poll(() => page.evaluate(() => (window as any).toolbar.darkTheme())).toBe(true)
+    await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(25, 25, 25)')
+    await page.waitForTimeout(350)
+    await page.screenshot({ path: test.info().outputPath('vscode-style.png') })
+    expect(await page.evaluate(() => (window as any).toolbar.snapshot())).toEqual(before)
+    await page.evaluate(() => document.body.classList.replace('vscode-dark', 'vscode-light'))
+    await expect.poll(() => page.evaluate(() => (window as any).toolbar.darkTheme())).toBe(false)
+    await page.evaluate(() => document.body.classList.replace('vscode-light', 'vscode-dark'))
+    await expect.poll(() => page.evaluate(() => (window as any).toolbar.darkTheme())).toBe(true)
+    await style.selectOption('excel')
+    await expect.poll(() => page.evaluate(() => (window as any).toolbar.darkTheme())).toBe(false)
+    expect(await page.evaluate(() => (window as any).toolbar.snapshot())).toEqual(before)
+    await expect(page.getByRole('alert')).toHaveCount(0)
+  } finally {
+    await page.evaluate(() => (window as any).toolbar.dispose())
+  }
+})
+
+test('horizontal and vertical merges survive manual editing and projection replacement', async ({
+  page,
+}) => {
+  await page.goto(base)
+  await page.evaluate(async () => {
+    const { mountManualRuntime } = await import(
+      /* @vite-ignore */ String('/packages/sheets-editor/tests/fixtures/manual-runtime.ts')
+    )
+    ;(window as any).manual = await mountManualRuntime(true)
+  })
+  try {
+    const merges = await page.evaluate(() => (window as any).manual.merges())
+    expect(merges).toHaveLength(2)
+    expect(merges[0]).toMatchObject({ startRow: 0, endRow: 0, startColumn: 0, endColumn: 2 })
+    expect(merges[1]).toMatchObject({ startRow: 2, endRow: 4, startColumn: 0, endColumn: 0 })
+    await page.evaluate(() => (window as any).manual.editMerged())
+    expect(await page.evaluate(() => (window as any).manual.requested().operations)).toEqual([
+      { op: 'set_cell', sheetId: 'manual-sheet', address: 'A1', value: 900 },
+    ])
+    await page.evaluate(() => (window as any).manual.commit())
+    expect(await page.evaluate(() => (window as any).manual.value())).toBe(900)
+    expect(await page.evaluate(() => (window as any).manual.merges())).toEqual(merges)
+  } finally {
+    await page.evaluate(() => (window as any).manual.dispose())
+  }
+})
+
+test('typing into a merged selection forwards only the anchor', async ({ page }) => {
+  await page.goto(base)
+  await page.evaluate(async () => {
+    const { mountManualToolbar } = await import(
+      /* @vite-ignore */ String('/packages/sheets-editor/tests/fixtures/manual-toolbar.tsx')
+    )
+    ;(window as any).toolbar = await mountManualToolbar(false, true)
+  })
+  try {
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          [...document.querySelectorAll('canvas')].some(
+            (e) => e.getBoundingClientRect().height > 100,
+          ),
+        ),
+      )
+      .toBe(true)
+    expect(await page.evaluate(() => (window as any).toolbar.beginMergedEdit())).toBe(true)
+    await page.keyboard.press('ControlOrMeta+A')
+    await page.keyboard.type('Typed heading')
+    await page.keyboard.press('Enter')
+    await expect
+      .poll(() =>
+        page.evaluate(() => (window as any).toolbar.snapshot().sheets[0].cells.A1.rawValue),
+      )
+      .toBe('Typed heading')
+    expect(
+      await page.evaluate(() => (window as any).toolbar.snapshot().sheets[0].cells.B1.rawValue),
+    ).toBe('Sales')
+    await page.screenshot({ path: test.info().outputPath('merged-heading.png') })
+  } finally {
+    await page.evaluate(() => (window as any).toolbar.dispose())
+  }
+})

@@ -6,6 +6,26 @@
   --hover: var(--vscode-toolbar-hoverBackground);
   --input: var(--vscode-input-background);
   --error: var(--vscode-errorForeground);
+  --workbook-accent: var(--vscode-focusBorder);
+  --workbook-accent-text: var(--vscode-button-foreground);
+  --workbook-font: var(--vscode-font-family);
+  --workbook-font-size: var(--vscode-font-size);
+  color-scheme: light dark;
+}
+/* This palette changes interface chrome only; authored cells keep their colors. */
+:root[data-workbook-appearance='excel'] {
+  --surface: #ffffff;
+  --text: #242424;
+  --chrome: #f3f3f3;
+  --border: #d1d1d1;
+  --hover: #e5f1e9;
+  --input: #ffffff;
+  --error: #b42318;
+  --workbook-accent: #217346;
+  --workbook-accent-text: #ffffff;
+  --workbook-font: 'Segoe UI', Calibri, Arial, sans-serif;
+  --workbook-font-size: 13px;
+  color-scheme: light;
 }
 html,
 body,
@@ -18,7 +38,7 @@ body,
 body {
   background: var(--surface);
   color: var(--text);
-  font: var(--vscode-font-size) var(--vscode-font-family);
+  font: var(--workbook-font-size) var(--workbook-font);
 }
 .workbook-editor {
   display: flex;
@@ -85,4 +105,43 @@ body {
   padding: 6px;
   color: var(--error);
   background: var(--surface);
+}
+
+.workbook-appearance {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 8px;
+}
+:root[data-workbook-appearance='excel'] .workbook-toolbar {
+  padding: 10px 12px;
+  gap: 6px;
+  border-top: 4px solid var(--workbook-accent);
+}
+:root[data-workbook-appearance='excel'] .workbook-toolbar button,
+:root[data-workbook-appearance='excel'] .workbook-toolbar input,
+:root[data-workbook-appearance='excel'] .workbook-toolbar select {
+  border-radius: 3px;
+}
+.workbook-toolbar :focus-visible {
+  outline: 2px solid var(--workbook-accent);
+  outline-offset: 1px;
+}
+
+:root[data-workbook-appearance='vscode'] body.vscode-dark,
+:root[data-workbook-appearance='vscode'] body.vscode-high-contrast {
+  color-scheme: dark;
+}
+:root[data-workbook-appearance='vscode'] body.vscode-light,
+:root[data-workbook-appearance='vscode'] body.vscode-high-contrast-light {
+  color-scheme: light;
+}
+
+.workbook-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 12px;
+  color: var(--workbook-accent-text);
+  background: var(--workbook-accent);
 }

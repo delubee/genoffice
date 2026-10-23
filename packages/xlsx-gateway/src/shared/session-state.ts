@@ -130,6 +130,8 @@ export const protocolMessageSchema = z.strictObject({
     'view.flush',
     'view.selection',
     'view.presentation',
+    'appearance.change',
+    'appearance.changed',
     'view.intent',
     'candidate.prepare',
     'candidate.result',

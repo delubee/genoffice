@@ -19,6 +19,7 @@ interface PendingRequest {
 /** Pure reads a departing consumer can abandon; skipping a queued close (or
  * save) instead would leave its side effects permanently undone. */
 const CANCELLABLE_READS = new Set([
+  'read_merge_ranges',
   'read_range',
   'read_formula_cells',
   'read_row_outline',
@@ -84,6 +85,13 @@ export class XlsxSidecarClient {
     }
   }): Promise<unknown> {
     return this.request({ command: 'read_range', ...input })
+  }
+
+  async readMergeRanges(input: {
+    readonly sessionId: string
+    readonly sheetId: string
+  }): Promise<unknown> {
+    return this.request({ command: 'read_merge_ranges', ...input })
   }
 
   async readFormulaCells(input: {

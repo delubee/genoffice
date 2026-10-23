@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "vscode": "1.109.5",
+  "platform": "win32-x64",
+  "installedExtension": "E:\\github\\genoffice\\apps\\vscode-office\\.vscode-test\\package-proof-H5wXsN\\extensions\\genoffice.genoffice-workbook-0.1.0",
+  "savedReopenedValue": 731,
+  "nativeToolRead": true,
+  "skillInstalled": true,
+  "runtimeCargoPathRemoved": true,
+  "realModel": "unverified",
+  "vsixSha256": "3223b0b641bb541dd698f027bc5b481f612f50d38d77b16167e230c756a8c7c5",
+  "root": "E:\\github\\genoffice\\apps\\vscode-office\\.vscode-test\\package-proof-H5wXsN",
+  "checkedAt": "2026-10-23T01:59:01.314Z",
+  "finalNativeBackupErrorCount": 0
+}

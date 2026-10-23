@@ -32,6 +32,7 @@ async function context() {
 
 it('keeps the last confirmed backup when a newer backup is interrupted and verifies the complete feature root', async () => {
   const { directory, input, state } = await context()
+  await chmod(input.original.path, 0o400)
   state.sheets[0]!.features = { charts: [{ id: 'chart', data: [1, 2] }] }
   const first = await createRecoveryPoint(input)
   const modified = structuredClone(state)

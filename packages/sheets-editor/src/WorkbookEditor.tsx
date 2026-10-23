@@ -6,15 +6,20 @@ import type { WorkbookOperation } from '@genoffice/xlsx-gateway/domain/workbook-
 import { columnLabel } from '@genoffice/xlsx-gateway/domain/cell-address'
 import { BasicChart } from './BasicChart'
 import type { SheetVisual } from '@genoffice/xlsx-gateway/domain/chart-visual'
+import type { WorkbookAppearance } from './appearance'
 
 export function WorkbookEditor({
   host,
   onReady,
   locale,
+  appearance = 'vscode',
+  onAppearanceChange,
 }: {
   host: EditorHost
   onReady(runtime: WorkbookRuntime): void
   locale?: string
+  appearance?: WorkbookAppearance
+  onAppearanceChange?(appearance: WorkbookAppearance): void
 }) {
   const container = useRef<HTMLDivElement>(null),
     runtime = useRef<WorkbookRuntime | null>(null)
@@ -36,6 +41,7 @@ export function WorkbookEditor({
   const [charts, setCharts] = useState<readonly SheetVisual[]>([]),
     [chartType, setChartType] = useState<'column' | 'bar' | 'line' | 'pie'>('column')
   const text = editorText(locale)
+  const initialAppearance = useRef(appearance)
   useEffect(() => {
     const projection = new WorkbookRuntime(
       container.current!,
@@ -43,6 +49,7 @@ export function WorkbookEditor({
       (failure) => setError(failure instanceof Error ? failure.message : String(failure)),
       () => setCharts(runtime.current?.charts ?? []),
       locale,
+      initialAppearance.current,
     )
     runtime.current = projection
     onReady(projection)
@@ -51,6 +58,9 @@ export function WorkbookEditor({
       projection.dispose()
     }
   }, [host, onReady, locale])
+  useEffect(() => {
+    runtime.current?.setAppearance(appearance)
+  }, [appearance])
   const selected = () => {
     const selection = runtime.current?.selection
     if (!selection) throw new Error(text.selectFirst)
@@ -67,7 +77,26 @@ export function WorkbookEditor({
   }
   return (
     <section className="workbook-editor">
+      {onAppearanceChange && appearance === 'excel' && (
+        <div className="workbook-titlebar">
+          <strong>GenOffice</strong>
+          <span>{text.title}</span>
+        </div>
+      )}
       <div className="workbook-toolbar" role="toolbar" aria-label={text.title}>
+        {onAppearanceChange && (
+          <label className="workbook-appearance">
+            {text.appearance}
+            <select
+              aria-label={text.appearance}
+              value={appearance}
+              onChange={(event) => onAppearanceChange(event.target.value as WorkbookAppearance)}
+            >
+              <option value="excel">{text.excelAppearance}</option>
+              <option value="vscode">{text.vscodeAppearance}</option>
+            </select>
+          </label>
+        )}
         <button
           onClick={() => {
             void runtime.current

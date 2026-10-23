@@ -5021,3 +5021,44 @@ fn preserves_error_kind_separately_from_literal_error_text() {
     assert!(result.cells.iter().find(|cell| cell.column == 0).unwrap().is_error);
     assert!(!result.cells.iter().find(|cell| cell.column == 1).unwrap().is_error);
 }
+
+#[test]
+fn sheet_merge_ranges_include_offscreen_merges_without_cell_reads() {
+    let (_dir, path) = open_fixture(&[
+        (
+            "xl/workbook.xml",
+            r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Data" sheetId="1" r:id="rId1"/></sheets></workbook>"#,
+        ),
+        (
+            "xl/_rels/workbook.xml.rels",
+            r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#,
+        ),
+        (
+            "xl/worksheets/sheet1.xml",
+            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:AZ1002"/><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData><mergeCells count="2"><mergeCell ref="A1:C1"/><mergeCell ref="AX1000:AZ1002"/></mergeCells></worksheet>"#,
+        ),
+    ]);
+    let mut sessions = WorkbookSessions::new();
+    let metadata = sessions.open(&path).unwrap();
+    let sheet_id = &metadata.sheets[0].id;
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        let result = sessions
+            .read_merge_ranges(&metadata.session_id, sheet_id)
+            .unwrap();
+        if result.indexing_complete {
+            assert_eq!(result.merges.len(), 2);
+            assert_eq!(result.merges[1].start_row, 999);
+            assert_eq!(result.merges[1].end_column, 51);
+            break;
+        }
+        assert!(std::time::Instant::now() < deadline);
+        thread::sleep(Duration::from_millis(5));
+    }
+    assert!(sessions.read_merge_ranges("unknown", sheet_id).is_err());
+    assert!(
+        sessions
+            .read_merge_ranges(&metadata.session_id, "unknown")
+            .is_err()
+    );
+}

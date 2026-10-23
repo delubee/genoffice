@@ -1,3 +1,5 @@
+import { useState, useSyncExternalStore } from 'react'
+import { workbookAppearance, type WorkbookAppearance } from '@genoffice/sheets-editor/appearance'
 import { createRoot } from 'react-dom/client'
 import { WorkbookEditor } from '@genoffice/sheets-editor/WorkbookEditor'
 import { attachCandidateHandler, JsonBridge } from '@genoffice/sheets-editor/bridge'
@@ -80,9 +82,58 @@ bridge.handle('view.presentation', async (raw) => {
   return {
     stateId: runtime.selectionContext.stateId,
     values: runtime.projectedValues(request.range),
+    merges: runtime.projectedMerges(),
     visible: !document.hidden,
+    ...runtime.appearanceState,
   }
 })
+let currentAppearance = workbookAppearance(document.documentElement.dataset.workbookAppearance)
+const appearanceListeners = new Set<() => void>()
+function applyAppearance(appearance: WorkbookAppearance) {
+  currentAppearance = appearance
+  document.documentElement.dataset.workbookAppearance = appearance
+  for (const listener of appearanceListeners) listener()
+}
+bridge.handle('appearance.changed', (raw) => {
+  applyAppearance(workbookAppearance((raw as { appearance?: unknown }).appearance))
+  return { appearance: currentAppearance }
+})
+function StyledWorkbook(props: { onReady(runtime: WorkbookRuntime): void }) {
+  const appearance = useSyncExternalStore(
+    (listener) => {
+      appearanceListeners.add(listener)
+      return () => {
+        appearanceListeners.delete(listener)
+      }
+    },
+    () => currentAppearance,
+  )
+  const [error, setError] = useState('')
+  return (
+    <>
+      {error && (
+        <div className="workbook-error" role="alert">
+          {error}
+        </div>
+      )}
+      <WorkbookEditor
+        host={host}
+        locale={document.documentElement.lang || navigator.language}
+        onReady={props.onReady}
+        appearance={appearance}
+        onAppearanceChange={(value) => {
+          setError('')
+          void bridge
+            .request('appearance.change', { appearance: value })
+            .then((raw) => {
+              applyAppearance(workbookAppearance((raw as { appearance?: unknown }).appearance))
+            })
+            .catch((error) => setError(String(error)))
+        }}
+      />
+    </>
+  )
+}
 const root = createRoot(document.getElementById('root')!)
 void bridge
   .request('view.ready', {})
@@ -92,9 +143,7 @@ void bridge
       state: unknown
     }
     root.render(
-      <WorkbookEditor
-        host={host}
-        locale={document.documentElement.lang || navigator.language}
+      <StyledWorkbook
         onReady={(runtime) => {
           void runtime
             .install(descriptor.stateId, descriptor.revision, state)

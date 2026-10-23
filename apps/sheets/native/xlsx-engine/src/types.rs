@@ -731,6 +731,13 @@ pub struct RowOutlineResult {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct MergeRangesResult {
+    pub merges: Vec<MergedRange>,
+    pub indexing_complete: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FormulaCellsResult {
     /// Masters and ordinary formula cells only; shared-formula followers are
     /// described by `shared_groups`.

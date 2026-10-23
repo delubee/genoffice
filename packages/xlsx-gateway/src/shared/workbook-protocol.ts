@@ -919,6 +919,13 @@ const filterColumnStateSchema = z
     { message: 'A filter column needs values, a blank flag, or custom criteria.' },
   )
 
+export const workbookMergeRangesResultSchema = z
+  .object({
+    merges: z.array(cellAreaSchema).max(MAX_RANGE_CELLS),
+    indexingComplete: z.boolean(),
+  })
+  .strict()
+
 export const workbookRangeResultSchema = z
   .object({
     cells: z.array(workbookCellRecordSchema).max(MAX_RANGE_CELLS),

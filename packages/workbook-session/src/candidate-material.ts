@@ -8,10 +8,10 @@ import {
   parseRange,
   rangeCellCount,
 } from '@genoffice/xlsx-gateway/domain/cell-address'
-import { z } from 'zod'
 import { LIMITS, WorkbookError, assertNotCancelled, type WorkbookState } from './domain'
 import type { WorkbookSource } from './ports'
 import { readCurrentRange } from './read'
+import { indexedFeatures } from './source-features'
 import { workbookStateSchema } from './schemas'
 import type { SheetVisual } from '@genoffice/xlsx-gateway/domain/chart-visual'
 
@@ -23,39 +23,6 @@ const structural = new Set([
   'delete_sheet',
   'rename_sheet',
 ])
-const featuresSchema = z
-  .object({
-    indexingComplete: z.boolean(),
-    sheetProtection: z
-      .object({ protected: z.boolean().optional() })
-      .passthrough()
-      .nullable()
-      .optional(),
-  })
-  .passthrough()
-
-async function indexedFeatures(
-  source: WorkbookSource,
-  sessionId: string,
-  sheetId: string,
-  signal?: AbortSignal,
-) {
-  const deadline = Date.now() + 10_000
-  for (;;) {
-    assertNotCancelled(signal)
-    const features = featuresSchema.parse(await source.readFeatures(sessionId, sheetId))
-    if (features.indexingComplete) return features
-    if (Date.now() >= deadline)
-      throw new WorkbookError(
-        'index_pending',
-        'Wait for source indexing before editing; protection metadata is not complete yet.',
-        {},
-        true,
-      )
-    await new Promise((resolve) => setTimeout(resolve, 25))
-  }
-}
-
 /** Host-only materialization; the browser receives no paths or sidecar handles. */
 export async function prepareCandidateMaterial(input: {
   state: Readonly<WorkbookState>

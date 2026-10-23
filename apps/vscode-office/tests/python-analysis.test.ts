@@ -14,12 +14,12 @@ function run(executable: string, args: string[], signal?: AbortSignal) {
 }
 
 it('uses an existing standard-library Python interpreter and reports missing executables, script/dependency errors and cancellation without installing anything', async () => {
-  expect(
-    await run('python3', [
-      '-c',
-      'from decimal import Decimal; import json; print(json.dumps({"total":str(Decimal("100")+Decimal("20"))}))',
-    ]),
-  ).toEqual({ code: 0, output: '{"total": "120"}\n' })
+  const analysis = await run('python3', [
+    '-c',
+    'from decimal import Decimal; import json; print(json.dumps({"total":str(Decimal("100")+Decimal("20"))}))',
+  ])
+  expect(analysis.code).toBe(0)
+  expect(JSON.parse(analysis.output)).toEqual({ total: '120' })
   await expect(run('/no-such-genoffice-test-interpreter', [])).rejects.toMatchObject({
     code: 'ENOENT',
   })

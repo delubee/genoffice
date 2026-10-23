@@ -1,7 +1,7 @@
 {
   "name": "genoffice-workbook",
   "displayName": "GenOffice Workbook",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "private": true,
   "description": "Editable workbooks for VS Code and its native agent tools",
   "publisher": "genoffice",
@@ -1799,6 +1799,25 @@
           "additionalProperties": false
         }
       }
-    ]
+    ],
+    "configuration": {
+      "title": "GenOffice Workbook",
+      "properties": {
+        "genoffice.workbook.appearance": {
+          "type": "string",
+          "enum": [
+            "excel",
+            "vscode"
+          ],
+          "enumDescriptions": [
+            "Excel-style light interface with green accents.",
+            "Follow the current VS Code light, dark or high contrast theme."
+          ],
+          "default": "excel",
+          "scope": "resource",
+          "description": "Workbook interface style. Changes apply immediately without changing document formatting."
+        }
+      }
+    }
   }
 }

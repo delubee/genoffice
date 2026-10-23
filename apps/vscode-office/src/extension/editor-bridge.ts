@@ -73,6 +73,7 @@ export class WebviewCandidateBridge implements CandidateInterpreter {
         source: input.source,
         logicalSheetId: request.logicalSheetId,
         range: request.range,
+        includeMerges: true,
       })
     })
     this.bridge.handle('view.intent', async (raw) => {

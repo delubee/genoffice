@@ -1,5 +1,8 @@
 import type { zh } from './zh'
 export default {
+  appearance: 'Interface style',
+  excelAppearance: 'Excel style',
+  vscodeAppearance: 'Match VS Code',
   title: 'Workbook',
   undo: 'Undo',
   redo: 'Redo',

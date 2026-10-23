@@ -1,4 +1,4 @@
-import { formatAddress } from '@genoffice/xlsx-gateway/domain/cell-address'
+import { formatAddress, parseAddress } from '@genoffice/xlsx-gateway/domain/cell-address'
 import type { WorkbookOperation } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
 import type { GridRange } from './ports'
 import { workbookOperationSchema } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
@@ -71,6 +71,7 @@ export function manualStyleIntent(
 export function manualValueIntents(
   sheetId: string,
   input: { value: unknown; range?: GridRange },
+  merges: readonly GridRange[] = [],
 ): WorkbookOperation[] {
   const result: WorkbookOperation[] = []
   function cell(row: number, column: number, raw: unknown) {
@@ -129,5 +130,30 @@ export function manualValueIntents(
         cell(Number(row), Number(column), value)
   }
   if (!result.length) throw new Error('empty_edit_payload')
-  return result
+  // Univer expands a scalar edit across the merged selection. Only its anchor
+  // stores a value in Excel; forwarding the covered cells creates hidden data.
+  return result.filter((op) => {
+    if (!('address' in op)) return true
+    const point = parseAddress(op.address)
+    const merge = merges.find(
+      (merge) =>
+        point.row >= merge.startRow &&
+        point.row <= merge.endRow &&
+        point.column >= merge.startColumn &&
+        point.column <= merge.endColumn &&
+        (point.row !== merge.startRow || point.column !== merge.startColumn),
+    )
+    if (!merge) return true
+    const anchor = result.find(
+      (candidate) =>
+        'address' in candidate &&
+        candidate.address === formatAddress(merge.startRow, merge.startColumn),
+    )
+    if (
+      !anchor ||
+      JSON.stringify({ ...op, address: '' }) !== JSON.stringify({ ...anchor, address: '' })
+    )
+      throw new Error('merged_cell_target: edit the merged cell from its top-left anchor')
+    return false
+  })
 }

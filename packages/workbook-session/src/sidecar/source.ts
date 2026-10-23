@@ -3,6 +3,7 @@ import {
   workbookFileSchema,
   workbookRangeRequestSchema,
   workbookRangeResultSchema,
+  workbookMergeRangesResultSchema,
 } from '@genoffice/xlsx-gateway/shared/workbook-protocol'
 import type { WorkbookSource } from '../ports'
 import { WorkbookError } from '../domain'
@@ -12,6 +13,10 @@ import { XlsxSidecarClient } from './client'
 export class SidecarWorkbookSource implements WorkbookSource {
   private features = new Map<string, Record<string, unknown>>()
   private metadata = new Map<string, ReturnType<typeof workbookFileSchema.parse>>()
+  private mergeFeatures = new Map<
+    string,
+    ReturnType<typeof workbookMergeRangesResultSchema.parse>
+  >()
   constructor(readonly client: XlsxSidecarClient) {}
   async openSnapshot(path: string) {
     const metadata = workbookFileSchema
@@ -58,8 +63,20 @@ export class SidecarWorkbookSource implements WorkbookSource {
           }),
         ),
       )
+    if (!this.mergeFeatures.get(key)?.indexingComplete)
+      this.mergeFeatures.set(
+        key,
+        workbookMergeRangesResultSchema.parse(
+          await this.client.readMergeRanges({ sessionId, sheetId }),
+        ),
+      )
+    const mergeFeatures = this.mergeFeatures.get(key)!
     return {
       ...this.features.get(key),
+      ...mergeFeatures,
+      indexingComplete: Boolean(
+        this.features.get(key)?.indexingComplete && mergeFeatures.indexingComplete,
+      ),
       sheet,
       styles: file.styles,
       nativeVisuals: file.visuals.filter((visual) => visual.sheetId === sheetId),
@@ -96,6 +113,8 @@ export class SidecarWorkbookSource implements WorkbookSource {
       this.metadata.delete(sessionId)
       for (const key of this.features.keys())
         if (key.startsWith(`${sessionId}:`)) this.features.delete(key)
+      for (const key of this.mergeFeatures.keys())
+        if (key.startsWith(`${sessionId}:`)) this.mergeFeatures.delete(key)
     }
   }
 }

@@ -2,10 +2,11 @@ import { WorkbookRuntime } from '../../src/runtime'
 import { workbookStateSchema } from '@genoffice/xlsx-gateway/shared/session-state'
 import { computeCandidateState } from '@genoffice/xlsx-gateway/domain/session-candidate'
 import { ICommandService } from '@univerjs/core'
-export async function mountManualRuntime() {
+export async function mountManualRuntime(merged = false) {
   const container = document.createElement('div')
   container.style.width = '100vw'
   container.style.height = '600px'
+  container.style.position = 'relative'
   document.body.append(container)
   let state = workbookStateSchema.parse({
     schemaVersion: 1,
@@ -18,6 +19,14 @@ export async function mountManualRuntime() {
         rows: 10,
         columns: 5,
         cells: { A1: { kind: 'number', rawValue: 123 } },
+        features: merged
+          ? {
+              merges: [
+                { startRow: 0, endRow: 0, startColumn: 0, endColumn: 2 },
+                { startRow: 2, endRow: 4, startColumn: 0, endColumn: 0 },
+              ],
+            }
+          : {},
       },
     ],
   })
@@ -29,6 +38,7 @@ export async function mountManualRuntime() {
     {
       async read() {
         return {
+          merges: state.sheets[0]!.features?.merges ?? [],
           cells: Object.entries(state.sheets[0]!.cells).map(([address, cell]) => ({
             address,
             ...cell,
@@ -54,6 +64,19 @@ export async function mountManualRuntime() {
   const facade = (runtime as unknown as { runtime: { univerAPI: any } }).runtime.univerAPI
   return {
     value: () => facade.getActiveWorkbook().getActiveSheet().getRange('A1').getValue(),
+    merges: () =>
+      facade
+        .getActiveWorkbook()
+        .getActiveSheet()
+        .getMergedRanges()
+        .map((range: any) => range.getRange()),
+    editMerged() {
+      try {
+        facade.getActiveWorkbook().getActiveSheet().getRange('A1:C1').setValue(900)
+      } catch (error) {
+        if (!String(error).includes('manual_intent_forwarded')) throw error
+      }
+    },
     mutateDirectly() {
       const service = (runtime as any).runtime.univer.__getInjector().get(ICommandService)
       return service.syncExecuteCommand('sheet.mutation.set-range-values', {

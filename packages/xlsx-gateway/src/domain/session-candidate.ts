@@ -18,6 +18,7 @@ import { refreshChartReferences } from './session-chart-references'
 import { stateChangeset, type CandidateState } from '../shared/session-changeset'
 import { copySessionRange } from './session-range-copy'
 import { SESSION_OPERATION_NAMES, hasMixedSessionOperations } from '../shared/session-operations'
+import { assertMergeOperation } from './session-merges'
 
 type TypedCell = z.infer<typeof cellRecordSchema>
 export interface CandidateMaterial {
@@ -229,6 +230,7 @@ export async function computeCandidateState(
     if (target && !material.writableSheetIds.includes(target.id))
       throw new Error('unverified_writable_target')
     if (permissions?.readOnly || permissions?.protected) throw new Error('protected_target')
+    assertMergeOperation(current, op)
     if (
       op.op === 'delete_sheet' &&
       book.sheets.some((sheet) =>

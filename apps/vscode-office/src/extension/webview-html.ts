@@ -8,6 +8,7 @@ export function workbookHtml(input: {
   cspSource: string
   language: string
   sessionId: string
+  appearance?: 'excel' | 'vscode'
   resource(path: string): string
 }) {
   if (!/^[A-Za-z0-9+/=]+$/.test(input.nonce) || !/^[A-Za-z0-9-]+$/.test(input.sessionId))
@@ -26,7 +27,7 @@ export function workbookHtml(input: {
     })
     .replace(
       '<html ',
-      `<html lang="${input.language.replace(/[^a-zA-Z0-9-]/g, '')}" data-session-id="${input.sessionId}" `,
+      `<html lang="${input.language.replace(/[^a-zA-Z0-9-]/g, '')}" data-session-id="${input.sessionId}" data-workbook-appearance="${input.appearance === 'vscode' ? 'vscode' : 'excel'}" `,
     )
     .replace('<head>', `<head><meta http-equiv="Content-Security-Policy" content="${csp}">`)
     .replace(/<script /g, `<script nonce="${input.nonce}" `)

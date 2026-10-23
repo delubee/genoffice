@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, join, relative } from 'node:path'
 import { readFile, realpath, rm, stat, readdir } from 'node:fs/promises'
 import { z } from 'zod'
 import { FileResourceStore, resourceManifestSchema } from './store'
@@ -36,7 +36,16 @@ export async function publishRecoverySlot(input: {
   const storage = await realpath(input.storageDirectory)
   const name = input.slotPath ? basename(input.slotPath, '.json') : `backup-slot-${randomUUID()}`
   const path = join(storage, 'manifests', `${name}.json`)
-  if (!namePattern.test(name) || (input.slotPath && input.slotPath !== path))
+  if (
+    !namePattern.test(name) ||
+    (input.slotPath &&
+      (relative(path, input.slotPath) !== '' ||
+        (await realpath(input.slotPath).catch(async (error: NodeJS.ErrnoException) => {
+          if (error.code !== 'ENOENT') throw error
+          // VS Code retires a clean document's backup before it is edited again.
+          return join(await realpath(dirname(input.slotPath!)), basename(input.slotPath!))
+        })) !== path))
+  )
     throw new WorkbookError('recovery_invalid', 'The backup slot is outside extension storage.')
   const store = await FileResourceStore.create(storage)
   const generation = randomUUID()
@@ -108,7 +117,12 @@ export async function readRecoverySlot(input: {
 
 /** Lists only small private metadata; full copies are verified when selected. */
 export async function listRecoverySlots(storageDirectory: string) {
-  const directory = join(storageDirectory, 'manifests')
+  const storage = await realpath(storageDirectory).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === 'ENOENT') return undefined
+    throw error
+  })
+  if (!storage) return []
+  const directory = join(storage, 'manifests')
   const entries = await readdir(directory).catch((error: NodeJS.ErrnoException) => {
     if (error.code === 'ENOENT') return []
     throw error

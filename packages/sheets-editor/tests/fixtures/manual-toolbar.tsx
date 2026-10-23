@@ -1,4 +1,6 @@
 import { createRoot } from 'react-dom/client'
+import { useState } from 'react'
+import type { WorkbookAppearance } from '../../src/appearance'
 import { WorkbookEditor } from '../../src/WorkbookEditor'
 import type { WorkbookRuntime } from '../../src/runtime'
 import {
@@ -11,7 +13,7 @@ import '../../../../apps/vscode-office/src/webview/theme.css'
 import { ThemeService } from '@univerjs/core'
 
 /** In-memory authority for UI tests; native sidecar/save are tested separately. */
-export async function mountManualToolbar() {
+export async function mountManualToolbar(appearanceControls = false, merged = false) {
   let state = workbookStateSchema.parse({
       schemaVersion: 1,
       stateId: 'toolbar-before',
@@ -30,6 +32,9 @@ export async function mountManualToolbar() {
             A3: { kind: 'string', rawValue: 'South' },
             B3: { kind: 'number', rawValue: -30 },
           },
+          features: merged
+            ? { merges: [{ startRow: 0, startColumn: 0, endRow: 0, endColumn: 1 }] }
+            : {},
         },
       ],
     }),
@@ -38,6 +43,7 @@ export async function mountManualToolbar() {
   const host: EditorHost = {
     async read(sheetId) {
       return {
+        merges: state.sheets.find((sheet) => sheet.id === sheetId)!.features?.merges ?? [],
         cells: Object.entries(state.sheets.find((sheet) => sheet.id === sheetId)!.cells).map(
           ([address, cell]) => ({ address, ...cell }),
         ),
@@ -76,20 +82,41 @@ export async function mountManualToolbar() {
     },
   }
   const root = createRoot(document.body)
-  await new Promise<void>((resolve, reject) =>
-    root.render(
-      <WorkbookEditor
-        host={host}
-        locale="en"
-        onReady={(runtime) => {
-          projection = runtime
-          void runtime.install(state.stateId, revision, state).then(resolve, reject)
-        }}
-      />,
-    ),
-  )
+  if (appearanceControls) document.documentElement.dataset.workbookAppearance = 'excel'
+  await new Promise<void>((resolve, reject) => {
+    const onReady = (runtime: WorkbookRuntime) => {
+      projection = runtime
+      void runtime.install(state.stateId, revision, state).then(resolve, reject)
+    }
+    function Fixture() {
+      const [appearance, setAppearance] = useState<WorkbookAppearance>('excel')
+      return (
+        <WorkbookEditor
+          host={host}
+          locale="en"
+          onReady={onReady}
+          appearance={appearanceControls ? appearance : 'vscode'}
+          onAppearanceChange={
+            appearanceControls
+              ? (value) => {
+                  document.documentElement.dataset.workbookAppearance = value
+                  setAppearance(value)
+                }
+              : undefined
+          }
+        />
+      )
+    }
+    root.render(<Fixture />)
+  })
   const facade = (projection! as unknown as { runtime: { univerAPI: any } }).runtime.univerAPI
   return {
+    beginMergedEdit() {
+      const book = facade.getActiveWorkbook()
+      const sheet = book.getActiveSheet()
+      sheet.setActiveRange(sheet.getRange('A1:B1'))
+      return book.startEditing()
+    },
     select(range: string) {
       const sheet = facade.getActiveWorkbook().getActiveSheet()
       sheet.setActiveRange(sheet.getRange(range))

@@ -6,10 +6,12 @@ import {
   RedoCommandId,
   IUniverInstanceService,
   LocaleType,
+  ThemeService,
   type ICellData,
   type IWorkbookData,
 } from '@univerjs/core'
 import { UniverSheetsCorePreset } from '@univerjs/preset-sheets-core'
+import { AddWorksheetMergeMutation } from '@univerjs/sheets'
 import enUS from '@univerjs/preset-sheets-core/locales/en-US'
 import zhCN from '@univerjs/preset-sheets-core/locales/zh-CN'
 import zhTW from '@univerjs/preset-sheets-core/locales/zh-TW'
@@ -29,6 +31,7 @@ import { manualStyleIntent, manualValueIntents } from './manual-intents'
 import { gridCell, type ViewCell } from './grid-cell'
 import { requestHostHistory } from './history-bridge'
 import type { SheetVisual } from '@genoffice/xlsx-gateway/domain/chart-visual'
+import type { WorkbookAppearance } from './appearance'
 
 export class WorkbookRuntime implements EditorProjection {
   private runtime: ReturnType<typeof createUniver>
@@ -47,12 +50,14 @@ export class WorkbookRuntime implements EditorProjection {
   private loadTimer: ReturnType<typeof setTimeout> | undefined
   private themeObserver: MutationObserver
   private systemTheme = matchMedia('(prefers-color-scheme: dark)')
+  private baseTheme!: ReturnType<ThemeService['getCurrentTheme']>
   constructor(
     private readonly container: HTMLElement,
     private readonly host: EditorHost,
     private readonly report: (error: unknown) => void,
     private readonly changed: () => void = () => {},
     locale = navigator.language,
+    private appearance: WorkbookAppearance = 'vscode',
   ) {
     this.runtime = createUniver({
       locale: /^zh[-_](TW|HK|MO|Hant)/i.test(locale)
@@ -73,6 +78,8 @@ export class WorkbookRuntime implements EditorProjection {
         }),
       ],
     })
+    this.baseTheme = this.runtime.univer.__getInjector().get(ThemeService).getCurrentTheme()
+    this.setAppearance(appearance)
     this.themeObserver = new MutationObserver(this.updateTheme)
     this.themeObserver.observe(document.body, {
       attributes: true,
@@ -145,10 +152,14 @@ export class WorkbookRuntime implements EditorProjection {
             !this.state?.sheets.some((candidate) => candidate.id === targetSheetId)
           )
             throw new Error('invalid_manual_target')
-          const operations = manualValueIntents(targetSheetId, {
-            ...params,
-            range: params.range ?? sheet.getActiveRange()?.getRange(),
-          })
+          const operations = manualValueIntents(
+            targetSheetId,
+            {
+              ...params,
+              range: params.range ?? sheet.getActiveRange()?.getRange(),
+            },
+            workbook!.getSheetBySheetId(targetSheetId)!.getSheet().getMergeData(),
+          )
           void this.enqueue(operations).catch(this.report)
           throw new Error('manual_intent_forwarded')
         }
@@ -193,6 +204,7 @@ export class WorkbookRuntime implements EditorProjection {
     this.composing = true
   }
   private darkTheme() {
+    if (this.appearance === 'excel') return false
     const classes = document.body.classList
     if (classes.contains('vscode-dark') || classes.contains('vscode-high-contrast')) return true
     if (classes.contains('vscode-light') || classes.contains('vscode-high-contrast-light'))
@@ -201,6 +213,29 @@ export class WorkbookRuntime implements EditorProjection {
   }
   private updateTheme = () => {
     this.runtime.univerAPI.toggleDarkMode(this.darkTheme())
+  }
+  setAppearance(appearance: WorkbookAppearance) {
+    this.appearance = appearance
+    const service = this.runtime.univer.__getInjector().get(ThemeService)
+    const accent = getComputedStyle(this.container).getPropertyValue('--workbook-accent').trim()
+    service.setTheme(
+      appearance === 'excel'
+        ? {
+            ...this.baseTheme,
+            primary: {
+              ...this.baseTheme.green,
+              ...(accent ? { 500: accent, 600: accent, 700: accent } : {}),
+            },
+          }
+        : this.baseTheme,
+    )
+    this.updateTheme()
+  }
+  get appearanceState() {
+    return {
+      appearance: this.appearance,
+      darkMode: this.runtime.univer.__getInjector().get(ThemeService).darkMode,
+    }
   }
   private onCompositionEnd = () => {
     this.composing = false
@@ -296,12 +331,13 @@ export class WorkbookRuntime implements EditorProjection {
     }
     const key = `${state.stateId}:${sheet.getSheetId()}:${startRow}:${startColumn}`
     if (this.loaded.has(key)) return
-    let result: { cells: ViewCell[] }
+    let result: { cells: ViewCell[]; merges?: GridRange[] }
     const started = Date.now()
     for (;;) {
       try {
         result = (await this.host.read(sheet.getSheetId(), range, state.stateId)) as {
           cells: ViewCell[]
+          merges?: GridRange[]
         }
         break
       } catch (error) {
@@ -328,12 +364,34 @@ export class WorkbookRuntime implements EditorProjection {
     }
     this.internal++
     try {
+      const mergeKey = (merge: GridRange) =>
+        [merge.startRow, merge.startColumn, merge.endRow, merge.endColumn].join(':')
+      const installed = new Set(sheet.getSheet().getMergeData().map(mergeKey))
+      const merges = (result.merges ?? []).filter((merge) => !installed.has(mergeKey(merge)))
+      if (merges.length)
+        this.runtime.univer
+          .__getInjector()
+          .get(ICommandService)
+          .syncExecuteCommand(AddWorksheetMergeMutation.id, {
+            unitId: sheet.getWorkbook().getUnitId(),
+            subUnitId: sheet.getSheetId(),
+            ranges: merges,
+          })
+      // Include off-page anchors without expanding a sparse page to the grid.
+      const startRow = Math.min(
+        range.startRow,
+        ...result.cells.map((cell) => parseAddress(cell.address).row),
+      )
+      const startColumn = Math.min(
+        range.startColumn,
+        ...result.cells.map((cell) => parseAddress(cell.address).column),
+      )
       sheet
         .getRange(
-          range.startRow,
-          range.startColumn,
-          range.endRow - range.startRow + 1,
-          range.endColumn - range.startColumn + 1,
+          startRow,
+          startColumn,
+          range.endRow - startRow + 1,
+          range.endColumn - startColumn + 1,
         )
         .setValues(cells)
       this.loaded.add(key)
@@ -367,6 +425,12 @@ export class WorkbookRuntime implements EditorProjection {
     }
   }
   /** Read the installed grid projection for presentation verification. */
+  projectedMerges() {
+    return (
+      this.runtime.univerAPI.getActiveWorkbook()?.getActiveSheet()?.getSheet().getMergeData() ?? []
+    )
+  }
+
   projectedValues(range: string) {
     if (rangeCellCount(parseRange(range)) > 2000) throw new Error('presentation_range_limit')
     return this.runtime.univerAPI

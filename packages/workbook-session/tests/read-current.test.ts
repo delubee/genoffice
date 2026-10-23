@@ -109,3 +109,36 @@ it('maps coordinates through structure and refuses unreadable sources instead of
     }),
   ).rejects.toThrow('2000')
 })
+
+it('projects complete merge geometry and current off-page anchors without mutating state', async () => {
+  const current = structuredClone(state)
+  current.sheets[0]!.cells.A1 = { kind: 'string', rawValue: 'Edited merged heading' }
+  const merges = [{ startRow: 0, endRow: 2, startColumn: 0, endColumn: 2 }]
+  const mergedSource = {
+    ...source,
+    async readFeatures() {
+      return { indexingComplete: true, styles: [], merges }
+    },
+  }
+  const before = JSON.stringify(current)
+  const view = await readCurrentRange({
+    state: current,
+    sessionId: 'source',
+    source: mergedSource,
+    logicalSheetId: sheetId,
+    range: 'B2:C3',
+    includeMerges: true,
+  })
+  expect(view).toHaveProperty('merges', merges)
+  expect(view.cells.find((cell) => cell.address === 'A1')?.rawValue).toBe('Edited merged heading')
+  expect(JSON.stringify(current)).toBe(before)
+  const ordinary = await readCurrentRange({
+    state: current,
+    sessionId: 'source',
+    source: mergedSource,
+    logicalSheetId: sheetId,
+    range: 'B2:C3',
+  })
+  expect(ordinary.cells).toHaveLength(4)
+  expect(ordinary).not.toHaveProperty('merges')
+})

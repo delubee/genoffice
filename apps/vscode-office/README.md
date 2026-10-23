@@ -6,7 +6,17 @@ Preview extension for manual and agent editing of `.xlsx` workbooks. Documents u
 
 Install the VSIX matching the **extension host**: Linux x64, Windows x64 or macOS arm64. In Remote SSH, install it on the remote host. Use **Extensions → Install from VSIX**, trust the workspace, and open an XLSX with **Open With → GenOffice Workbook** or **GenOffice: Open Workbook**. Unsupported host architectures, virtual workspaces and browser-only VS Code are rejected.
 
-Linux x64 is locally verified. Windows 11 x64, macOS 14 arm64 and actual Remote SSH acceptance remain unverified. See [implementation status](IMPLEMENTATION-STATUS.md) in the source repository and `test-results/` for exact evidence. This preview is not a release candidate.
+Linux x64 and Windows 11 x64 are locally verified. macOS 14 arm64 and actual Remote SSH acceptance remain unverified. See [implementation status](IMPLEMENTATION-STATUS.md) in the source repository and `test-results/` for exact evidence. This preview is not a release candidate.
+
+## Interface style
+
+Version 0.1.1 defaults to **Excel style**: a light interface with green accents.
+Use the **Interface style** selector in the workbook toolbar to choose **Match
+VS Code** instead. The choice is saved for the workspace and applies to open
+workbooks immediately. It is also available in Settings as
+`genoffice.workbook.appearance` (`excel` or `vscode`). Changing it preserves
+unsaved content, document formatting and undo history. Match VS Code follows
+light, dark and high contrast themes; Excel style stays light.
 
 ## Manual and AI edits
 
@@ -18,6 +28,15 @@ The editor supports values, formulas, basic formats, typed copy/fill, worksheet/
 4. Use **GenOffice: Workbook Skill Status** to inspect local registration; it cannot verify tool enablement for a particular conversation.
 
 Eight tools: `genoffice_workbook_context`, `_read`, `_aggregate`, `_apply`, `_operationStatus`, `_export`, `_prepareImport`, `_applyImport` (each suffix uses the `genoffice_workbook` prefix). Explicit URI or binding determines the target; changing editor focus never retargets a running task.
+
+### Existing merged cells
+
+Version 0.1.2 displays horizontal and vertical merges from the original XLSX,
+including regions outside the initial viewport. Manual input stores the value
+in the top-left anchor. Agent edits and Python imports must also target that
+anchor; writes to covered cells are rejected. Save and reopen preserve merges.
+Creating/unmerging cells, copying/filling merged ranges and changing row/column
+structure in workbooks containing merges are not supported in this preview.
 
 ## Optional skill and Python
 

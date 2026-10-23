@@ -49,7 +49,9 @@ export async function createRecoveryPoint(input: {
   try {
     const basePath = join(directory, 'base.xlsx')
     await copyFile(input.original.path, basePath)
-    const baseHandle = await open(basePath, 'r')
+    // Windows requires write access for FlushFileBuffers; copied sources may be read-only.
+    await chmod(basePath, 0o600)
+    const baseHandle = await open(basePath, 'r+')
     try {
       await baseHandle.sync()
     } finally {

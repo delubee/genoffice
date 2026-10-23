@@ -18,6 +18,7 @@ import { WorkbookSnapshots } from '@genoffice/workbook-session/exchange/snapshot
 import { WorkbookImports } from '@genoffice/workbook-session/exchange/import-plan'
 import { checkNative } from '../../scripts/native-resource.mjs'
 import { workbookHtml } from './webview-html'
+import { workbookAppearance } from '@genoffice/sheets-editor/appearance'
 export const EDITOR_ID = 'genoffice.workbook'
 
 export class WorkbookEditorProvider
@@ -205,15 +206,45 @@ export class WorkbookEditorProvider
     panel.webview.options = { enableScripts: true, localResourceRoots: [root] }
     this.panelDetach.get(panel)?.()
     this.panelDetach.set(panel, document.attach(panel.webview))
+    const configuration = () =>
+      vscode.workspace.getConfiguration('genoffice.workbook', document.uri)
+    document.bridge!.handle('appearance.change', async (raw) => {
+      const value = (raw as { appearance?: unknown })?.appearance
+      if (value !== 'excel' && value !== 'vscode') throw new Error('Invalid workbook appearance.')
+      await configuration().update(
+        'appearance',
+        value,
+        vscode.workspace.getWorkspaceFolder(document.uri)
+          ? vscode.ConfigurationTarget.WorkspaceFolder
+          : vscode.ConfigurationTarget.Global,
+      )
+      return { appearance: workbookAppearance(configuration().get('appearance')) }
+    })
+    const appearanceSubscription = vscode.workspace.onDidChangeConfiguration((event) => {
+      if (
+        event.affectsConfiguration('genoffice.workbook.appearance', document.uri) &&
+        !document.isClosed
+      )
+        void document.bridge
+          ?.request('appearance.changed', {
+            appearance: workbookAppearance(configuration().get('appearance')),
+          })
+          .catch((error) => this.output.appendLine(String(error)))
+    })
+    const previousSubscription = this.panelSubscriptions.get(panel)
+    if (previousSubscription) appearanceSubscription.dispose()
     if (!this.panelSubscriptions.has(panel))
       this.panelSubscriptions.set(
         panel,
-        panel.onDidDispose(() => {
-          this.panelDetach.get(panel)?.()
-          this.panelDetach.delete(panel)
-          this.panelSubscriptions.delete(panel)
-          this.panels.delete(document)
-        }),
+        vscode.Disposable.from(
+          appearanceSubscription,
+          panel.onDidDispose(() => {
+            this.panelDetach.get(panel)?.()
+            this.panelDetach.delete(panel)
+            this.panelSubscriptions.delete(panel)
+            this.panels.delete(document)
+          }),
+        ),
       )
     panel.webview.html = await this.html(document, panel.webview, root)
     if (this.recoveredWithoutNativeContext.delete(document)) this.changes.fire({ document })
@@ -228,6 +259,9 @@ export class WorkbookEditorProvider
       cspSource: webview.cspSource,
       language: vscode.env.language,
       sessionId: document.sessionId,
+      appearance: workbookAppearance(
+        vscode.workspace.getConfiguration('genoffice.workbook', document.uri).get('appearance'),
+      ),
       resource: (path) => webview.asWebviewUri(vscode.Uri.file(path)).toString(),
     })
   }

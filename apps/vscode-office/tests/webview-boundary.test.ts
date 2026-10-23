@@ -21,6 +21,10 @@ it('renders only packaged assets with nonce CSP and escaped locale', () => {
   expect(html).toContain("script-src 'nonce-abc123'")
   expect(html).toContain('<script nonce="abc123"')
   expect(html).not.toContain('onload="bad')
+  expect(html).toContain('data-workbook-appearance="excel"')
+  expect(
+    workbookHtml({ ...options, html: '<html lang="en"><head></head>', appearance: 'vscode' }),
+  ).toContain('data-workbook-appearance="vscode"')
 })
 it('rejects escaping and network resources and invalid session attributes', () => {
   for (const path of [

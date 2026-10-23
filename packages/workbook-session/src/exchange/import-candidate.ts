@@ -6,6 +6,7 @@ import {
   rangeAddresses,
 } from '@genoffice/xlsx-gateway/domain/cell-address'
 import { computeCandidateState } from '@genoffice/xlsx-gateway/domain/session-candidate'
+import { assertMergeOperation } from '@genoffice/xlsx-gateway/domain/session-merges'
 import { stateChangeset } from '@genoffice/xlsx-gateway/shared/session-changeset'
 import type { WorkbookOperation } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
 import {
@@ -123,6 +124,8 @@ export async function prepareImportCandidate(input: {
   })
   if (!material.writableSheetIds.includes(sheetId))
     throw new WorkbookError('protected_target', 'The prepared import target is not editable.')
+  for (const operation of importValueOperations(batch, sheetId))
+    assertMergeOperation(material.state, operation)
   const next = structuredClone(current),
     sheet = next.sheets.find((item) => item.id === sheetId)!
   next.stateId = material.allocation.stateId

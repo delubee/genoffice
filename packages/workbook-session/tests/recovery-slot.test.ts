@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createRecoveryPoint } from '../src/recovery'
-import { publishRecoverySlot, readRecoverySlot } from '../src/recovery-slot'
+import { publishRecoverySlot, readRecoverySlot, listRecoverySlots } from '../src/recovery-slot'
 import { initialState } from '../src/state'
 import { hashFile } from '../src/resources'
 import { useSessionTestResources } from './helpers'
@@ -28,12 +28,30 @@ it('resolves an old native ID to the newest confirmed root and ignores deletion 
   const changed = structuredClone(state)
   changed.stateId = 'changed-root'
   changed.sheets[0]!.cells.A1 = { kind: 'number', rawValue: 101 }
+  const nativePath = (path: string) =>
+    process.platform === 'win32'
+      ? path.replace(
+          /^([a-z]):/i,
+          (_match, drive: string) =>
+            `${drive === drive.toUpperCase() ? drive.toLowerCase() : drive.toUpperCase()}:`,
+        )
+      : path
   const second = await publishRecoverySlot({
     ...input,
-    slotPath: first.path,
+    slotPath: nativePath(first.path),
     point: await createRecoveryPoint({ ...input, state: changed }),
   })
   expect(second.path).toBe(first.path)
+  expect((await listRecoverySlots(nativePath(directory))).map((slot) => slot.path)).toContain(
+    first.path,
+  )
+  await expect(
+    publishRecoverySlot({
+      ...input,
+      slotPath: join(directory, 'outside', first.path.split(/[\\/]/).at(-1)!),
+      point: { manifestPath: '', manifestHash: '', dispose: async () => {} },
+    }),
+  ).rejects.toMatchObject({ code: 'recovery_invalid' })
   await first.dispose()
   const read = () =>
     readRecoverySlot({
@@ -51,4 +69,12 @@ it('resolves an old native ID to the newest confirmed root and ignores deletion 
   ).rejects.toMatchObject({ code: 'recovery_invalid' })
   await second.dispose()
   await expect(read()).rejects.toMatchObject({ code: 'recovery_invalid' })
+  const afterSave = await publishRecoverySlot({
+    ...input,
+    slotPath: nativePath(first.path),
+    point: await createRecoveryPoint({ ...input, state: changed }),
+  })
+  expect(afterSave.path).toBe(first.path)
+  expect((await read()).state).toEqual(changed)
+  await afterSave.dispose()
 })
