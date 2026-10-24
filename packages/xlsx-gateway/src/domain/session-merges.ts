@@ -61,7 +61,7 @@ const contains = (a: Area, b: Area) =>
 
 /** Manual, agent and import candidates obey the same current merge geometry. */
 export function assertMergeOperation(
-  state: { sheets: readonly { id: string; features?: Record<string, unknown> }[] },
+  state: { sheets: readonly { id: string; features?: Record<string, unknown> | undefined }[] },
   op: WorkbookOperation,
 ) {
   if (!('sheetId' in op)) return

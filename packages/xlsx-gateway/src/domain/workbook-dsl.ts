@@ -1865,7 +1865,7 @@ export function expandToPrimitiveOps(
           byColumn: operation.byColumn,
           ascending: operation.order === 'asc',
           hasHeader: operation.hasHeader ?? false,
-          locale: options.sortLocale,
+          ...(options.sortLocale !== undefined ? { locale: options.sortLocale } : {}),
         },
         (address) => readCell(address, operation.sheetId),
       )

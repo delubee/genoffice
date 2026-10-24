@@ -26,6 +26,25 @@ During setup on 2026-10-23, the clean local `main` was fast-forwarded to
 have not been merged into the feature or integration branch. Review and commit
 the current feature before bringing that upstream update into its working code.
 
+## Integration checkpoint — 2026-10-24
+
+The VS Code 0.1.4 feature is saved at `5f5dc5df` on `feature/vscode-office`.
+`main` is a clean upstream mirror at `79ecbc97`. The integration branch
+`dev/genoffice` combines that upstream revision with the VS Code feature using
+merges; continue combined development there, or create a new feature branch
+from it. The existing feature branch retains its independent history.
+
+Shared protocol additions from upstream live in
+`packages/xlsx-gateway/src/shared/workbook-protocol.ts`; the desktop API keeps
+re-exporting them. The save gateway preserves upstream redaction arguments and
+the fork's formula-cache invalidation without shifting existing callers.
+Validation and integration details are recorded in
+[the synchronization report](upstream-sync-2026-10-24.md).
+
+This checkpoint describes local branches. Publishing changes to `origin` is a
+separate explicit action. Existing 0.1.4 VSIX artifacts identify the pre-sync
+feature build; a new release needs its own platform build and verification.
+
 ## Set up another clone
 
 ```bash

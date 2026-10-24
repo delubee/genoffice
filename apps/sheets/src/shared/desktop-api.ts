@@ -35,7 +35,29 @@ export type {
 } from '@genoffice/xlsx-gateway/shared/edit-schemas'
 
 export * from '@genoffice/xlsx-gateway/shared/workbook-protocol'
-import type { WorkbookFile, WorkbookSaveRequest, WorkbookSaveEditsBegin, WorkbookSaveEditsChunk, WorkbookSaveEditsAbort, WorkbookSaveResult, WorkbookRangeRequest, WorkbookFormulaCellsRequest, WorkbookFormulaCellsResult, WorkbookFindCellsRequest, WorkbookFindCellsResult, WorkbookRowOutlineResult, WorkbookRangeResult, WorkbookRecalcRequest, WorkbookRecalcResult, WorkbookMediaRequest, WorkbookMediaResult, WorkbookPivotRequest, WorkbookPivotDefinition } from '@genoffice/xlsx-gateway/shared/workbook-protocol'
+import type {
+  WorkbookFile,
+  WorkbookSaveRequest,
+  WorkbookSaveEditsBegin,
+  WorkbookSaveEditsChunk,
+  WorkbookSaveEditsAbort,
+  WorkbookSaveResult,
+  WorkbookRangeRequest,
+  WorkbookFormulaCellsRequest,
+  WorkbookFormulaCellsResult,
+  WorkbookFindCellsRequest,
+  WorkbookFindCellsResult,
+  WorkbookRowOutlineResult,
+  WorkbookRangeResult,
+  WorkbookRecalcRequest,
+  WorkbookRecalcResult,
+  WorkbookMediaRequest,
+  WorkbookMediaResult,
+  WorkbookPivotRequest,
+  WorkbookPivotDefinition,
+  WorkbookRedactionsRequest,
+  WorkbookRedactionsResult,
+} from '@genoffice/xlsx-gateway/shared/workbook-protocol'
 
 export const localImageRequestSchema = z
   .object({
@@ -579,6 +601,12 @@ export interface DesktopApi {
   recalcWorkbook(request: WorkbookRecalcRequest): Promise<WorkbookRecalcResult>
   readWorkbookMedia(request: WorkbookMediaRequest): Promise<WorkbookMediaResult>
   readPivotDefinition(request: WorkbookPivotRequest): Promise<WorkbookPivotDefinition>
+  /**
+   * The cells the reader withheld from the model, read once per open. An
+   * unreadable part is reported as such rather than as "nothing withheld" —
+   * see `workbookRedactionsResultSchema`.
+   */
+  readWorkbookRedactions(request: WorkbookRedactionsRequest): Promise<WorkbookRedactionsResult>
   readLocalImage(request: LocalImageRequest): Promise<LocalImageResult>
   captureScreenSources(): Promise<ScreenSourcesResult>
   /// null when the source vanished between listing and capture.
@@ -653,6 +681,12 @@ export interface DesktopApi {
   onAiSettingsChanged(handler: () => void): () => void
   /// shell only: switch to Home and open Settings › AI Model (rejects in standalone)
   openAiModelSettings(): Promise<void>
+  /// shell only: switch to Home and open Settings › Integrations (the skills list)
+  openSkillsSettings(): Promise<void>
+  /// the skills installed into GenOffice's own folder
+  skillsList(): Promise<UserSkillEntry[]>
+  /// one installed skill's body, by name; the main process resolves the path
+  skillText(name: string): Promise<string>
   aiChat(request: AiChatRequest): Promise<AiChatResponse>
   /// start a streaming AI call; deltas arrive via onAiStream with the same requestId
   aiStream(request: AiStreamRequest): Promise<void>
@@ -715,4 +749,10 @@ export interface ImageSearchResponse {
 export interface GenerateImageResult {
   url?: string
   error?: string
+}
+
+export interface UserSkillEntry {
+  name: string
+  description: string
+  relevant: boolean
 }
