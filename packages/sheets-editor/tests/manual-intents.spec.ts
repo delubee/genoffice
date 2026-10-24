@@ -147,6 +147,7 @@ test('toolbar creates, edits and deletes a chart whose cache follows current cel
     ;(window as any).toolbar.select('A1:B3')
   })
   try {
+    await page.getByRole('tab', { name: 'Insert', exact: true }).click()
     await page.getByRole('button', { name: 'Add chart', exact: true }).click()
     await expect(page.locator('.workbook-charts svg')).toHaveCount(1)
     await page.getByLabel('Chart title', { exact: true }).fill('Current sales')
@@ -353,6 +354,221 @@ test('typing into a merged selection forwards only the anchor', async ({ page })
       await page.evaluate(() => (window as any).toolbar.snapshot().sheets[0].cells.B1.rawValue),
     ).toBe('Sales')
     await page.screenshot({ path: test.info().outputPath('merged-heading.png') })
+  } finally {
+    await page.evaluate(() => (window as any).toolbar.dispose())
+  }
+})
+
+test('numeric sizes and native header drags commit persistent dimensions', async ({ page }) => {
+  await page.goto(base)
+  await page.evaluate(async () => {
+    const { mountManualToolbar } = await import(
+      /* @vite-ignore */ String('/packages/sheets-editor/tests/fixtures/manual-toolbar.tsx')
+    )
+    ;(window as any).toolbar = await mountManualToolbar()
+    ;(window as any).toolbar.select('B2')
+  })
+  try {
+    await page.getByRole('spinbutton', { name: 'Column width (px)' }).fill('140')
+    await page.getByRole('button', { name: 'Set column width', exact: true }).click()
+    await expect
+      .poll(() => page.evaluate(() => (window as any).toolbar.sizes().columns[1].pixels))
+      .toBe(140)
+    await page.getByRole('spinbutton', { name: 'Row height (pt)' }).fill('30')
+    await page.getByRole('button', { name: 'Set row height', exact: true }).click()
+    await expect
+      .poll(() => page.evaluate(() => (window as any).toolbar.sizes().rows[1].pixels))
+      .toBe(40)
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          [...document.querySelectorAll('canvas')].some(
+            (e) => e.getBoundingClientRect().height > 100,
+          ),
+        ),
+      )
+      .toBe(true)
+    // The column header's right edge comes from the current rendered geometry.
+    const position = await page.evaluate(() => {
+      const canvas = [...document.querySelectorAll('canvas')].find(
+        (e) => e.getBoundingClientRect().height > 100,
+      )!
+      const rect = canvas.getBoundingClientRect()
+      const sizes = (window as any).toolbar.sizes()
+      return { x: rect.x + 46 + sizes.columns[0].pixels + sizes.columns[1].pixels, y: rect.y + 10 }
+    })
+    await page.mouse.move(position.x, position.y)
+    await page.mouse.down()
+    await page.mouse.move(position.x + 40, position.y, { steps: 8 })
+    await page.mouse.up()
+    await expect
+      .poll(() => page.evaluate(() => (window as any).toolbar.sizes().columns[1].pixels))
+      .toBeGreaterThan(175)
+    const draggedWidth = await page.evaluate(
+      () => (window as any).toolbar.sizes().columns[1].pixels,
+    )
+    expect(draggedWidth).toBeLessThan(183)
+    expect(
+      await page.evaluate(() => (window as any).toolbar.snapshot().sheets[0].features.colWidths.B),
+    ).toBe(draggedWidth)
+    await page.evaluate(() => (window as any).toolbar.flush())
+    const rowPosition = await page.evaluate(() => {
+      const canvas = [...document.querySelectorAll('canvas')].find(
+        (e) => e.getBoundingClientRect().height > 100,
+      )!
+      const rect = canvas.getBoundingClientRect()
+      return { x: rect.x + 23, y: rect.y + (window as any).toolbar.cellRect('B2').bottom }
+    })
+    await page.mouse.move(rowPosition.x, rowPosition.y)
+    await page.mouse.down()
+    await page.mouse.move(rowPosition.x, rowPosition.y + 16, { steps: 8 })
+    await page.mouse.up()
+    await expect
+      .poll(() => page.evaluate(() => (window as any).toolbar.sizes().rows[1].pixels))
+      .toBeGreaterThan(50)
+    const draggedHeight = await page.evaluate(() => (window as any).toolbar.sizes().rows[1].pixels)
+    expect(draggedHeight).toBeLessThan(60)
+    expect(
+      await page.evaluate(
+        () => ((window as any).toolbar.snapshot().sheets[0].features.rowHeights['2'] * 4) / 3,
+      ),
+    ).toBeCloseTo(draggedHeight, 2)
+  } finally {
+    await page.evaluate(() => (window as any).toolbar.dispose())
+  }
+})
+
+test('ribbon merges and unmerges the projected grid and refuses to hide existing data', async ({
+  page,
+}) => {
+  await page.goto(base)
+  await page.evaluate(async () => {
+    const { mountManualToolbar } = await import(
+      /* @vite-ignore */ String('/packages/sheets-editor/tests/fixtures/manual-toolbar.tsx')
+    )
+    ;(window as any).toolbar = await mountManualToolbar(true)
+    ;(window as any).toolbar.select('C1:D2')
+  })
+  try {
+    await page.getByRole('button', { name: 'Merge cells', exact: true }).click()
+    await expect
+      .poll(() => page.evaluate(() => (window as any).toolbar.merges()))
+      .toEqual([{ startRow: 0, endRow: 1, startColumn: 2, endColumn: 3 }])
+    await page.evaluate(() => (window as any).toolbar.select('D2'))
+    await page.getByRole('button', { name: 'Unmerge cells', exact: true }).click()
+    await expect.poll(() => page.evaluate(() => (window as any).toolbar.merges())).toEqual([])
+    await page.evaluate(() => (window as any).toolbar.select('A1:B1'))
+    await page.getByRole('button', { name: 'Merge cells', exact: true }).click()
+    await expect(page.getByRole('alert')).toContainText('Other cells contain data')
+    expect(await page.evaluate(() => (window as any).toolbar.value('B1'))).toBe('Sales')
+    expect(await page.evaluate(() => (window as any).toolbar.merges())).toEqual([])
+  } finally {
+    await page.evaluate(() => (window as any).toolbar.dispose())
+  }
+})
+
+test('seven ribbon tabs execute page, formula, data, review and view operations', async ({
+  page,
+}) => {
+  await page.goto(base)
+  await page.evaluate(async () => {
+    const { mountManualToolbar } = await import(
+      /* @vite-ignore */ String('/packages/sheets-editor/tests/fixtures/manual-toolbar.tsx')
+    )
+    ;(window as any).toolbar = await mountManualToolbar(true)
+    ;(window as any).toolbar.select('A1:B3')
+  })
+  const snapshot = () => page.evaluate(() => (window as any).toolbar.snapshot())
+  const tab = (name: string) =>
+    page
+      .getByRole('tablist', { name: 'Ribbon', exact: true })
+      .getByRole('tab', { name, exact: true })
+      .click()
+  try {
+    for (const name of ['Home', 'Insert', 'Page Layout', 'Formulas', 'Data', 'Review', 'View'])
+      await expect(
+        page
+          .getByRole('tablist', { name: 'Ribbon', exact: true })
+          .getByRole('tab', { name, exact: true }),
+      ).toBeVisible()
+    await page
+      .getByRole('tablist', { name: 'Ribbon', exact: true })
+      .getByRole('tab', { name: 'Home', exact: true })
+      .focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(
+      page
+        .getByRole('tablist', { name: 'Ribbon', exact: true })
+        .getByRole('tab', { name: 'Insert', exact: true }),
+    ).toBeFocused()
+    await tab('Page Layout')
+    await page.getByLabel('Orientation', { exact: true }).selectOption('landscape')
+    await expect
+      .poll(async () => (await snapshot()).sheets[0].features.pageSetupEdits.orientation)
+      .toBe('landscape')
+    await page.getByLabel('Paper size', { exact: true }).selectOption('8')
+    await expect
+      .poll(async () => (await snapshot()).sheets[0].features.pageSetupEdits.paperSize)
+      .toBe(8)
+    await page.getByRole('button', { name: 'Set selection as print area', exact: true }).click()
+    await expect
+      .poll(async () => (await snapshot()).sheets[0].features.pageSetupEdits.printArea)
+      .toBe('A1:B3')
+    await tab('Formulas')
+    await page.evaluate(() => (window as any).toolbar.select('B2:B3'))
+    await page.getByRole('button', { name: 'Insert summary below selection', exact: true }).click()
+    await expect.poll(() => page.evaluate(() => (window as any).toolbar.value('B4'))).toBe(90)
+    await tab('Data')
+    await page.evaluate(() => (window as any).toolbar.select('A1:B3'))
+    await page.getByRole('button', { name: 'Sort descending', exact: true }).click()
+    await expect.poll(async () => (await snapshot()).sheets[0].cells.A2.rawValue).toBe('South')
+    expect((await snapshot()).sheets[0].cells.B2.rawValue).toBe(-30)
+    await page.getByRole('button', { name: 'Filter selected table', exact: true }).click()
+    await expect
+      .poll(async () => (await snapshot()).sheets[0].features.filterEdits.filter.range.endRow)
+      .toBe(2)
+    await page
+      .getByRole('textbox', {
+        name: 'Keep values (one per line; empty line matches blanks)',
+        exact: true,
+      })
+      .fill('South')
+    await page.getByRole('button', { name: 'Apply filter', exact: true }).click()
+    await expect.poll(() => page.evaluate(() => (window as any).toolbar.rowVisible(2))).toBe(false)
+    await page.getByRole('button', { name: 'Clear filter', exact: true }).click()
+    await expect.poll(() => page.evaluate(() => (window as any).toolbar.rowVisible(2))).toBe(true)
+    await tab('Review')
+    await page.evaluate(() => (window as any).toolbar.select('B2'))
+    await page.getByRole('textbox', { name: 'Note text', exact: true }).fill('Review this amount')
+    await page.getByRole('button', { name: 'Save note', exact: true }).click()
+    await expect
+      .poll(async () => (await snapshot()).sheets[0].features.noteEdits.B2)
+      .toBe('Review this amount')
+    await page.evaluate(() => (window as any).toolbar.flush())
+    await page.evaluate(() => (window as any).toolbar.editNote('Updated by another editor'))
+    await expect(page.getByRole('textbox', { name: 'Note text', exact: true })).toHaveValue(
+      'Updated by another editor',
+    )
+    await page.evaluate(() => (window as any).toolbar.select('A2:A3'))
+    await page.getByRole('textbox', { name: 'Find', exact: true }).fill('South')
+    await page.getByRole('textbox', { name: 'Replace with', exact: true }).fill('East')
+    await page.getByRole('button', { name: 'Replace all in selection', exact: true }).click()
+    await expect.poll(async () => (await snapshot()).sheets[0].cells.A2.rawValue).toBe('East')
+    await tab('View')
+    await page.getByRole('button', { name: 'Freeze top row', exact: true }).click()
+    await expect
+      .poll(() => page.evaluate(() => (window as any).toolbar.view().freeze.ySplit))
+      .toBe(1)
+    await page.getByLabel('Zoom', { exact: true }).selectOption('125')
+    await expect.poll(() => page.evaluate(() => (window as any).toolbar.view().zoom)).toBe(1.25)
+    await page.getByRole('checkbox', { name: 'Gridlines', exact: true }).click()
+    await expect
+      .poll(() => page.evaluate(() => (window as any).toolbar.view().gridlines))
+      .toBe(false)
+    await expect(page.getByRole('checkbox', { name: 'Gridlines', exact: true })).not.toBeChecked()
+    await expect(page.getByRole('alert')).toHaveCount(0)
+    await tab('Home')
+    await page.screenshot({ path: test.info().outputPath('excel-ribbon.png') })
   } finally {
     await page.evaluate(() => (window as any).toolbar.dispose())
   }

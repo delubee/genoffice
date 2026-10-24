@@ -35,8 +35,54 @@ Version 0.1.2 displays horizontal and vertical merges from the original XLSX,
 including regions outside the initial viewport. Manual input stores the value
 in the top-left anchor. Agent edits and Python imports must also target that
 anchor; writes to covered cells are rejected. Save and reopen preserve merges.
-Creating/unmerging cells, copying/filling merged ranges and changing row/column
-structure in workbooks containing merges are not supported in this preview.
+Copying/filling merged ranges and changing row/column structure in workbooks
+containing merges are not supported in this preview.
+
+## Merge editing (0.1.4)
+
+Home now includes **Merge cells** and **Unmerge cells**. Select a range to merge;
+only the top-left cell may contain data. Other content must be explicitly moved
+or cleared first. Unmerge accepts any cell inside the merged area and preserves
+all cell contents and formatting. Both actions support native undo/redo, save and
+reopen, and the shared AI operation API. Merges cannot overlap tables, pivot
+ranges or filters. Row/column structural changes after merge edits require saving
+and reopening; original workbook structures can still restrict those changes.
+
+## Ribbon and worksheet sizes (0.1.3)
+
+The workbook now has seven tabs. Their controls use the same revision-checked,
+undoable document operations as native agent tools.
+
+| Tab | Available controls |
+| --- | --- |
+| Home | Fonts/basic formats, alignment, copy/fill, worksheet and row/column operations, row height and column width |
+| Insert | Session column, bar, line and pie charts |
+| Page Layout | Paper size, orientation, margins, print area and print scaling |
+| Formulas | Explicit formula input, SUM/AVERAGE/COUNT/MIN/MAX summaries and recalculation |
+| Data | Sort by the first selected column, value filters and clearing contents |
+| Review | Read/add/change/delete text notes; find and replace in the selected range |
+| View | Gridlines, headings, zoom and frozen rows/columns |
+
+Hover over the middle of a row/column header separator until its resize grip
+appears, then drag; or select cells and use **Home → Row and column sizes**. Row height is in points; column width is in pixels. Original
+sizes load from the XLSX; edits participate in undo/redo and survive save/reopen.
+Column pixel conversion currently uses the default 7px digit width, so unusual
+Normal fonts can differ from native Excel by a few pixels.
+
+Sort/replace allow at most 2,000 cells per ordinary edit. Value filters are
+limited to 2,000 cells per table; create a filter, choose its column letter, and
+enter one retained display value per line (an empty line matches blanks).
+Text sorts use a fixed Chinese pinyin collation in the host and Webview.
+Clear filter criteria before sorting. Formula-containing sorts, merged-range
+sort/filter/replace, custom imported filter criteria and image notes fail closed.
+Some row/column structure changes are restricted while reference-bearing
+features are present. Page/print settings are written to XLSX; this preview
+has no print-preview or print-dialog integration.
+
+These are the first migrated ribbon controls. Desktop features such as pivot
+tables, conditional formatting, data validation, protection dialogs, images,
+and advanced charts are not yet ported to this adapter.
+Chat continues to use VS Code's native interface.
 
 ## Optional skill and Python
 

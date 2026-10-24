@@ -24,10 +24,11 @@ export interface SortSpec {
   readonly byColumn: string
   readonly ascending: boolean
   readonly hasHeader: boolean
+  readonly locale?: string
 }
 
 /// blanks always sort last; numbers before booleans before text (Excel order)
-function compareScalars(a: CellScalar, b: CellScalar): number {
+function compareScalars(a: CellScalar, b: CellScalar, locale?: string): number {
   if (a === null && b === null) return 0
   if (a === null) return 1
   if (b === null) return -1
@@ -48,7 +49,7 @@ function compareScalars(a: CellScalar, b: CellScalar): number {
     return 0
   }
   if (typeof a === 'boolean' && typeof b === 'boolean') return Number(a) - Number(b)
-  return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' })
+  return String(a).localeCompare(String(b), locale, { numeric: true, sensitivity: 'base' })
 }
 
 /// Stable data-row order for a sort: returns source-row indexes in their
@@ -59,11 +60,12 @@ export function computeSortedRowOrder(
   rows: readonly (readonly CellScalar[])[],
   keyOffset: number,
   ascending: boolean,
+  locale?: string,
 ): number[] {
   return rows
     .map((row, index) => ({ key: row[keyOffset] ?? null, index }))
     .sort((a, b) => {
-      const cmp = compareScalars(a.key, b.key)
+      const cmp = compareScalars(a.key, b.key, locale)
       const oriented = a.key === null || b.key === null || cmp === 0 ? cmp : ascending ? cmp : -cmp
       return oriented !== 0 ? oriented : a.index - b.index
     })
@@ -108,6 +110,7 @@ export function computeSortChanges(
     rows.map((row) => row.cells),
     keyColumn - bounds.startColumn,
     spec.ascending,
+    spec.locale,
   )
 
   const changes: SortComputedChange[] = []

@@ -1,7 +1,7 @@
 {
   "name": "genoffice-workbook",
   "displayName": "GenOffice Workbook",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "private": true,
   "description": "Editable workbooks for VS Code and its native agent tools",
   "publisher": "genoffice",
@@ -1013,7 +1013,7 @@
                                     "additionalProperties": false
                                   }
                                 ],
-                                "description": "pattern fill {pattern: solid|lightGray|darkHorizontal|\u2026, fg, bg?} or gradient {gradient: {angle?, stops: [{position 0..1, color}]}}; wins over fillColor"
+                                "description": "pattern fill {pattern: solid|lightGray|darkHorizontal|…, fg, bg?} or gradient {gradient: {angle?, stops: [{position 0..1, color}]}}; wins over fillColor"
                               },
                               {
                                 "type": "null"
@@ -1194,6 +1194,164 @@
                     "properties": {
                       "op": {
                         "type": "string",
+                        "const": "sort_range"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "range": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,6}(:[A-Z]{1,3}[1-9][0-9]{0,6})?$"
+                      },
+                      "byColumn": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{1,3}$"
+                      },
+                      "order": {
+                        "type": "string",
+                        "enum": [
+                          "asc",
+                          "desc"
+                        ]
+                      },
+                      "hasHeader": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "range",
+                      "byColumn",
+                      "order"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "merge_cells"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "range": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,6}(:[A-Z]{1,3}[1-9][0-9]{0,6})?$"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "range"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "unmerge_cells"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "range": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,6}(:[A-Z]{1,3}[1-9][0-9]{0,6})?$"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "range"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "set_row_height"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "row": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1048576
+                      },
+                      "count": {
+                        "default": 1,
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 500
+                      },
+                      "heightPoints": {
+                        "type": "number",
+                        "minimum": 2,
+                        "maximum": 409
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "row",
+                      "count",
+                      "heightPoints"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "set_col_width"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "column": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{1,3}$"
+                      },
+                      "count": {
+                        "default": 1,
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                      },
+                      "widthPx": {
+                        "type": "number",
+                        "minimum": 10,
+                        "maximum": 2000
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "column",
+                      "count",
+                      "widthPx"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
                         "const": "edit_chart"
                       },
                       "chartPath": {
@@ -1366,6 +1524,313 @@
                       "sheetId",
                       "chartType",
                       "dataRange"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "set_filter"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "range": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,6}(:[A-Z]{1,3}[1-9][0-9]{0,6})?$"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "range"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "clear_filter"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "set_filter_criteria"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "column": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{1,3}$"
+                      },
+                      "values": {
+                        "anyOf": [
+                          {
+                            "minItems": 1,
+                            "maxItems": 1000,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "maxLength": 32767
+                            }
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "column",
+                      "values"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "set_page_setup"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "showGridlines": {
+                        "type": "boolean"
+                      },
+                      "showHeadings": {
+                        "type": "boolean"
+                      },
+                      "zoomScale": {
+                        "type": "integer",
+                        "minimum": 10,
+                        "maximum": 400
+                      },
+                      "orientation": {
+                        "type": "string",
+                        "enum": [
+                          "portrait",
+                          "landscape"
+                        ]
+                      },
+                      "paperSize": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 118
+                      },
+                      "scale": {
+                        "type": "integer",
+                        "minimum": 10,
+                        "maximum": 400
+                      },
+                      "fitToWidth": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1000
+                      },
+                      "fitToHeight": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1000
+                      },
+                      "margins": {
+                        "type": "string",
+                        "enum": [
+                          "normal",
+                          "wide",
+                          "narrow"
+                        ]
+                      },
+                      "printGridlines": {
+                        "type": "boolean"
+                      },
+                      "printHeadings": {
+                        "type": "boolean"
+                      },
+                      "printArea": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,6}(:[A-Z]{1,3}[1-9][0-9]{0,6})?$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "printTitles": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^\\$?([A-Za-z]{1,3}|\\d{1,7}):\\$?([A-Za-z]{1,3}|\\d{1,7})(,\\$?([A-Za-z]{1,3}|\\d{1,7}):\\$?([A-Za-z]{1,3}|\\d{1,7}))?$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "header": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "left": {
+                                "type": "string",
+                                "maxLength": 255
+                              },
+                              "center": {
+                                "type": "string",
+                                "maxLength": 255
+                              },
+                              "right": {
+                                "type": "string",
+                                "maxLength": 255
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "footer": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "left": {
+                                "type": "string",
+                                "maxLength": 255
+                              },
+                              "center": {
+                                "type": "string",
+                                "maxLength": 255
+                              },
+                              "right": {
+                                "type": "string",
+                                "maxLength": 255
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "rowBreaks": {
+                        "maxItems": 1023,
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 1048575
+                        }
+                      },
+                      "colBreaks": {
+                        "maxItems": 1023,
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 16383
+                        }
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "set_freeze"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "rows": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "columns": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "rows",
+                      "columns"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "set_note"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "address": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,6}$"
+                      },
+                      "text": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 32000
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "address",
+                      "text"
                     ],
                     "additionalProperties": false
                   },
@@ -1574,6 +2039,46 @@
                     "required": [
                       "op",
                       "visualId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "find_replace"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "range": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,6}(:[A-Z]{1,3}[1-9][0-9]{0,6})?$"
+                      },
+                      "find": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 32767
+                      },
+                      "replace": {
+                        "type": "string",
+                        "maxLength": 255
+                      },
+                      "matchCase": {
+                        "type": "boolean"
+                      },
+                      "wholeCell": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "range",
+                      "find",
+                      "replace"
                     ],
                     "additionalProperties": false
                   }

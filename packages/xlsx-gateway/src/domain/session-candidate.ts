@@ -1,6 +1,8 @@
 import { isDateFormat } from 'numfmt'
 import { InMemoryWorkbookAdapter } from './in-memory-workbook'
-import { formatAddress, parseAddress } from './cell-address'
+import { formatAddress, parseAddress, parseRange, columnIndex } from './cell-address'
+import { computeSortedRowOrder } from './sort-range'
+import { updateSessionFilter } from './session-filter'
 import { shiftIndex, shiftSpecForOp } from './formula-shift'
 import type { SheetVisual } from './chart-visual'
 import type { CellFormatState, WorkbookSnapshot, WorksheetState } from './workbook.types'
@@ -18,7 +20,7 @@ import { refreshChartReferences } from './session-chart-references'
 import { stateChangeset, type CandidateState } from '../shared/session-changeset'
 import { copySessionRange } from './session-range-copy'
 import { SESSION_OPERATION_NAMES, hasMixedSessionOperations } from '../shared/session-operations'
-import { assertMergeOperation } from './session-merges'
+import { assertMergeOperation, updateSessionMerges } from './session-merges'
 
 type TypedCell = z.infer<typeof cellRecordSchema>
 export interface CandidateMaterial {
@@ -34,6 +36,9 @@ export interface CandidateMaterial {
 }
 
 const whitelist = new Set<string>(SESSION_OPERATION_NAMES)
+// The extension host OS and Webview language can differ. Both executions
+// use the same explicit Han/Latin collation, including typed/style movement.
+const SESSION_SORT_LOCALE = 'zh-CN'
 const changingCoordinates = new Set([
   'insert_rows',
   'delete_rows',
@@ -116,6 +121,8 @@ function snapshot(state: CandidateState): WorkbookSnapshot {
           .filter(([, cell]) => cell.style || cell.numberFormat)
           .map(([address, cell]) => [address, formatState(cell)]),
       ),
+      rowHeights: structuredClone((sheet.features?.rowHeights ?? {}) as Record<string, number>),
+      colWidths: structuredClone((sheet.features?.colWidths ?? {}) as Record<string, number>),
       visuals: structuredClone((sheet.features?.charts ?? []) as unknown as SheetVisual[]),
     })),
   }
@@ -175,6 +182,21 @@ export async function computeCandidateState(
     for (const sheet of current.sheets) {
       formulaCount += Object.values(sheet.cells).filter((cell) => cell.formula).length
       const metadata = sheet.features?.originalMetadata as Record<string, unknown> | undefined
+      if (sheet.features?.mergeEdits)
+        throw new Error('unsupported_structural_feature: session_merges')
+      if (Object.keys((sheet.features?.noteEdits ?? {}) as object).length)
+        throw new Error('unsupported_structural_feature: session_notes')
+      if (sheet.features?.filterEdits)
+        throw new Error('unsupported_structural_feature: session_filter')
+      if (sheet.features?.autoFilter) throw new Error('unsupported_structural_feature: autoFilter')
+      const page = sheet.features?.pageSetupEdits as
+        { printArea?: unknown; printTitles?: unknown } | undefined
+      if (page?.printArea || page?.printTitles)
+        throw new Error('unsupported_structural_feature: print_references')
+      const freeze = sheet.features?.freezeEdits as
+        { frozenRows?: number; frozenColumns?: number } | undefined
+      if (freeze?.frozenRows || freeze?.frozenColumns)
+        throw new Error('unsupported_structural_feature: freeze')
       // Features whose references have no implemented transform are rejected
       // before creating a candidate, rather than silently left behind.
       for (const key of ['tables', 'comments', 'pivotRanges', 'pivotTables', 'sparklines'])
@@ -208,6 +230,7 @@ export async function computeCandidateState(
   const dimensions = new Map(
     current.sheets.map((sheet) => [sheet.id, { rows: sheet.rows, columns: sheet.columns }]),
   )
+  const featureEdits = new Map<string, Record<string, unknown>>()
   const log = structuredClone(before.structuralLog)
   const sheetMap = structuredClone(before.sheetMap)
   const affected: string[] = []
@@ -227,10 +250,30 @@ export async function computeCandidateState(
             ),
           )
     const permissions = current.sheets.find((sheet) => sheet.id === target?.id)
+    if (op.op === 'sort_range') {
+      const filter = (
+        permissions?.features?.filterEdits as { filter?: { columns?: unknown[] } } | undefined
+      )?.filter
+      if (
+        filter?.columns?.length ||
+        (!permissions?.features?.filterEdits &&
+          (permissions?.features?.autoFilterColumns as unknown[] | undefined)?.length)
+      )
+        throw new Error('active_filter_sort: clear the filter criteria before sorting')
+    }
     if (target && !material.writableSheetIds.includes(target.id))
       throw new Error('unverified_writable_target')
     if (permissions?.readOnly || permissions?.protected) throw new Error('protected_target')
-    assertMergeOperation(current, op)
+    assertMergeOperation(
+      {
+        ...current,
+        sheets: current.sheets.map((sheet) => ({
+          ...sheet,
+          features: featureEdits.get(sheet.id) ?? sheet.features,
+        })),
+      },
+      op,
+    )
     if (
       op.op === 'delete_sheet' &&
       book.sheets.some((sheet) =>
@@ -264,14 +307,74 @@ export async function computeCandidateState(
               )
     }
     let next: WorkbookSnapshot
-    if (op.op === 'copy_range' || op.op === 'fill_range') {
+    if (
+      op.op === 'merge_cells' ||
+      op.op === 'unmerge_cells' ||
+      op.op === 'set_page_setup' ||
+      op.op === 'set_freeze' ||
+      op.op === 'set_note' ||
+      op.op === 'set_filter' ||
+      op.op === 'clear_filter' ||
+      op.op === 'set_filter_criteria'
+    ) {
+      const features =
+        featureEdits.get(op.sheetId) ??
+        structuredClone(current.sheets.find((sheet) => sheet.id === op.sheetId)!.features ?? {})
+      if (op.op === 'merge_cells' || op.op === 'unmerge_cells') {
+        const cells = book.sheets.find((sheet) => sheet.id === op.sheetId)!.cells
+        features.mergeEdits = updateSessionMerges(
+          features,
+          op,
+          Object.fromEntries(
+            Object.entries(cells).map(([address, cell]) => [
+              address,
+              { rawValue: cell.value, ...(cell.formula ? { formula: cell.formula } : {}) },
+            ]),
+          ),
+        )
+        if (op.op === 'merge_cells') {
+          const range = parseRange(op.range),
+            size = dimensions.get(op.sheetId)!
+          size.rows = Math.max(size.rows, range.endRow + 1)
+          size.columns = Math.max(size.columns, range.endColumn + 1)
+        }
+      } else if (
+        op.op === 'set_filter' ||
+        op.op === 'clear_filter' ||
+        op.op === 'set_filter_criteria'
+      )
+        features.filterEdits = updateSessionFilter(features, op, book, current.dateSystem)
+      else if (op.op === 'set_page_setup') {
+        const { op: _op, sheetId: _id, ...patch } = op
+        const page = { ...((features.pageSetupEdits ?? {}) as Record<string, unknown>), ...patch }
+        if (op.scale !== undefined) {
+          delete page.fitToWidth
+          delete page.fitToHeight
+        }
+        if (op.fitToWidth !== undefined || op.fitToHeight !== undefined) delete page.scale
+        features.pageSetupEdits = page
+      } else if (op.op === 'set_freeze')
+        features.freezeEdits = { frozenRows: op.rows, frozenColumns: op.columns }
+      else {
+        const metadata = features.originalMetadata as
+          { comments?: { image?: unknown }[] } | undefined
+        if (metadata?.comments?.some((note) => note.image))
+          throw new Error('unsupported_note_image: notes with images must be preserved')
+        features.noteEdits = {
+          ...((features.noteEdits ?? {}) as Record<string, string | null>),
+          [op.address]: op.text,
+        }
+      }
+      featureEdits.set(op.sheetId, features)
+      next = structuredClone(book)
+    } else if (op.op === 'copy_range' || op.op === 'fill_range') {
       const copied = copySessionRange(book, op, typedTemplates, signal)
       next = copied.snapshot
       const size = dimensions.get(op.sheetId)!
       size.rows = Math.max(size.rows, copied.target.endRow + 1)
       size.columns = Math.max(size.columns, copied.target.endColumn + 1)
     } else {
-      const adapter = new InMemoryWorkbookAdapter(book)
+      const adapter = new InMemoryWorkbookAdapter(book, { sortLocale: SESSION_SORT_LOCALE })
       const plan = adapter.plan({
         dslVersion: 1,
         summary: intent.summary,
@@ -305,6 +408,43 @@ export async function computeCandidateState(
         }
       adapter.apply(plan)
       next = adapter.getSnapshot()
+      if (op.op === 'sort_range') {
+        const range = parseRange(op.range),
+          first = range.startRow + (op.hasHeader ? 1 : 0)
+        const sourceSheet = book.sheets.find((sheet) => sheet.id === op.sheetId)!
+        const targetSheet = next.sheets.find((sheet) => sheet.id === op.sheetId)!
+        const matrix = Array.from({ length: range.endRow - first + 1 }, (_, r) =>
+          Array.from(
+            { length: range.endColumn - range.startColumn + 1 },
+            (_, c) =>
+              sourceSheet.cells[formatAddress(first + r, range.startColumn + c)]?.value ?? null,
+          ),
+        )
+        const order = computeSortedRowOrder(
+          matrix,
+          columnIndex(op.byColumn) - range.startColumn,
+          op.order === 'asc',
+          SESSION_SORT_LOCALE,
+        )
+        const templates = typedTemplates.get(op.sheetId)!,
+          old = structuredClone(templates)
+        const styles = { ...targetSheet.styles }
+        for (const [row, source] of order.entries())
+          for (let column = range.startColumn; column <= range.endColumn; column++) {
+            const from = formatAddress(first + source, column),
+              to = formatAddress(first + row, column)
+            if (old[from]) templates[to] = structuredClone(old[from]!)
+            else delete templates[to]
+            if (sourceSheet.styles?.[from]) styles[to] = structuredClone(sourceSheet.styles[from]!)
+            else delete styles[to]
+          }
+        next = {
+          ...next,
+          sheets: next.sheets.map((sheet) =>
+            sheet.id === op.sheetId ? { ...sheet, styles } : sheet,
+          ),
+        }
+      }
     }
     if (op.op === 'add_sheet') {
       const fresh = next.sheets.find(
@@ -333,6 +473,16 @@ export async function computeCandidateState(
       dimensions.set(logicalId, { rows: fresh.gridRows ?? 1000, columns: fresh.gridColumns ?? 20 })
       affected.push(logicalId)
     }
+    if (op.op === 'set_row_height')
+      dimensions.get(op.sheetId)!.rows = Math.max(
+        dimensions.get(op.sheetId)!.rows,
+        op.row + op.count - 1,
+      )
+    if (op.op === 'set_col_width')
+      dimensions.get(op.sheetId)!.columns = Math.max(
+        dimensions.get(op.sheetId)!.columns,
+        columnIndex(op.column) + op.count,
+      )
     if (op.op === 'rename_sheet' && target) {
       for (const sheet of next.sheets)
         for (const cell of Object.values(sheet.cells))
@@ -510,7 +660,13 @@ export async function computeCandidateState(
           false,
         cells,
         features: JSON.parse(
-          JSON.stringify({ ...original?.features, charts: sheet.visuals ?? [] }),
+          JSON.stringify({
+            ...original?.features,
+            ...featureEdits.get(sheet.id),
+            charts: sheet.visuals ?? [],
+            rowHeights: sheet.rowHeights ?? {},
+            colWidths: sheet.colWidths ?? {},
+          }),
         ),
       }
     }),

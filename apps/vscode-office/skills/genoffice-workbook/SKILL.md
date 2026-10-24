@@ -2,7 +2,7 @@
 name: genoffice-workbook
 description: Read and edit Excel workbooks open in GenOffice for VS Code, including unsaved data analysis through native workbook tools and workspace Python.
 metadata:
-  version: "0.1.0"
+  version: "0.1.4"
 ---
 
 # GenOffice 工作簿

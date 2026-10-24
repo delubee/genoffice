@@ -85,7 +85,10 @@ export class InMemoryWorkbookAdapter implements WorkbookAdapter {
   private readonly committedTransactions = new Set<string>()
   private readonly auditLog: AuditRecord[] = []
 
-  constructor(snapshot: WorkbookSnapshot) {
+  constructor(
+    snapshot: WorkbookSnapshot,
+    private readonly options: { sortLocale?: string } = {},
+  ) {
     this.snapshot = structuredClone(snapshot)
   }
 
@@ -119,7 +122,7 @@ export class InMemoryWorkbookAdapter implements WorkbookAdapter {
       return sheet.cells[address] ?? { value: null }
     }
 
-    for (const operation of expandToPrimitiveOps(batch.operations, readCell)) {
+    for (const operation of expandToPrimitiveOps(batch.operations, readCell, this.options)) {
       if (operation.op === 'fill_range') {
         // Demo workbooks clone every cell per revision, so fills stay at the
         // per-cell preview scale; imported files get the range-level executor

@@ -44,3 +44,36 @@ See [appearance evidence](test-results/appearance.md),
 [merged-cell evidence](test-results/merged-cells.md), and
 [final installed package proof](test-results/merged-cells-installed-win32-x64-proof.json).
 Remaining real-model, macOS, Remote SSH and broader release gates are unchanged.
+
+## Preview 0.1.3 — ribbon and worksheet sizing
+
+Seven ribbon tabs now expose common Home, Insert, Page Layout, Formulas, Data,
+Review and View operations. Header dragging and numeric row/column sizes use
+shared transactions, native undo/redo and XLSX persistence. Original source
+sizes are projected, including blank rows with custom height. Page settings,
+frozen panes, value filters and text notes are persisted through existing
+shared OOXML writers. The product skill and native tool schemas include these
+operations. The native VS Code chat workflow is unchanged.
+
+This is an initial migration of common ribbon controls, not full desktop
+feature parity. See README's ribbon matrix for the available controls and
+limits. Advanced dialogs, original objects, print preview, and transformations
+that cannot preserve reference-bearing features remain outside this increment.
+
+
+0.1.3 verification: Linux/Windows unit suites 59 session / 10 editor / 31
+extension; shared gateway 252; desktop compatibility 70 and desktop typecheck;
+Chromium 15 browser tests. Windows actual extension-host tests and final
+normal-profile VSIX installation passed. See
+[ribbon and dimensions evidence](test-results/ribbon-and-dimensions.md) and
+[0.1.3 installed proof](test-results/ribbon-installed-win32-x64-proof.json).
+
+## Preview 0.1.4 — merge editing
+
+Home includes merge/unmerge commands through the shared manual/agent transaction
+path. Merging refuses nonempty covered cells and unsupported feature overlaps;
+undo/redo, original-based saving and reopening preserve geometry and contents.
+Windows verification passed: 104 workspace unit tests, six real VS Code tests,
+and actual VSIX installation with editing, saving and native tool reads.
+See [merge editing evidence](test-results/merge-editing.md) and
+[0.1.4 installed proof](test-results/merge-installed-win32-x64-proof.json).

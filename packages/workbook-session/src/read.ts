@@ -21,8 +21,19 @@ import type { WorkbookSource } from './ports'
 import { logicalSheet } from './sheet-map'
 import { indexedFeatures } from './source-features'
 import { workbookMergeRangesResultSchema } from '@genoffice/xlsx-gateway/shared/workbook-protocol'
+import { originalAxisIndex } from '@genoffice/xlsx-gateway/domain/session-coordinates'
 
 const sourceCells = z.object({
+  rows: z
+    .array(
+      z.object({
+        row: z.number().int().nonnegative(),
+        height: z.number().nonnegative().optional(),
+        hidden: z.boolean().optional(),
+        customHeight: z.boolean().optional(),
+      }),
+    )
+    .default([]),
   cells: z.array(
     z.object({
       row: z.number().int().nonnegative(),
@@ -135,13 +146,17 @@ export async function readCurrentRange(input: {
   const needed = points.filter(
     (point) =>
       point.original &&
-      !Object.hasOwn(sheet.cells, point.address) &&
+      (input.includeMerges || !Object.hasOwn(sheet.cells, point.address)) &&
       (originalMetadata?.rowCount === undefined ||
         point.original.row < originalMetadata.rowCount) &&
       (originalMetadata?.columnCount === undefined ||
         point.original.column < originalMetadata.columnCount),
   )
   const base = new Map<string, CellRecord>()
+  const sourceRows = new Map<
+    number,
+    { height?: number; hidden?: boolean; customHeight?: boolean }
+  >()
   if (needed.length && sheet.originalSheetId) {
     const features = sourceFeatures.parse(
       await source.readFeatures(input.sessionId, sheet.originalSheetId),
@@ -181,6 +196,12 @@ export async function readCurrentRange(input: {
           `${formatAddress(range.startRow, range.startColumn)}:${formatAddress(range.endRow, range.endColumn)}`,
         ),
       )
+      for (const row of response.rows)
+        sourceRows.set(row.row, {
+          ...(row.height === undefined ? {} : { height: row.height }),
+          ...(row.hidden === undefined ? {} : { hidden: row.hidden }),
+          ...(row.customHeight === undefined ? {} : { customHeight: row.customHeight }),
+        })
       for (const cell of response.cells) {
         const sourceStyle = features.styles[cell.styleIndex ?? 0]
         const style = workbookStyleEditSchema
@@ -252,7 +273,7 @@ export async function readCurrentRange(input: {
     : { indexingComplete: true, merges: [] }
   const { merges } = workbookMergeRangesResultSchema.parse({
     indexingComplete: features.indexingComplete,
-    merges: features.merges ?? [],
+    merges: sheet.features?.mergeEdits ?? features.merges ?? [],
   })
   // Coordinate-changing edits on merged sheets are rejected by the candidate
   // interpreter. Source merge coordinates therefore remain current coordinates.
@@ -272,5 +293,11 @@ export async function readCurrentRange(input: {
     })
     cells.push(...anchor.cells)
   }
-  return { ...result, merges }
+  const rows = []
+  for (let row = bounds.startRow; row <= bounds.endRow; row++) {
+    const original = originalAxisIndex(state.structuralLog, sheet.id, row, 'row')
+    const properties = original === null ? undefined : sourceRows.get(original)
+    if (properties) rows.push({ row, ...properties })
+  }
+  return { ...result, merges, rows, pageSetup: features.pageSetup ?? null }
 }

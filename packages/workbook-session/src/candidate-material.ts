@@ -121,6 +121,37 @@ export async function prepareCandidateMaterial(input: {
         )
       : undefined
     const selected = ranges.get(sheet.id) ?? new Set<string>()
+    if (
+      input.operations.some(
+        (op) =>
+          'sheetId' in op &&
+          op.sheetId === sheet.id &&
+          ['set_filter_criteria', 'clear_filter'].includes(op.op),
+      )
+    ) {
+      const edits = sheet.features?.filterEdits as
+        | {
+            filter?: {
+              range: { startRow: number; endRow: number; startColumn: number; endColumn: number }
+            }
+            visibilityRange?: {
+              startRow: number
+              endRow: number
+              startColumn: number
+              endColumn: number
+            }
+          }
+        | undefined
+      const range =
+        edits?.visibilityRange ??
+        edits?.filter?.range ??
+        (features?.autoFilter as
+          { startRow: number; endRow: number; startColumn: number; endColumn: number } | undefined)
+      if (range)
+        selected.add(
+          `${formatAddress(range.startRow, range.startColumn)}:${formatAddress(range.endRow, range.endColumn)}`,
+        )
+    }
     for (const range of selected) {
       if (rangeCellCount(parseRange(range)) > LIMITS.rangeCells)
         throw new WorkbookError('range_limit', 'Candidate material exceeds the range budget.')

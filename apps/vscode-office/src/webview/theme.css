@@ -145,3 +145,99 @@ body {
   color: var(--workbook-accent-text);
   background: var(--workbook-accent);
 }
+
+.workbook-quick-access {
+  align-items: center;
+  flex-shrink: 0;
+}
+.workbook-ribbon {
+  background: var(--chrome);
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+.workbook-ribbon-tabs {
+  display: flex;
+  overflow-x: auto;
+  gap: 2px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--border);
+}
+.workbook-ribbon-tabs button {
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--text);
+  border: 0;
+  border-bottom: 3px solid transparent;
+  padding: 8px 16px;
+  font: inherit;
+  cursor: pointer;
+}
+.workbook-ribbon-tabs button[aria-selected='true'] {
+  color: var(--workbook-accent);
+  border-bottom-color: var(--workbook-accent);
+  font-weight: 600;
+}
+.workbook-ribbon-tabs button:hover {
+  background: var(--hover);
+}
+.workbook-ribbon button:focus-visible,
+.workbook-ribbon input:focus-visible,
+.workbook-ribbon select:focus-visible,
+.workbook-ribbon textarea:focus-visible {
+  outline: 2px solid var(--workbook-accent);
+  outline-offset: 1px;
+}
+.workbook-ribbon-panel {
+  flex-wrap: nowrap;
+  align-items: stretch;
+  min-height: 118px;
+  max-height: 196px;
+  overflow: auto;
+  border: 0;
+  padding: 6px 8px;
+}
+.workbook-ribbon-panel[hidden] {
+  display: none;
+}
+.workbook-ribbon-group {
+  flex: 0 0 auto;
+  width: 310px;
+  min-width: 180px;
+  margin: 0;
+  border: 0;
+  border-right: 1px solid var(--border);
+  padding: 4px 12px 8px 4px;
+}
+.workbook-ribbon-group legend {
+  padding: 0 4px;
+  font-size: 0.9em;
+  color: var(--text);
+}
+.workbook-ribbon-group > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.workbook-ribbon-group label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.workbook-ribbon-group input[type='checkbox'] {
+  width: auto;
+  accent-color: var(--workbook-accent);
+}
+.workbook-ribbon-group textarea {
+  width: 100%;
+  height: 48px;
+  resize: vertical;
+  color: var(--text);
+  background: var(--input);
+  border: 1px solid var(--border);
+  font: inherit;
+}
+.workbook-ribbon-group p {
+  margin: 0;
+  font-size: 0.9em;
+}

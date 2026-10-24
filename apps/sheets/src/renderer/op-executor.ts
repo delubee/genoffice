@@ -740,6 +740,16 @@ async function executeOp(op: PlannedOp, run: OpRun): Promise<void> {
     if (!workbook) throw new Error(t('appNoWorkbookOpen'))
     workbook.deleteDefinedName(op.name)
   } else if (op.op === 'set_page_setup') {
+    // These new DSL settings are implemented by the VS Code session adapter.
+    // Preserve the desktop adapter's prior contract instead of ignoring them.
+    if (
+      op.zoomScale !== undefined ||
+      op.showGridlines !== undefined ||
+      op.showHeadings !== undefined
+    )
+      throw new Error(
+        'unsupported_view_settings: use the desktop View ribbon or the VS Code workbook editor',
+      )
     sheetById(op.sheetId)
     const prior = state.editJournal.pageSetup.get(op.sheetId) ?? {}
     const patch: PageSetupJournalState = {}

@@ -17,15 +17,22 @@ aggregate 最多 1,000,000 格，最多 50 个高频值；只对 number 类型�
 
 ## 操作子集
 
-始终以 capabilities 为准。首版支持：
+始终以 capabilities 为准。当前预览版支持：
 
 - set_cell、set_formula、clear_cell、set_range、clear_range；
 - format_range：常用字体、颜色、对齐、换行、边框、数字格式；
+- merge_cells、unmerge_cells：合并/取消合并；合并时除左上角外必须为空，不会自动丢弃数据；不能部分覆盖已有合并区域，不能与表格/透视表/筛选区域重叠；取消合并可选中区域中的任意格；
+- set_row_height（磅）、set_col_width（像素）：可保存、撤销的尺寸设置；
+- set_page_setup：纸张、页边距、打印区域、显示网格/标题和缩放；set_freeze：冻结行列；
+- sort_range、find_replace：选区排序与替换，普通编辑最多 2,000 格，排序拒绝含公式/合并格的选区；
+- set_filter、set_filter_criteria、clear_filter：最多 2,000 格的表格值筛选；先创建筛选，再设置列条件；
+- set_note：左上角锚点的文本批注；null 删除，文件中含图片的批注暂不编辑；
 - copy_range、fill_range：复制值/公式并保留目标格式；过滤复制不支持；
 - add_sheet、rename_sheet、delete_sheet，受限行列插入/删除；
 - add_chart、edit_chart、delete_visual：本会话新增的 column/bar/line/pie 基础图表。
 
 原文件图表及高级对象不按可编辑对象推断。保护、合并、表格、命名区域等可能限制结构变换；
+已有合并格仅写左上角锚点。批注、筛选、冻结或打印引用等可能限制后续结构变换；必要时先清除相关设置并保存重开；源文件中的批注、保护或高级结构仍可能限制行列变换。
 不能保真的操作会在提交前拒绝。图表和结构操作另受引用材料与公式依赖预算限制。
 
 set_cell 的字符串为文本；set_formula 显式写公式。set_range 沿用既有 DSL 的公式前缀规则；

@@ -2,6 +2,8 @@ import { copyFile, mkdtemp, rename, rm, unlink } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { z } from 'zod'
 import { columnIndex, parseAddress } from '@genoffice/xlsx-gateway/domain/cell-address'
+import { sessionMerges } from '@genoffice/xlsx-gateway/domain/session-merges'
+import { pixelsToColumnWidth } from '@genoffice/xlsx-gateway/domain/sheet-dimensions'
 import type { SheetVisual } from '@genoffice/xlsx-gateway/domain/chart-visual'
 import {
   saveWorkbookViaSidecar,
@@ -10,10 +12,15 @@ import {
 } from '@genoffice/xlsx-gateway/gateway/xlsx-package-io'
 import type { SheetEditPlan } from '@genoffice/xlsx-gateway/gateway/xlsx-sheets'
 import { workbookVisualAddSchema } from '@genoffice/xlsx-gateway/shared/workbook-protocol'
+import { workbookFilterStateSchema } from '@genoffice/xlsx-gateway/shared/workbook-protocol'
+import type { SheetFilterState } from '@genoffice/xlsx-gateway/gateway/xlsx-filter'
 import { WorkbookError, assertNotCancelled, type WorkbookState } from './domain'
 import type { PackageWriter } from './ports'
 import { hashFile } from './resources'
 import { workbookStateSchema } from './schemas'
+import { workbookOperationSchema } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
+import type { SheetPageSetupState } from '@genoffice/xlsx-gateway/gateway/xlsx-page-setup'
+import type { SheetNoteState } from '@genoffice/xlsx-gateway/gateway/xlsx-gateway'
 import { captureFileBaseline, publishStagedWorkbook, type FileBaseline } from './publish'
 
 const metadataSchema = z.object({ sheets: z.array(z.object({ id: z.string(), name: z.string() })) })
@@ -156,12 +163,102 @@ export class SessionPackageWriter implements PackageWriter {
       const edits: StreamingSaveRequest['edits'][number][] = [],
         visualAdditions: NonNullable<StreamingSaveRequest['visualAdditions']>[number][] = [],
         formulaValues: NonNullable<StreamingSaveRequest['formulaValues']>[number][] = []
+      const pageSetupStates: SheetPageSetupState[] = [],
+        noteStates: SheetNoteState[] = []
+      const filterStates: SheetFilterState[] = []
       for (const sheet of state.sheets) {
         if (names.get(sheet.id) !== sheet.name)
           throw new WorkbookError(
             'invalid_document',
             'The structural log does not produce the current sheet map.',
           )
+        const heights = z
+          .record(z.string().regex(/^[1-9][0-9]*$/), z.number().finite().min(2).max(409))
+          .parse(sheet.features?.rowHeights ?? {})
+        const widths = z
+          .record(z.string().regex(/^[A-Z]{1,3}$/), z.number().finite().min(10).max(2000))
+          .parse(sheet.features?.colWidths ?? {})
+        const sizeOps = [
+          ...Object.entries(heights).map(([row, height]) => ({
+            kind: 'set-row-size' as const,
+            start: Number(row) - 1,
+            end: Number(row) - 1,
+            size: height,
+          })),
+          ...Object.entries(widths).map(([column, width]) => ({
+            kind: 'set-col-size' as const,
+            start: columnIndex(column),
+            end: columnIndex(column),
+            size: pixelsToColumnWidth(width),
+          })),
+        ]
+        if (sizeOps.length)
+          await writeStage({ edits: [], structuralOps: [{ sheetName: sheet.name, ops: sizeOps }] })
+        if (sheet.features?.mergeEdits) {
+          const original = sessionMerges({ merges: sheet.features.merges ?? [] })
+          const current = sessionMerges(sheet.features)
+          const ops = [
+            ...original.map((range) => ({ kind: 'unmerge-cells' as const, range })),
+            ...current.map((range) => ({ kind: 'merge-cells' as const, range })),
+          ]
+          if (ops.length)
+            await writeStage({ edits: [], structuralOps: [{ sheetName: sheet.name, ops }] })
+        }
+        if (sheet.features?.filterEdits) {
+          const { sheetId: _id, ...filter } = workbookFilterStateSchema.parse(
+            sheet.features.filterEdits,
+          )
+          filterStates.push({ sheetName: sheet.name, ...filter })
+        }
+        if (sheet.features?.pageSetupEdits || sheet.features?.freezeEdits) {
+          const page = sheet.features.pageSetupEdits
+            ? workbookOperationSchema.parse({
+                ...(sheet.features.pageSetupEdits as object),
+                op: 'set_page_setup',
+                sheetId: sheet.id,
+              })
+            : undefined
+          const freeze = sheet.features.freezeEdits
+            ? z
+                .object({
+                  frozenRows: z.number().int().min(0).max(100),
+                  frozenColumns: z.number().int().min(0).max(100),
+                })
+                .parse(sheet.features.freezeEdits)
+            : undefined
+          if (page && page.op !== 'set_page_setup')
+            throw new WorkbookError('invalid_document', 'Invalid page settings.')
+          const {
+            op: _op,
+            sheetId: _id,
+            ...settings
+          } = page ?? { op: undefined, sheetId: undefined }
+          pageSetupStates.push({ sheetName: sheet.name, ...settings, ...freeze })
+        }
+        if (sheet.features?.noteEdits) {
+          const original =
+            (sheet.features.originalMetadata as { comments?: SheetNoteState['notes'] } | undefined)
+              ?.comments ?? []
+          const notes = new Map(
+            original.map((note) => [String(note.row) + ':' + String(note.column), note]),
+          )
+          const changes = z
+            .record(z.string(), z.string().min(1).max(32000).nullable())
+            .parse(sheet.features.noteEdits)
+          for (const [address, text] of Object.entries(changes)) {
+            const point = parseAddress(address),
+              key = `${point.row}:${point.column}`
+            if (text === null) notes.delete(key)
+            else
+              notes.set(key, {
+                ...notes.get(key),
+                ...point,
+                author: notes.get(key)?.author ?? 'GenOffice',
+                text,
+              })
+          }
+          noteStates.push({ sheetName: sheet.name, notes: [...notes.values()] })
+        }
         const formulaCells: NonNullable<
           StreamingSaveRequest['formulaValues']
         >[number]['cells'][number][] = []
@@ -235,8 +332,23 @@ export class SessionPackageWriter implements PackageWriter {
           })
         }
       }
-      if (edits.length || visualAdditions.length || state.structuralLog.length)
-        await writeStage({ edits, visualAdditions, formulaValues, invalidateFormulaCaches: true })
+      if (
+        edits.length ||
+        visualAdditions.length ||
+        state.structuralLog.length ||
+        pageSetupStates.length ||
+        noteStates.length ||
+        filterStates.length
+      )
+        await writeStage({
+          edits,
+          visualAdditions,
+          formulaValues,
+          pageSetupStates,
+          noteStates,
+          filterStates,
+          invalidateFormulaCaches: true,
+        })
       assertNotCancelled(signal)
       if ((await hashFile(originalPath)) !== originalHash)
         throw new WorkbookError(

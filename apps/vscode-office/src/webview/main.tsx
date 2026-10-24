@@ -83,6 +83,8 @@ bridge.handle('view.presentation', async (raw) => {
     stateId: runtime.selectionContext.stateId,
     values: runtime.projectedValues(request.range),
     merges: runtime.projectedMerges(),
+    dimensions: runtime.projectedDimensions(request.range),
+    view: runtime.projectedView(),
     visible: !document.hidden,
     ...runtime.appearanceState,
   }

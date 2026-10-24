@@ -14,6 +14,7 @@ import type { WorkbookBindings } from '@genoffice/workbook-session/bindings'
 import type { readCurrentRange } from '@genoffice/workbook-session/read'
 import { toolSchemas, type ToolKind } from './schemas'
 import { SESSION_OPERATION_NAMES } from '@genoffice/xlsx-gateway/shared/session-operations'
+import { isLayoutOp, layoutOpLabel } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
 import type { WorkbookExchangeTools } from './exchange-tools'
 
 export interface ToolDocument {
@@ -107,7 +108,8 @@ export class WorkbookTools {
                               : 'name' in operation
                                 ? operation.name
                                 : 'workbook object'
-              return `${operation.op}: ${sheet?.name ?? ('sheetId' in operation ? operation.sheetId : 'workbook')}; ${area}`
+              const detail = isLayoutOp(operation) ? `; ${layoutOpLabel(operation)}` : ''
+              return `${operation.op}: ${sheet?.name ?? ('sheetId' in operation ? operation.sheetId : 'workbook')}; ${area}${detail}`
             })
             .join('\n')
         : ''

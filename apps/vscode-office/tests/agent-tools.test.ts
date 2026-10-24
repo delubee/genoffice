@@ -75,6 +75,21 @@ it('prepare only describes effects, while invocation rechecks the explicit targe
   }
   expect(tools.prepare('apply', input)).toMatchObject({ confirmationRequired: true })
   expect(tools.prepare('apply', input).message).toContain('A1')
+  const viewEffect = tools.prepare('apply', {
+    ...input,
+    operations: [
+      {
+        op: 'set_page_setup',
+        sheetId: state.sheets[0]!.id,
+        zoomScale: 125,
+        showGridlines: false,
+        showHeadings: true,
+      },
+    ],
+  }).message
+  expect(viewEffect).toContain('view zoom 125%')
+  expect(viewEffect).toContain('hide gridlines')
+  expect(viewEffect).toContain('show headings')
   expect(
     await tools.invoke('apply', {
       ...input,

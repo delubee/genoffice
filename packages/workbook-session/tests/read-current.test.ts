@@ -141,4 +141,38 @@ it('projects complete merge geometry and current off-page anchors without mutati
   })
   expect(ordinary.cells).toHaveLength(4)
   expect(ordinary).not.toHaveProperty('merges')
+  current.sheets[0]!.features = { ...current.sheets[0]!.features, mergeEdits: [] }
+  const unmerged = await readCurrentRange({
+    state: current,
+    sessionId: 'source',
+    source: mergedSource,
+    logicalSheetId: sheetId,
+    range: 'B2:C3',
+    includeMerges: true,
+  })
+  expect(unmerged).toHaveProperty('merges', [])
+  expect(unmerged.cells.some((cell) => cell.address === 'A1')).toBe(false)
+})
+
+it('returns finite JSON for hidden rows without explicit heights', async () => {
+  const { assertSerializable } = await import('@genoffice/xlsx-gateway/shared/json-data')
+  const sourceWithHiddenRow = {
+    ...source,
+    async readFeatures() {
+      return { indexingComplete: true, merges: [], styles: [] }
+    },
+    async readBaseRange() {
+      return { cells: [], rows: [{ row: 0, hidden: true }] }
+    },
+  }
+  const view = await readCurrentRange({
+    state,
+    sessionId: 'source',
+    source: sourceWithHiddenRow,
+    logicalSheetId: sheetId,
+    range: 'A1:C2',
+    includeMerges: true,
+  })
+  expect(() => assertSerializable(view)).not.toThrow()
+  expect(view).toHaveProperty('rows', [{ row: 0, hidden: true }])
 })

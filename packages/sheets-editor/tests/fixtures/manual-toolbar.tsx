@@ -43,7 +43,10 @@ export async function mountManualToolbar(appearanceControls = false, merged = fa
   const host: EditorHost = {
     async read(sheetId) {
       return {
-        merges: state.sheets.find((sheet) => sheet.id === sheetId)!.features?.merges ?? [],
+        merges:
+          state.sheets.find((sheet) => sheet.id === sheetId)!.features?.mergeEdits ??
+          state.sheets.find((sheet) => sheet.id === sheetId)!.features?.merges ??
+          [],
         cells: Object.entries(state.sheets.find((sheet) => sheet.id === sheetId)!.cells).map(
           ([address, cell]) => ({ address, ...cell }),
         ),
@@ -128,6 +131,16 @@ export async function mountManualToolbar(appearanceControls = false, merged = fa
     value(address: string) {
       return facade.getActiveWorkbook().getActiveSheet().getRange(address).getValue()
     },
+    sizes: () => projection.projectedDimensions('A1:C3'),
+    flush: () => projection.flushEditor(),
+    cellRect: (address: string) => {
+      const cell = facade.getActiveWorkbook().getActiveSheet().getRange(address).getCellRect()
+      return { left: cell.left, right: cell.right, top: cell.top, bottom: cell.bottom }
+    },
+    view: () => projection.projectedView(),
+    merges: () => projection.projectedMerges(),
+    rowVisible: (row: number) =>
+      facade.getActiveWorkbook().getActiveSheet().getSheet().getRowVisible(row),
     formula() {
       try {
         facade.getActiveWorkbook().getActiveSheet().getRange('C2').setFormula('=B2*2')
@@ -146,6 +159,11 @@ export async function mountManualToolbar(appearanceControls = false, merged = fa
       ).runtime.univer
         .__getInjector()
         .get(ThemeService).darkMode,
+    editNote(value: string) {
+      return projection.enqueue([
+        { op: 'set_note', sheetId: 'toolbar-sheet', address: 'B2', text: value },
+      ])
+    },
     edit() {
       return projection.enqueue([
         { op: 'set_cell', sheetId: 'toolbar-sheet', address: 'B2', value: 200 },
