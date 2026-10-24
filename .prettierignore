@@ -5,6 +5,9 @@ release/
 .build/
 target/
 coverage/
+**/.vscode-test/
+**/test-workspace/
+**/playwright-report/
 
 # Generated artifacts and dependency-managed metadata.
 package-lock.json

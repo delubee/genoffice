@@ -1,0 +1,243 @@
+:root {
+  --surface: var(--vscode-editor-background);
+  --text: var(--vscode-editor-foreground);
+  --chrome: var(--vscode-sideBar-background);
+  --border: var(--vscode-panel-border);
+  --hover: var(--vscode-toolbar-hoverBackground);
+  --input: var(--vscode-input-background);
+  --error: var(--vscode-errorForeground);
+  --workbook-accent: var(--vscode-focusBorder);
+  --workbook-accent-text: var(--vscode-button-foreground);
+  --workbook-font: var(--vscode-font-family);
+  --workbook-font-size: var(--vscode-font-size);
+  color-scheme: light dark;
+}
+/* This palette changes interface chrome only; authored cells keep their colors. */
+:root[data-workbook-appearance='excel'] {
+  --surface: #ffffff;
+  --text: #242424;
+  --chrome: #f3f3f3;
+  --border: #d1d1d1;
+  --hover: #e5f1e9;
+  --input: #ffffff;
+  --error: #b42318;
+  --workbook-accent: #217346;
+  --workbook-accent-text: #ffffff;
+  --workbook-font: 'Segoe UI', Calibri, Arial, sans-serif;
+  --workbook-font-size: 13px;
+  color-scheme: light;
+}
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+body {
+  background: var(--surface);
+  color: var(--text);
+  font: var(--workbook-font-size) var(--workbook-font);
+}
+.workbook-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.workbook-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px;
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border);
+}
+.workbook-toolbar button,
+.workbook-toolbar input,
+.workbook-toolbar select {
+  color: var(--text);
+  background: var(--input);
+  border: 1px solid var(--border);
+  padding: 4px 6px;
+  font: inherit;
+}
+.workbook-toolbar button:hover {
+  background: var(--hover);
+}
+.workbook-toolbar input {
+  width: 100px;
+}
+.workbook-content {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.workbook-grid {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+.workbook-charts {
+  width: min(34vw, 380px);
+  overflow: auto;
+  border-left: 1px solid var(--border);
+  background: var(--chrome);
+}
+.workbook-charts section {
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.workbook-charts svg {
+  width: 100%;
+}
+.workbook-charts input,
+.workbook-charts select,
+.workbook-charts button {
+  max-width: 100%;
+  color: var(--text);
+  background: var(--input);
+  border: 1px solid var(--border);
+  padding: 4px;
+  font: inherit;
+}
+.workbook-error {
+  padding: 6px;
+  color: var(--error);
+  background: var(--surface);
+}
+
+.workbook-appearance {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 8px;
+}
+:root[data-workbook-appearance='excel'] .workbook-toolbar {
+  padding: 10px 12px;
+  gap: 6px;
+  border-top: 4px solid var(--workbook-accent);
+}
+:root[data-workbook-appearance='excel'] .workbook-toolbar button,
+:root[data-workbook-appearance='excel'] .workbook-toolbar input,
+:root[data-workbook-appearance='excel'] .workbook-toolbar select {
+  border-radius: 3px;
+}
+.workbook-toolbar :focus-visible {
+  outline: 2px solid var(--workbook-accent);
+  outline-offset: 1px;
+}
+
+:root[data-workbook-appearance='vscode'] body.vscode-dark,
+:root[data-workbook-appearance='vscode'] body.vscode-high-contrast {
+  color-scheme: dark;
+}
+:root[data-workbook-appearance='vscode'] body.vscode-light,
+:root[data-workbook-appearance='vscode'] body.vscode-high-contrast-light {
+  color-scheme: light;
+}
+
+.workbook-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 12px;
+  color: var(--workbook-accent-text);
+  background: var(--workbook-accent);
+}
+
+.workbook-quick-access {
+  align-items: center;
+  flex-shrink: 0;
+}
+.workbook-ribbon {
+  background: var(--chrome);
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+.workbook-ribbon-tabs {
+  display: flex;
+  overflow-x: auto;
+  gap: 2px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--border);
+}
+.workbook-ribbon-tabs button {
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--text);
+  border: 0;
+  border-bottom: 3px solid transparent;
+  padding: 8px 16px;
+  font: inherit;
+  cursor: pointer;
+}
+.workbook-ribbon-tabs button[aria-selected='true'] {
+  color: var(--workbook-accent);
+  border-bottom-color: var(--workbook-accent);
+  font-weight: 600;
+}
+.workbook-ribbon-tabs button:hover {
+  background: var(--hover);
+}
+.workbook-ribbon button:focus-visible,
+.workbook-ribbon input:focus-visible,
+.workbook-ribbon select:focus-visible,
+.workbook-ribbon textarea:focus-visible {
+  outline: 2px solid var(--workbook-accent);
+  outline-offset: 1px;
+}
+.workbook-ribbon-panel {
+  flex-wrap: nowrap;
+  align-items: stretch;
+  min-height: 118px;
+  max-height: 196px;
+  overflow: auto;
+  border: 0;
+  padding: 6px 8px;
+}
+.workbook-ribbon-panel[hidden] {
+  display: none;
+}
+.workbook-ribbon-group {
+  flex: 0 0 auto;
+  width: 310px;
+  min-width: 180px;
+  margin: 0;
+  border: 0;
+  border-right: 1px solid var(--border);
+  padding: 4px 12px 8px 4px;
+}
+.workbook-ribbon-group legend {
+  padding: 0 4px;
+  font-size: 0.9em;
+  color: var(--text);
+}
+.workbook-ribbon-group > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.workbook-ribbon-group label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.workbook-ribbon-group input[type='checkbox'] {
+  width: auto;
+  accent-color: var(--workbook-accent);
+}
+.workbook-ribbon-group textarea {
+  width: 100%;
+  height: 48px;
+  resize: vertical;
+  color: var(--text);
+  background: var(--input);
+  border: 1px solid var(--border);
+  font: inherit;
+}
+.workbook-ribbon-group p {
+  margin: 0;
+  font-size: 0.9em;
+}

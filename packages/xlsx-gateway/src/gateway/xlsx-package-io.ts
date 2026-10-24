@@ -81,6 +81,8 @@ export interface ArchiveClient {
 }
 
 export interface StreamingSaveRequest {
+  /** Clear unverified formula caches, then apply explicitly supplied fresh results. */
+  readonly invalidateFormulaCaches?: boolean
   readonly client: ArchiveClient
   readonly sourcePath: string
   readonly targetPath: string
@@ -183,6 +185,7 @@ export async function saveWorkbookViaSidecar(
       request.tabColorStates ?? [],
       request.tableEdits ?? [],
       request.cellImageAdditions ?? [],
+      request.invalidateFormulaCaches ?? false,
     )
 
     const replacements = await writePlanContents(workDir, 'replace', plan.replaced)

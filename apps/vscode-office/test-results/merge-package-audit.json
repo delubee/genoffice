@@ -1,0 +1,18 @@
+{
+  "passed": true,
+  "target": "win32-x64",
+  "version": "0.1.4",
+  "vsixSha256": "20874cea23d520246dd829785935e1e76eb6413e32aaffba3d29d82c16f58b4d",
+  "bytes": 6788106,
+  "sidecarSha256": "9508b0d98e55a16b63cf74e1cab7a3eb7d0f80d0881cdc925286cc371a4acb05",
+  "peMachine": "0x8664",
+  "imports": [
+    "bcryptprimitives.dll",
+    "api-ms-win-core-synch-l1-2-0.dll",
+    "bcrypt.dll",
+    "ADVAPI32.dll",
+    "KERNEL32.dll",
+    "ntdll.dll"
+  ],
+  "requiresVCRedistributableDll": false
+}

@@ -85,7 +85,10 @@ export class InMemoryWorkbookAdapter implements WorkbookAdapter {
   private readonly committedTransactions = new Set<string>()
   private readonly auditLog: AuditRecord[] = []
 
-  constructor(snapshot: WorkbookSnapshot) {
+  constructor(
+    snapshot: WorkbookSnapshot,
+    private readonly options: { sortLocale?: string } = {},
+  ) {
     this.snapshot = structuredClone(snapshot)
   }
 
@@ -119,7 +122,7 @@ export class InMemoryWorkbookAdapter implements WorkbookAdapter {
       return sheet.cells[address] ?? { value: null }
     }
 
-    for (const operation of expandToPrimitiveOps(batch.operations, readCell)) {
+    for (const operation of expandToPrimitiveOps(batch.operations, readCell, this.options)) {
       if (operation.op === 'fill_range') {
         // Demo workbooks clone every cell per revision, so fills stay at the
         // per-cell preview scale; imported files get the range-level executor
@@ -852,5 +855,8 @@ function replaceCell(
   cell: CellState,
 ): void {
   const sheet = findSheet(snapshot, sheetId)
-  replaceSheet(snapshot, { ...sheet, cells: { ...sheet.cells, [address]: cell } })
+  // Every caller owns a structuredClone made by plan() or apply(). Copying the
+  // complete dictionary per cell makes a 1,000-cell batch quadratic in workbook
+  // size; mutating that private working copy preserves external snapshot isolation.
+  ;(sheet.cells as Record<string, CellState>)[address] = cell
 }

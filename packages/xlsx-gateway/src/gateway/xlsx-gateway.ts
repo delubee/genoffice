@@ -755,6 +755,7 @@ export async function planCellEditsToXlsx(
   tabColorStates: readonly SheetTabColorState[] = [],
   tableEdits: readonly SheetTableEdit[] = [],
   cellImageAdditions: readonly SheetCellImageAddition[] = [],
+  invalidateFormulaCaches = false,
 ): Promise<MutationPlan> {
   // A pending pivot pins final coordinates for its source and output; shifts
   // on either sheet, and sheet renames (worksheetSource@sheet), would desync
@@ -858,6 +859,10 @@ export async function planCellEditsToXlsx(
   }
 
   const sheetNames = new Set([
+    ...(invalidateFormulaCaches
+      ? parseSheetElements(await pkg.readText('xl/workbook.xml')).map((sheet) => sheet.name)
+      : []),
+    ...formulaValues.map((sheet) => sheet.sheetName),
     ...edits.map((edit) => edit.sheetName),
     ...bulkConstantFills.map((fill) => fill.sheetName),
     ...structuralOps.map((sheet) => sheet.sheetName),
@@ -1087,6 +1092,16 @@ export async function planCellEditsToXlsx(
       worksheetXmls.set(sheetName, worksheetXml)
     }
   }
+  if (invalidateFormulaCaches)
+    for (const [sheetName, xml] of worksheetXmls)
+      worksheetXmls.set(
+        sheetName,
+        xml.replace(/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g, (cell) => {
+          if (!/<f[\s/>]/.test(cell)) return cell
+          const address = /\br="([A-Z]+[1-9][0-9]*)"/.exec(cell)?.[1]
+          return address ? patchFormulaCachedValue(cell, address, null) : cell
+        }),
+      )
   // Recalculated formula results: refresh each formula cell's cached
   // <v> while leaving its <f> alone. Applied after the value edits so a cell the
   // user turned into a literal keeps that literal.
@@ -2907,6 +2922,8 @@ function serializeStyledCell(
   arrayRef?: string,
 ): string {
   const style = styleIndex === undefined ? '' : ` s="${styleIndex}"`
+  if (cell.error && !cell.formula && typeof cell.value === 'string')
+    return `<c r="${address}" t="e"${style}><v>${escapeXmlText(cell.value)}</v></c>`
   if (cell.formula) {
     return `<c r="${address}"${style}>${formulaXml(address, cell.formula.replace(/^=/, ''), arrayRef)}</c>`
   }
@@ -3013,6 +3030,8 @@ function formulaXml(address: string, formula: string, arrayRef?: string): string
 }
 
 function serializeCell(address: string, cell: CellState): string {
+  if (cell.error && !cell.formula && typeof cell.value === 'string')
+    return `<c r="${address}" t="e"><v>${escapeXmlText(cell.value)}</v></c>`
   if (cell.formula) {
     return `<c r="${address}">${formulaXml(address, cell.formula.slice(1))}</c>`
   }

@@ -471,6 +471,9 @@ pub struct CellRecord {
     pub row: usize,
     pub column: usize,
     pub value: Option<CellValue>,
+    /// Preserve OOXML errors separately from literal strings such as "#REF!".
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub is_error: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub formula: Option<String>,
     /// `<f t="array" ref>`: the legacy CSE range this master formula fills.
@@ -723,6 +726,13 @@ pub struct RowOutlineEntry {
 #[serde(rename_all = "camelCase")]
 pub struct RowOutlineResult {
     pub rows: Vec<RowOutlineEntry>,
+    pub indexing_complete: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeRangesResult {
+    pub merges: Vec<MergedRange>,
     pub indexing_complete: bool,
 }
 

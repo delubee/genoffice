@@ -1,0 +1,12 @@
+{
+  "phase": "recover",
+  "passed": true,
+  "version": "1.109.5",
+  "oldSessionId": "3c2dfe7a-6081-4938-9c62-4b25bd2d0819",
+  "newSessionId": "61b71f5d-84e2-4ad7-bbf9-6648a036719b",
+  "recoveredStateId": "de2af864-8ec2-4126-b70e-148be1c419f2",
+  "originalHash": "8cdb24baa6557abf1638ae667ead65639d1fd6b08da69ee4d635e7496a783844",
+  "platform": "linux-x64",
+  "runRoot": "/home/github/genoffice/apps/vscode-office/.vscode-test/normal-recovery-Licx0j",
+  "checkedAt": "2026-10-22T09:24:58.512Z"
+}

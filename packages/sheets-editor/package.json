@@ -1,0 +1,39 @@
+{
+  "name": "@genoffice/sheets-editor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "Browser workbook editor and isolated candidate interpreter",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts",
+    "./WorkbookEditor": "./src/WorkbookEditor.tsx"
+  },
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@genoffice/xlsx-gateway": "*",
+    "@univerjs/core": "^0.25.1",
+    "@univerjs/preset-sheets-core": "^0.25.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "zod": "^4.3.6",
+    "@univerjs/sheets": "^0.25.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.0.4",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "vitest": "^4.1.11",
+    "esbuild": "^0.25.0",
+    "@types/vscode": "1.109.0"
+  }
+}

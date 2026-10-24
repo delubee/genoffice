@@ -19,6 +19,8 @@ export default defineConfig({
           '@genoffice/i18n',
           '@genoffice/pptx-render',
           '@genoffice/xlsx-gateway',
+          '@genoffice/workbook-session',
+          '@genoffice/sheets-editor',
         ],
       }),
     ],

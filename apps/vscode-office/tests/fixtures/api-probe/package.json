@@ -1,0 +1,47 @@
+{
+  "name": "workbook-api-probe",
+  "publisher": "genoffice-test",
+  "version": "0.0.0",
+  "private": true,
+  "engines": {
+    "vscode": "^1.109.5"
+  },
+  "main": "./index.cjs",
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "genoffice-test.probe",
+        "displayName": "API Probe",
+        "selector": [
+          {
+            "filenamePattern": "*.testbook"
+          }
+        ],
+        "priority": "option"
+      }
+    ],
+    "languageModelTools": [
+      {
+        "name": "genoffice_test_probe",
+        "displayName": "API Probe",
+        "modelDescription": "Test-only stable API probe",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "expected": {
+              "type": "number"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "expected",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      }
+    ]
+  }
+}

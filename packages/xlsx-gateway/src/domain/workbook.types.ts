@@ -15,6 +15,8 @@ import type { SheetVisual } from './chart-visual'
 export type CellScalar = string | number | boolean | null
 
 export interface CellState {
+  /** OOXML error value, distinct from a literal error-looking string. */
+  readonly error?: boolean | undefined
   readonly value: CellScalar
   readonly formula?: string | undefined
   /** raw model value where `value` is the rendered display text (numfmt

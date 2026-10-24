@@ -51,6 +51,12 @@ pub enum Command {
         #[serde(rename = "visualId")]
         visual_id: String,
     },
+    ReadMergeRanges {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+        #[serde(rename = "sheetId")]
+        sheet_id: String,
+    },
     ReadFormulaCells {
         #[serde(rename = "sessionId")]
         session_id: String,
@@ -548,6 +554,12 @@ pub fn handle_request(
             visual_id,
         } => sessions
             .read_media(&session_id, &visual_id)
+            .and_then(to_json_value),
+        Command::ReadMergeRanges {
+            session_id,
+            sheet_id,
+        } => sessions
+            .read_merge_ranges(&session_id, &sheet_id)
             .and_then(to_json_value),
         Command::ReadFormulaCells {
             session_id,

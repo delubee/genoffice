@@ -548,6 +548,35 @@ impl WorkbookSessions {
         session.read_range(sheet_index, range)
     }
 
+    /// Sheet-wide merge geometry without loading any cell chunks.
+    pub fn read_merge_ranges(
+        &mut self,
+        session_id: &str,
+        sheet_id: &str,
+    ) -> Result<MergeRangesResult, SidecarError> {
+        let session = self
+            .sessions
+            .get_mut(session_id)
+            .ok_or_else(|| SidecarError::InvalidRequest("Unknown workbook session.".into()))?;
+        let sheet_index = session
+            .sheets
+            .iter()
+            .position(|sheet| sheet.id == sheet_id)
+            .ok_or_else(|| SidecarError::InvalidRequest("Unknown worksheet.".into()))?;
+        session.ensure_parser(sheet_index)?;
+        let (lock, _) = &*session.runtimes[sheet_index].state;
+        let index = lock
+            .lock()
+            .map_err(|_| SidecarError::Io("Worksheet index lock was poisoned.".into()))?;
+        if let Some(error) = &index.error {
+            return Err(SidecarError::Workbook(error.clone()));
+        }
+        Ok(MergeRangesResult {
+            merges: index.merges.clone(),
+            indexing_complete: index.complete,
+        })
+    }
+
     pub fn read_formula_cells(
         &mut self,
         session_id: &str,

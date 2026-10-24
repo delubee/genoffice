@@ -825,6 +825,9 @@ const isValidPrintTitles = (value: string): boolean => {
 const setPageSetupSchema = z.object({
   op: z.literal('set_page_setup'),
   sheetId: z.string().min(1),
+  showGridlines: z.boolean().optional(),
+  showHeadings: z.boolean().optional(),
+  zoomScale: z.number().int().min(10).max(400).optional(),
   orientation: z.enum(['portrait', 'landscape']).optional(),
   /** OOXML paper-size code: 1 Letter, 8 A3, 9 A4, 11 A5 … */
   paperSize: z.number().int().min(1).max(118).optional(),
@@ -1699,6 +1702,7 @@ function setRangeOrigin(operation: SetRangeOperation): { startRow: number; start
 export function expandToPrimitiveOps(
   operations: readonly WorkbookOperation[],
   readCell?: ExpandCellReader,
+  options: { sortLocale?: string } = {},
 ): PrimitiveOperation[] {
   const convertBatchError = convertToValuesBatchError(operations)
   if (convertBatchError) throw new Error(convertBatchError)
@@ -1861,6 +1865,7 @@ export function expandToPrimitiveOps(
           byColumn: operation.byColumn,
           ascending: operation.order === 'asc',
           hasHeader: operation.hasHeader ?? false,
+          locale: options.sortLocale,
         },
         (address) => readCell(address, operation.sheetId),
       )
@@ -2223,6 +2228,10 @@ export function layoutOpLabel(op: LayoutOperation): string {
       return `Delete defined name ${op.name}`
     case 'set_page_setup': {
       const parts: string[] = []
+      if (op.zoomScale !== undefined) parts.push(`view zoom ${op.zoomScale}%`)
+      if (op.showGridlines !== undefined)
+        parts.push(`${op.showGridlines ? 'show' : 'hide'} gridlines`)
+      if (op.showHeadings !== undefined) parts.push(`${op.showHeadings ? 'show' : 'hide'} headings`)
       if (op.orientation !== undefined) parts.push(op.orientation)
       if (op.paperSize !== undefined) parts.push(`paper ${op.paperSize}`)
       if (op.scale !== undefined) parts.push(`scale ${op.scale}%`)

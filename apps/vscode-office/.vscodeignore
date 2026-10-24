@@ -1,0 +1,15 @@
+**/*
+!package.json
+!README.md
+!IMPLEMENTATION-STATUS.md
+!LICENSE
+!THIRD-PARTY-NOTICES.txt
+!docs/troubleshooting.md
+!dist/extension.cjs
+!dist/webview/**
+!native/**
+!skills/genoffice-workbook/**
+**/__pycache__/**
+**/*.pyc
+**/*.map
+**/.DS_Store
