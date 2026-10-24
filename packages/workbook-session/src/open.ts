@@ -1,10 +1,11 @@
 import { constants } from 'node:fs'
-import { copyFile, realpath, stat, chmod } from 'node:fs/promises'
+import { copyFile, stat, chmod } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { assertNotCancelled, WorkbookError, type OriginalBase } from './domain'
 import type { WorkbookSource } from './ports'
 import { hashFile, privateDirectory, RetainedResource } from './resources'
+import { resolveDocumentPath } from './document-path'
 
 export async function openWorkbookSnapshot(input: {
   uri: string
@@ -20,7 +21,7 @@ export async function openWorkbookSnapshot(input: {
       'Only a file on the extension host is supported.',
     )
   const path = fileURLToPath(url),
-    canonicalPath = await realpath(path),
+    canonicalPath = await resolveDocumentPath(path),
     physical = await stat(canonicalPath)
   if (!physical.isFile())
     throw new WorkbookError('unsupported_resource', 'The workbook must be a regular file.')

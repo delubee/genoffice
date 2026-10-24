@@ -38,6 +38,16 @@ anchor; writes to covered cells are rejected. Save and reopen preserve merges.
 Copying/filling merged ranges and changing row/column structure in workbooks
 containing merges are not supported in this preview.
 
+## Windows virtual-drive paths (0.1.5)
+
+Opening and saving user-selected documents tolerate Windows filesystems that
+allow access but report `UNKNOWN`/unsupported from `realpath`. The compatibility
+path checks existence and follows readable junction targets, with cycle limits.
+Missing-file and permission errors still fail. Workspace exchange, skill and
+recovery containment checks retain their strict canonical-path rules.
+This handles path resolution; it does not add unsupported filesystem operations
+such as hard links or change the save conflict checks.
+
 ## Merge editing (0.1.4)
 
 Home now includes **Merge cells** and **Unmerge cells**. Select a range to merge;

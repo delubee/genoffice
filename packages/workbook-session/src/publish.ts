@@ -1,9 +1,10 @@
 import { constants } from 'node:fs'
-import { chmod, copyFile, link, open, realpath, rename, stat, unlink } from 'node:fs/promises'
+import { chmod, copyFile, link, open, rename, stat, unlink } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { WorkbookError } from './domain'
 import { hashFile } from './resources'
+import { resolveDocumentPath } from './document-path'
 
 export interface FileBaseline {
   requestedPath: string
@@ -21,10 +22,10 @@ export async function captureFileBaseline(path: string): Promise<FileBaseline> {
   const requestedPath = resolve(path)
   let canonicalPath: string
   try {
-    canonicalPath = await realpath(requestedPath)
+    canonicalPath = await resolveDocumentPath(requestedPath)
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-    const parent = await realpath(dirname(requestedPath)).catch(
+    const parent = await resolveDocumentPath(dirname(requestedPath)).catch(
       (missing: NodeJS.ErrnoException) => {
         if (missing.code === 'ENOENT') return dirname(requestedPath)
         throw missing
