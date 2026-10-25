@@ -1,12 +1,22 @@
-# GenOffice Workbook for VS Code
+# GenOffice for VS Code
 
-Preview extension for manual and agent editing of `.xlsx` workbooks. Documents use a custom editor; chat, model choice, skills and terminal execution use VS Code's native agent features. VS Code 1.109.5 or later is required. No model credentials are managed by this extension.
+Preview extension for manual and agent editing of `.xlsx` workbooks and `.docx` documents. Both editors ship in the same VSIX, retaining extension ID `genoffice.genoffice-workbook`. Chat, model choice, skills and terminal execution use VS Code's native agent features. VS Code 1.109.5 or later is required. No model credentials are managed by this extension.
 
 ## Install and open
 
 Install the VSIX matching the **extension host**: Linux x64, Windows x64 or macOS arm64. In Remote SSH, install it on the remote host. Use **Extensions → Install from VSIX**, trust the workspace, and open an XLSX with **Open With → GenOffice Workbook** or **GenOffice: Open Workbook**. Unsupported host architectures, virtual workspaces and browser-only VS Code are rejected.
 
 Linux x64 and Windows 11 x64 are locally verified. macOS 14 arm64 and actual Remote SSH acceptance remain unverified. See [implementation status](IMPLEMENTATION-STATUS.md) in the source repository and `test-results/` for exact evidence. This preview is not a release candidate.
+
+## Word documents (0.2.0)
+
+Open a `.docx` with **Open With → GenOffice Word**. The Word-style toolbar supports manual text editing, font/size, bold/italic/underline/strike, alignment, headings, real numbered/bulleted lists and rectangular tables with row/column operations. Save, Save As and undo/redo use VS Code. `genoffice.docx.appearance` defaults to `word`; choose `vscode` to follow the editor chrome. Document paper, colors and authored formatting are preserved.
+
+Enable `genoffice_docx_*` tools in native Agent chat. Context with an explicit documentUri returns a bindingId; read current blocks before applying versioned edits. Context without a target lists open DOCX documents. `selection: true` binds the synchronized selection, which expires when the document changes. Edits remain unsaved until you save them.
+
+For Python, use export → a visible workspace script → prepare_import → apply_import. Only text changes in editable paragraphs are imported; IDs, order and metadata must be retained. The preview binds the result hash and document revision. The shipped skill includes [DOCX instructions](skills/genoffice-workbook/references/docx.md) and a standard-library example script. Python runs through the native terminal/agent environment.
+
+Original images, headers/footers, private runs and advanced objects are retained. Advanced objects and merged/complex tables are protected in this first slice. Header/footer editing, tracked changes, comments and precise Word pagination are outside this version. DOCX files are limited to 16 MiB, reads to 100 blocks, edit batches to 100 operations and exchange files to 1000 blocks / 2 MiB. DOCX loads separately from XLSX and shares no document state with it.
 
 ## Interface style
 
@@ -63,15 +73,15 @@ and reopening; original workbook structures can still restrict those changes.
 The workbook now has seven tabs. Their controls use the same revision-checked,
 undoable document operations as native agent tools.
 
-| Tab | Available controls |
-| --- | --- |
-| Home | Fonts/basic formats, alignment, copy/fill, worksheet and row/column operations, row height and column width |
-| Insert | Session column, bar, line and pie charts |
-| Page Layout | Paper size, orientation, margins, print area and print scaling |
-| Formulas | Explicit formula input, SUM/AVERAGE/COUNT/MIN/MAX summaries and recalculation |
-| Data | Sort by the first selected column, value filters and clearing contents |
-| Review | Read/add/change/delete text notes; find and replace in the selected range |
-| View | Gridlines, headings, zoom and frozen rows/columns |
+| Tab         | Available controls                                                                                          |
+| ----------- | ----------------------------------------------------------------------------------------------------------- |
+| Home        | Fonts/basic formats, alignment, copy/fill, worksheet and row/column operations, row height and column width |
+| Insert      | Session column, bar, line and pie charts                                                                    |
+| Page Layout | Paper size, orientation, margins, print area and print scaling                                              |
+| Formulas    | Explicit formula input, SUM/AVERAGE/COUNT/MIN/MAX summaries and recalculation                               |
+| Data        | Sort by the first selected column, value filters and clearing contents                                      |
+| Review      | Read/add/change/delete text notes; find and replace in the selected range                                   |
+| View        | Gridlines, headings, zoom and frozen rows/columns                                                           |
 
 Hover over the middle of a row/column header separator until its resize grip
 appears, then drag; or select cells and use **Home → Row and column sizes**. Row height is in points; column width is in pixels. Original
@@ -110,17 +120,17 @@ Cancellation preserves already committed batches and receipts. Undo reverts each
 
 ## Limits and measured capacity
 
-| Operation | Limit |
-| --- | --- |
-| Current read | 2,000 cells; 200 with formats |
-| Aggregate | 1,000,000 cells; 50 frequent values |
-| Ordinary expanded edit | 2,000 cells; 1,000 operations |
-| Supported range operation | 200,000 cells, subject to budgets |
-| Typed exchange artifact | 1,000,000 cells AND 64 MiB |
-| NDJSON record / manifest | 256 KiB each |
-| Import commit | At most 1,000 cells |
-| Import plan lifetime | 30 minutes |
-| Forward + inverse transaction | 64 MiB |
+| Operation                       | Limit                                 |
+| ------------------------------- | ------------------------------------- |
+| Current read                    | 2,000 cells; 200 with formats         |
+| Aggregate                       | 1,000,000 cells; 50 frequent values   |
+| Ordinary expanded edit          | 2,000 cells; 1,000 operations         |
+| Supported range operation       | 200,000 cells, subject to budgets     |
+| Typed exchange artifact         | 1,000,000 cells AND 64 MiB            |
+| NDJSON record / manifest        | 256 KiB each                          |
+| Import commit                   | At most 1,000 cells                   |
+| Import plan lifetime            | 30 minutes                            |
+| Forward + inverse transaction   | 64 MiB                                |
 | Retained unique history storage | 256 MiB; edits reject before eviction |
 
 100,000-cell input analysis and complete 100,000-cell output were actually verified locally. Full output took about 11 minutes for 100 batches in a Node/Rust correctness test; this is not a UI latency claim. Spreadsheet address dimensions and configured limits are not tested capacity claims. Formula values with unverified caches are reported pending. Original dates preserve workbook date system and serials, including serial 60.

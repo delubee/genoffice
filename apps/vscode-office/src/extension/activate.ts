@@ -3,12 +3,20 @@ import { WorkbookEditorProvider, EDITOR_ID } from './provider'
 import { registerWorkbookTools } from './tools/register'
 import { registerBindSelection } from './commands/bind-selection'
 import { registerWorkbookSkillCommands } from './commands/install-skill'
+import { LazyDocxProvider } from './docx-proxy'
 export function activate(context: vscode.ExtensionContext) {
   const output = vscode.window.createOutputChannel('GenOffice Workbook')
   const provider = new WorkbookEditorProvider(context, output)
+  const docx = new LazyDocxProvider(context)
   context.subscriptions.push(
     output,
     provider,
+    docx,
+    docx.registerTools(),
+    vscode.window.registerCustomEditorProvider('genoffice.docx', docx, {
+      supportsMultipleEditorsPerDocument: false,
+      webviewOptions: { retainContextWhenHidden: true },
+    }),
     registerWorkbookTools(provider),
     registerBindSelection(provider),
     registerWorkbookSkillCommands(context),
@@ -43,6 +51,8 @@ export function activate(context: vscode.ExtensionContext) {
     operationStatus: provider.operationStatus.bind(provider),
     ...(context.extensionMode === vscode.ExtensionMode.Test
       ? {
+          docxBackupForTests: docx.backupForTests.bind(docx),
+          docxRestoreForTests: docx.restoreForTests.bind(docx),
           revertForTests: async (uri: vscode.Uri) => {
             const document = provider.getDocument(uri)
             if (!document) throw new Error('The test workbook is not open.')

@@ -140,6 +140,7 @@ export const protocolMessageSchema = z.strictObject({
     'history.request',
     'source.read',
     'view.dispose',
+    'docx.operations',
   ]),
   payload: z.json(),
 })

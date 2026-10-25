@@ -1,3 +1,13 @@
+/** Escape a value inside a quoted CSS attribute selector in browsers and Node. */
+function cssQuotedValue(value: string): string {
+  return (
+    value
+      .replace(/\0/g, '\uFFFD')
+      // eslint-disable-next-line no-control-regex -- CSS strings must escape C0 control characters.
+      .replace(/["\\\x01-\x1f\x7f]/g, (character) => `\\${character.charCodeAt(0).toString(16)} `)
+  )
+}
+
 import {
   paraCsFormat,
   readSections,
@@ -304,7 +314,7 @@ function listGroupSelectors(parsed: ParsedDocFull): string[] {
   const groups = new Map<string, string[]>()
   for (const [numId, def] of parsed.numbering ?? []) {
     const g = groups.get(def.abstractNumId) ?? []
-    g.push(`[data-num="${CSS.escape(numId)}"]`)
+    g.push(`[data-num="${cssQuotedValue(numId)}"]`)
     groups.set(def.abstractNumId, g)
   }
   const known = [...groups.values()].flat()
@@ -796,7 +806,7 @@ export function docStyleCss(parsed: ParsedDocFull): string {
   for (const info of parsed.styles.values()) {
     const t = info.tableDisplay
     if (info.type !== 'table' || !t) continue
-    const sel = `.doc-page table[data-tbl-style="${CSS.escape(info.styleId)}"]`
+    const sel = `.doc-page table[data-tbl-style="${cssQuotedValue(info.styleId)}"]`
     const tableDark = fillInk(t.fill) === 'light'
     if (t.fill) {
       rules.push(`${sel} td, ${sel} th { background:#${t.fill} }`)
@@ -1028,7 +1038,7 @@ export function docStyleCss(parsed: ParsedDocFull): string {
       decls.push(`--doc-line-mult:${styleMult}`)
       if (typedGrid) {
         rules.push(
-          `.doc-page [data-style="${CSS.escape(info.styleId)}"]:not(.doc-lh-fixed) span { ${gridSpanSnap} }`,
+          `.doc-page [data-style="${cssQuotedValue(info.styleId)}"]:not(.doc-lh-fixed) span { ${gridSpanSnap} }`,
         )
       }
     }
@@ -1040,14 +1050,14 @@ export function docStyleCss(parsed: ParsedDocFull): string {
     if ((d.lineRule === 'exact' && d.lineRawTwips) || d.lineRule === 'atLeast') {
       decls.push('--doc-line-fixed:1')
       rules.push(
-        `.doc-page [data-style="${CSS.escape(info.styleId)}"]:not(.doc-lh-fixed) span { line-height:inherit }`,
+        `.doc-page [data-style="${cssQuotedValue(info.styleId)}"]:not(.doc-lh-fixed) span { line-height:inherit }`,
       )
     }
     // CJK stretches (.doc-run-lf) re-resolve the style's line rule with their
     // own factor; the style rule beats the document-level .doc-run-lf rule
     if (styleLh) {
       rules.push(
-        `.doc-page [data-style="${CSS.escape(info.styleId)}"]:not(.doc-lh-fixed) .doc-run-lf { line-height:${
+        `.doc-page [data-style="${cssQuotedValue(info.styleId)}"]:not(.doc-lh-fixed) .doc-run-lf { line-height:${
           d.lineRule === 'exact' ? 'inherit' : styleLh
         } }`,
       )
@@ -1068,7 +1078,7 @@ export function docStyleCss(parsed: ParsedDocFull): string {
     // un-!important so a direct explicit margin (inline, auto turned off) wins —
     // specificity already beats the style's own margin declaration
     if (d.spaceAfterAuto || d.spaceBeforeAuto) {
-      const sa = `[data-style="${CSS.escape(info.styleId)}"]`
+      const sa = `[data-style="${cssQuotedValue(info.styleId)}"]`
       if (d.spaceAfterAuto) {
         liCollapse(sa, 'after')
         rules.push(`${CELL_BLOCK}${sa}${CELL_LAST} { margin-bottom:0 }`)
@@ -1086,7 +1096,7 @@ export function docStyleCss(parsed: ParsedDocFull): string {
     // marker box; a style text-indent double-shifts the first line and leaks
     // into the ::before marker) — w:hanging feeds the fallback chain instead
     if (d.indentFirstLineTwips != null) {
-      const s = `[data-style="${CSS.escape(info.styleId)}"]`
+      const s = `[data-style="${cssQuotedValue(info.styleId)}"]`
       rules.push(
         `.doc-page ${s}:not(${LIST_LINES}) { text-indent:${(d.indentFirstLineTwips / 20).toFixed(1)}pt }`,
       )
@@ -1114,22 +1124,22 @@ export function docStyleCss(parsed: ParsedDocFull): string {
     // a real style definition without w:i means upright
     if (info.headingLevel && info.headingLevel >= 4 && !d.italic) decls.push('font-style:normal')
     if (decls.length > 0) {
-      rules.push(`.doc-page [data-style="${CSS.escape(info.styleId)}"] { ${decls.join(';')} }`)
+      rules.push(`.doc-page [data-style="${cssQuotedValue(info.styleId)}"] { ${decls.join(';')} }`)
     }
     {
       const cell = cellPadResetDecls(d, parsed.docDefaults?.borderSides)
       if (cell.length > 0) {
         rules.push(
-          `.doc-page :is(td, th) [data-style="${CSS.escape(info.styleId)}"] { ${cell.join(';')} }`,
+          `.doc-page :is(td, th) [data-style="${cssQuotedValue(info.styleId)}"] { ${cell.join(';')} }`,
         )
       }
     }
-    darkTwin(`.doc-page [data-style="${CSS.escape(info.styleId)}"]`, darkDecls)
+    darkTwin(`.doc-page [data-style="${cssQuotedValue(info.styleId)}"]`, darkDecls)
     // Word merges indents per property (direct ind > numbering level ind > style ind), never
     // adds them: list items run on --li-left geometry, so the style indent must not also apply
     // as a margin — it only feeds the --li-left fallback chain (styles.css)
     if (d.indentLeftTwips != null) {
-      const s = `[data-style="${CSS.escape(info.styleId)}"]`
+      const s = `[data-style="${cssQuotedValue(info.styleId)}"]`
       const pt = (d.indentLeftTwips / 20).toFixed(1)
       rules.push(`.doc-page ${s}:not(${LIST_LINES}) { margin-inline-start:${pt}pt }`)
       rules.push(`.doc-page :is(${LIST_LINES})${s} { --style-li-left:${pt}pt }`)
@@ -1140,7 +1150,7 @@ export function docStyleCss(parsed: ParsedDocFull): string {
     // w:contextualSpacing: consecutive same-style paragraphs swallow the spacing
     // between them (ListParagraph/ListBullet carry this — Word lists are tight)
     if (d.contextualSpacing) {
-      const s = `[data-style="${CSS.escape(info.styleId)}"]`
+      const s = `[data-style="${cssQuotedValue(info.styleId)}"]`
       // !important so blockAttrs' inline margins (direct w:spacing) can't win:
       // Word swallows adjacent same-style spacing regardless of its source.
       // A direct w:contextualSpacing w:val="0" (.ctx-sp-off) re-enables the
@@ -1172,7 +1182,7 @@ export function docStyleCss(parsed: ParsedDocFull): string {
     for (const info of parsed.styles.values()) {
       const d = info.display
       if (!d) continue
-      const s = `[data-style="${CSS.escape(info.styleId)}"]`
+      const s = `[data-style="${cssQuotedValue(info.styleId)}"]`
       if (info.type === 'paragraph') {
         rules.push(
           `.doc-page ${s} .doc-cs { font-size:${paraCsFormat(d, dd).sizeHalfPoints / 2}pt }`,
@@ -1189,7 +1199,7 @@ export function docStyleCss(parsed: ParsedDocFull): string {
   // pairs are covered by a static rule in styles.css)
   for (const info of parsed.styles.values()) {
     if (info.type !== 'paragraph' || info.display?.contextualSpacing) continue
-    const s = `[data-style="${CSS.escape(info.styleId)}"]`
+    const s = `[data-style="${cssQuotedValue(info.styleId)}"]`
     rules.push(`.doc-page ${s}.ctx-sp:has(+ ${s}) { margin-bottom:0 !important }`)
     rules.push(`.doc-page ${s} + ${s}.ctx-sp { margin-top:0 !important }`)
     rules.push(`.doc-page ${s}.ctx-sp${beforeTableOpening(s)} { margin-bottom:0 !important }`)
@@ -1205,11 +1215,11 @@ export function docStyleCss(parsed: ParsedDocFull): string {
     '.doc-toc-line',
     ...[...parsed.styles.values()]
       .filter((s) => s.type === 'paragraph' && tocLevelOf(s.styleId, parsed.styles) !== null)
-      .map((s) => `[data-style="${CSS.escape(s.styleId)}"]`),
+      .map((s) => `[data-style="${cssQuotedValue(s.styleId)}"]`),
   ].join(',')
   for (const info of parsed.styles.values()) {
     if (info.type !== 'character' || !isHyperlinkStyle(info)) continue
-    const h = `[data-style="${CSS.escape(info.styleId)}"]`
+    const h = `[data-style="${cssQuotedValue(info.styleId)}"]`
     rules.push(`.doc-page .doc-link:has(${h}) { color:inherit;text-decoration:none }`)
     rules.push(`.doc-page :is(${tocScopes}) ${h} { color:inherit;text-decoration:none }`)
     darkRules.push(`.page-dark .doc-page :is(${tocScopes}) ${h} { color:inherit }`)

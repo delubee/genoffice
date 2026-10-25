@@ -49,9 +49,13 @@ const files = Object.keys(zip.files).filter((name) => !zip.files[name].dir)
 for (const required of [
   'package.json',
   'dist/extension.cjs',
+  'dist/docx-host.cjs',
   'dist/webview/index.html',
+  'dist/webview/docx.html',
   'skills/genoffice-workbook/SKILL.md',
   'skills/genoffice-workbook/scripts/analyze.py',
+  'skills/genoffice-workbook/scripts/docx_transform.py',
+  'skills/genoffice-workbook/references/docx.md',
   'LICENSE.txt',
   'THIRD-PARTY-NOTICES.txt',
 ])

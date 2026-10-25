@@ -3,6 +3,16 @@ import { mkdir, readdir } from 'node:fs/promises'
 
 await mkdir('test-workspace', { recursive: true })
 await build({
+  entryPoints: ['src/extension/docx/provider.ts'],
+  outfile: 'dist/docx-host.cjs',
+  bundle: true,
+  platform: 'node',
+  target: 'node22',
+  format: 'cjs',
+  external: ['vscode'],
+  define: { 'import.meta.env': '{"DEV":false}' },
+})
+await build({
   entryPoints: ['src/extension/tools/manifest.ts'],
   outfile: 'dist/tool-schema.cjs',
   bundle: true,

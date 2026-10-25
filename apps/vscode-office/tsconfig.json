@@ -2,9 +2,10 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "jsx": "react-jsx",
-    "lib": ["ES2022", "DOM"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["node", "vscode"],
     "noUncheckedIndexedAccess": true
   },
-  "include": ["src", "tests", "*.config.ts"]
+  "include": ["src", "tests", "*.config.ts"],
+  "exclude": ["src/extension/docx", "src/webview/docx.tsx", "tests/docx-browser.test.ts"]
 }

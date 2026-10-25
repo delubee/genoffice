@@ -23,7 +23,10 @@
     "./image-viewer.css": "./src/image-viewer.css",
     "./fonts/*": "./src/fonts/*",
     "./ai-model-picker.css": "./src/ai-model-picker.css",
-    "./ai-skills.css": "./src/ai-skills.css"
+    "./ai-skills.css": "./src/ai-skills.css",
+    "./wordart-presets": "./src/wordart-presets.ts",
+    "./font-list": "./src/font-list.ts",
+    "./shape-gallery": "./src/shape-gallery.tsx"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

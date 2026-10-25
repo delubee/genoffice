@@ -1,0 +1,106 @@
+:root {
+  --office-docx-chrome: #f3f3f3;
+  --office-docx-fg: #242424;
+  --office-docx-accent: #185abd;
+  --office-docx-accent-fg: #fff;
+  --office-docx-border: #d1d1d1;
+  --office-docx-canvas: #e6e6e6;
+}
+html[data-docx-appearance='vscode'] {
+  --office-docx-chrome: var(--vscode-editor-background);
+  --office-docx-fg: var(--vscode-foreground);
+  --office-docx-accent: var(--vscode-button-background);
+  --office-docx-accent-fg: var(--vscode-button-foreground);
+  --office-docx-border: var(--vscode-panel-border);
+  --office-docx-canvas: var(--vscode-sideBar-background);
+}
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+.office-docx {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  font:
+    13px system-ui,
+    sans-serif;
+  color: var(--office-docx-fg);
+  background: var(--office-docx-chrome);
+}
+.office-docx-title {
+  background: var(--office-docx-accent);
+  color: var(--office-docx-accent-fg);
+  padding: 9px 18px;
+}
+.office-docx-toolbar {
+  display: flex;
+  gap: 5px;
+  padding: 10px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--office-docx-border);
+}
+.office-docx-toolbar button,
+.office-docx-toolbar input {
+  border: 1px solid var(--office-docx-border);
+  background: var(--office-docx-chrome);
+  color: var(--office-docx-fg);
+  border-radius: 3px;
+  padding: 5px 8px;
+}
+.office-docx-toolbar button[aria-pressed='true'] {
+  outline: 2px solid var(--office-docx-accent);
+}
+.office-docx-toolbar input[type='number'] {
+  width: 52px;
+}
+.office-docx-canvas {
+  flex: 1;
+  overflow: auto;
+  background: var(--office-docx-canvas);
+  padding: 24px;
+}
+.office-docx-page {
+  box-sizing: border-box;
+  width: 794px;
+  min-height: 1123px;
+  margin: 0 auto;
+  padding: 96px;
+  background: #fff;
+  color: #000;
+  box-shadow: 0 1px 6px #0003;
+  font:
+    11pt Calibri,
+    Arial,
+    sans-serif;
+}
+.office-docx-page .tiptap {
+  outline: none;
+  min-height: 930px;
+  font: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.office-docx-page p {
+  margin: 0 0 8pt;
+}
+.office-docx-page table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.office-docx-page td,
+.office-docx-page th {
+  border: 1px solid #aaa;
+  padding: 4px;
+  vertical-align: top;
+}
+[data-office-protected='true'] {
+  user-select: none;
+}
+.office-docx-error {
+  padding: 12px;
+  color: var(--vscode-errorForeground, #b00020);
+  white-space: pre-wrap;
+}

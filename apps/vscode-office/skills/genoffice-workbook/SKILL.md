@@ -1,11 +1,14 @@
 ---
 name: genoffice-workbook
-description: Read and edit Excel workbooks open in GenOffice for VS Code, including unsaved data analysis through native workbook tools and workspace Python.
+description: Read and edit Excel workbooks and Word documents open in GenOffice for VS Code, including unsaved content through native tools and workspace Python.
 metadata:
-  version: "0.1.5"
+  version: '0.2.0'
 ---
 
 # GenOffice 工作簿
+
+处理 `.docx` 时使用 `genoffice_docx_*` 工具，并阅读 [DOCX 操作与 Python 流程](references/docx.md)。
+下文工作表、单元格及分批导入规则适用于 `.xlsx`。
 
 使用 VS Code 原生聊天及 `genoffice_workbook_*` 工具处理 GenOffice 中打开的 `.xlsx`。
 手工修改与工具修改共用一个宿主会话、版本和撤销历史。

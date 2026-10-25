@@ -4,6 +4,8 @@ import { copyFile, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { join, delimiter } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
+import { chromium } from '@playwright/test'
+import { editInstalledDocx } from './installed-docx-editor.mjs'
 import {
   downloadAndUnzipVSCode,
   resolveCliArgsFromVSCodeExecutablePath,
@@ -104,6 +106,8 @@ await new Promise((resolve, reject) => {
       '--skip-welcome',
       '--skip-release-notes',
       '--disable-updates',
+      '--remote-debugging-address=127.0.0.1',
+      '--remote-debugging-port=0',
       '--user-data-dir',
       profile,
       '--extensions-dir',
@@ -115,6 +119,58 @@ await new Promise((resolve, reject) => {
   const log = createWriteStream(join(root, 'host.log'))
   child.stdout.pipe(log, { end: false })
   child.stderr.pipe(log, { end: false })
+  // Drive only this isolated installed-product profile, through its real editor.
+  // Native tool writes retain their production confirmation behavior.
+  let browser
+  const driveWord = async () => {
+    const deadline = Date.now() + 90000
+    while (
+      (await readFile(join(root, 'word-ready.json'), 'utf8').catch(() => '')) !== '{"ready":true}'
+    ) {
+      if (Date.now() > deadline) throw new Error('Installed DOCX did not become ready')
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+    const port = Number(
+      (await readFile(join(profile, 'DevToolsActivePort'), 'utf8')).split('\n')[0],
+    )
+    if (!Number.isInteger(port) || port <= 0) throw new Error('Invalid isolated debugger port')
+    browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`)
+    let edited = false
+    const frameDeadline = Date.now() + 15000
+    while (!edited && Date.now() < frameDeadline) {
+      edited = await editInstalledDocx(browser, 'Installed DOCX works')
+      if (!edited) await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+    if (!edited) {
+      const session = await browser.newBrowserCDPSession()
+      const targets = await session.send('Target.getTargets')
+      await writeFile(
+        join(root, 'editor-targets.json'),
+        JSON.stringify(
+          {
+            pages: browser.contexts().flatMap((context) =>
+              context.pages().map((page) => ({
+                url: page.url().split('?')[0],
+                frames: page.frames().map((frame) => frame.url().split('?')[0]),
+              })),
+            ),
+            targets: targets.targetInfos.map((target) => ({
+              type: target.type,
+              url: target.url.split('?')[0],
+            })),
+          },
+          null,
+          2,
+        ),
+      )
+      throw new Error('Installed DOCX editor frame was not found')
+    }
+    await writeFile(join(root, 'word-edited.json'), '{"edited":true}')
+  }
+  void driveWord().catch((error) => {
+    child.kill()
+    reject(error)
+  })
   const timer = setTimeout(() => {
     child.kill()
     reject(new Error(`Packaged test timed out: ${root}`))
@@ -125,6 +181,7 @@ await new Promise((resolve, reject) => {
     reject(error)
   })
   child.once('exit', (code) => {
+    void browser?.close().catch(() => {})
     clearTimeout(timer)
     log.end()
     if (code === 0) resolve()

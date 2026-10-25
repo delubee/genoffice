@@ -1,9 +1,10 @@
 import * as vscode from 'vscode'
 import * as assert from 'node:assert/strict'
-import { writeFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { manualWorkbook } from '../fixtures/manual-workbook'
 import type { WorkbookDocument } from '../../src/extension/workbook-document'
+import { buildDocx } from '../../../../packages/docx-engine/tests/helpers/build-docx'
 
 export async function activate() {
   const root = process.env.GENOFFICE_PACKAGE_PROOF_ROOT!
@@ -54,6 +55,60 @@ export async function activate() {
       range: 'A2',
     })
     assert.equal(read.cells[0].rawValue, 731)
+    const wordUri = vscode.Uri.joinPath(vscode.workspace.workspaceFolders![0]!.uri, 'packaged.docx')
+    await vscode.workspace.fs.writeFile(
+      wordUri,
+      await buildDocx({ bodyXml: '<w:p><w:r><w:t>Original Word text</w:t></w:r></w:p>' }),
+    )
+    await vscode.commands.executeCommand('vscode.openWith', wordUri, 'genoffice.docx')
+    const invokeDocx = async (suffix: string, input: object) => {
+      const result = await vscode.lm.invokeTool(`genoffice_docx_${suffix}`, {
+        input,
+        toolInvocationToken: undefined,
+      })
+      const part = result.content.find((item) => item instanceof vscode.LanguageModelTextPart)
+      assert.ok(part instanceof vscode.LanguageModelTextPart)
+      return JSON.parse(part.value)
+    }
+    let wordContext = await invokeDocx('context', { documentUri: wordUri.toString() })
+    const wordRead = await invokeDocx('read', {
+      bindingId: wordContext.bindingId,
+      expectedRevision: 0,
+    })
+    assert.equal(wordRead.blocks[0].text, 'Original Word text')
+    await writeFile(join(root, 'word-ready.json'), '{"ready":true}')
+    const manualDeadline = Date.now() + 30000
+    while (true) {
+      if (Date.now() > manualDeadline) throw new Error('Installed DOCX manual edit timed out')
+      if (
+        (await readFile(join(root, 'word-edited.json'), 'utf8').catch(() => '')) ===
+        '{"edited":true}'
+      )
+        break
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+    assert.equal(
+      (await invokeDocx('read', { bindingId: wordContext.bindingId, expectedRevision: 1 }))
+        .blocks[0].text,
+      'Installed DOCX works',
+    )
+    await vscode.commands.executeCommand('workbench.action.files.save')
+    await vscode.commands.executeCommand('undo')
+    assert.equal(
+      (await invokeDocx('read', { bindingId: wordContext.bindingId, expectedRevision: 2 }))
+        .blocks[0].text,
+      'Original Word text',
+    )
+    await vscode.commands.executeCommand('redo')
+    await vscode.commands.executeCommand('workbench.action.files.save')
+    await vscode.commands.executeCommand('workbench.action.closeActiveEditor')
+    await vscode.commands.executeCommand('vscode.openWith', wordUri, 'genoffice.docx')
+    wordContext = await invokeDocx('context', { documentUri: wordUri.toString() })
+    assert.equal(
+      (await invokeDocx('read', { bindingId: wordContext.bindingId, expectedRevision: 0 }))
+        .blocks[0].text,
+      'Installed DOCX works',
+    )
     await vscode.commands.executeCommand(
       'genoffice.installWorkbookSkill',
       vscode.workspace.workspaceFolders![0]!.uri,
@@ -73,6 +128,9 @@ export async function activate() {
           installedExtension: extension.extensionPath,
           savedReopenedValue: 731,
           nativeToolRead: true,
+          docxSavedReopenedText: 'Installed DOCX works',
+          docxNativeUndoRedo: true,
+          docxManualEdit: true,
           skillInstalled: true,
           runtimeCargoPathRemoved: true,
           realModel: 'unverified',

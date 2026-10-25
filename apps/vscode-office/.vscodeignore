@@ -6,6 +6,7 @@
 !THIRD-PARTY-NOTICES.txt
 !docs/troubleshooting.md
 !dist/extension.cjs
+!dist/docx-host.cjs
 !dist/webview/**
 !native/**
 !skills/genoffice-workbook/**

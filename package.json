@@ -42,8 +42,8 @@
     "dist:win": "npm run notices && npm run build:all && npm run dist:win -w @genoffice/shell",
     "dist:linux": "npm run notices && npm run build:all && npm run dist:linux -w @genoffice/shell",
     "vscode:build": "npm run build -w @genoffice/workbook-session && npm run build -w @genoffice/sheets-editor && npm run build -w apps/vscode-office",
-    "vscode:typecheck": "npm run typecheck -w @genoffice/workbook-session && npm run typecheck -w @genoffice/sheets-editor && npm run typecheck -w apps/vscode-office",
-    "vscode:test": "npm run test -w @genoffice/workbook-session && npm run test -w @genoffice/sheets-editor && npm run test -w apps/vscode-office"
+    "vscode:typecheck": "npm run typecheck -w @genoffice/workbook-session && npm run typecheck -w @genoffice/sheets-editor && npm run typecheck -w @genoffice/docs-editor && npm run typecheck -w @genoffice/docx-session && npm run typecheck -w apps/vscode-office",
+    "vscode:test": "npm run test -w @genoffice/workbook-session && npm run test -w @genoffice/sheets-editor && npm run test -w @genoffice/docx-session && npm run test -w apps/vscode-office"
   },
   "dependencies": {
     "ws": "^8.21.1"

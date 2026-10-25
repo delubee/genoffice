@@ -1,0 +1,17 @@
+{
+  "passed": true,
+  "vscode": "1.109.5",
+  "platform": "win32-x64",
+  "installedExtension": "E:\\github\\genoffice\\.genoffice\\work\\j015-20261024\\apps\\vscode-office\\.vscode-test\\package-proof-pZICxP\\extensions\\genoffice.genoffice-workbook-0.2.0",
+  "savedReopenedValue": 731,
+  "nativeToolRead": true,
+  "docxSavedReopenedText": "Installed DOCX works",
+  "docxNativeUndoRedo": true,
+  "docxManualEdit": true,
+  "skillInstalled": true,
+  "runtimeCargoPathRemoved": true,
+  "realModel": "unverified",
+  "vsixSha256": "3b1e13dea539a72c69530270bd6e6b54d5e4cafe545bdf78a798aa31a4395268",
+  "root": "E:\\github\\genoffice\\.genoffice\\work\\j015-20261024\\apps\\vscode-office\\.vscode-test\\package-proof-pZICxP",
+  "checkedAt": "2026-10-24T14:01:12.635Z"
+}
