@@ -19,6 +19,8 @@ const mutableAttrs = new Set([
   'hangingIndent',
   'spaceBefore',
   'spaceAfter',
+  'spaceBeforeAuto',
+  'spaceAfterAuto',
   'lineFactor',
   'level',
   'numId',
@@ -28,6 +30,18 @@ const mutableAttrs = new Set([
   'colWidthsPct',
   'widthPx',
   'widthPct',
+  'indentFirstLine',
+  'indentFirstLineChars',
+  'lineSpacing',
+  'lineRule',
+  'lineRawTwips',
+  'widowControl',
+  'keepNext',
+  'keepLines',
+  'suppressLineNumbers',
+  'contextualSpacing',
+  'pageBreakBefore',
+  'outlineOnly',
 ])
 const nestedMutable = new Set(['colwidth', 'heightTwips', 'heightRule'])
 const sourceOnlyAttrs = (attrs: Record<string, unknown>) =>
@@ -54,7 +68,26 @@ const textStyleAttrs = new Set([
   'eastAsiaFont',
   'fontAscii',
   'csFont',
+  'eaSlotEmpty',
+  'vertAlign',
+  'dstrike',
+  'caps',
+  'vanish',
+  'vanishOwn',
+  'charScalePct',
+  'charScaleEm',
+  'charSpacingTwips',
+  'positionHalfPoints',
+  'kernHalfPoints',
+  'kern',
 ])
+const fontNumberBounds: Record<string, readonly [number, number]> = {
+  charScalePct: [1, 600],
+  charScaleEm: [-100, 100],
+  charSpacingTwips: [-31680, 31680],
+  positionHalfPoints: [-3168, 3168],
+  kernHalfPoints: [0, 1638],
+}
 const encode = (value: unknown) => JSON.stringify(value)
 export function jsonBytes(value: unknown): number {
   return new TextEncoder().encode(encode(value)).length
@@ -133,6 +166,58 @@ function assertAttrValue(key: string, value: unknown) {
   if (key === 'sizeHalfPoints' && (typeof value !== 'number' || value < 2 || value > 800))
     throw new Error('Invalid font size')
   if (
+    ['eaSlotEmpty', 'dstrike', 'vanish', 'vanishOwn', 'kern'].includes(key) &&
+    typeof value !== 'boolean'
+  )
+    throw new Error(`Invalid ${key}`)
+  if (key === 'vertAlign' && !['superscript', 'subscript'].includes(String(value)))
+    throw new Error('Invalid baseline')
+  if (key === 'caps' && !['all', 'small', 'none'].includes(String(value)))
+    throw new Error('Invalid capitalization')
+  if (
+    [
+      'widowControl',
+      'keepNext',
+      'keepLines',
+      'suppressLineNumbers',
+      'contextualSpacing',
+      'pageBreakBefore',
+      'outlineOnly',
+      'spaceBeforeAuto',
+      'spaceAfterAuto',
+    ].includes(key) &&
+    typeof value !== 'boolean'
+  )
+    throw new Error(`Invalid ${key}`)
+  if (key === 'lineRule' && !['auto', 'exact', 'atLeast'].includes(String(value)))
+    throw new Error('Invalid line spacing rule')
+  if (key === 'lineSpacing' && (typeof value !== 'number' || value <= 0 || value > 1000))
+    throw new Error('Invalid line spacing')
+  if (
+    [
+      'indentLeft',
+      'indentRight',
+      'indentFirstLine',
+      'indentFirstLineChars',
+      'spaceBefore',
+      'spaceAfter',
+      'lineRawTwips',
+    ].includes(key) &&
+    (typeof value !== 'number' || !Number.isInteger(value))
+  )
+    throw new Error(`Invalid ${key}`)
+  if (key === 'lineRawTwips' && Number(value) <= 0) throw new Error('Invalid line spacing height')
+  const bounds = fontNumberBounds[key]
+  if (
+    bounds &&
+    (typeof value !== 'number' ||
+      !Number.isFinite(value) ||
+      value < bounds[0] ||
+      value > bounds[1] ||
+      (key !== 'charScaleEm' && !Number.isInteger(value)))
+  )
+    throw new Error(`Invalid ${key}`)
+  if (
     ['font', 'eastAsiaFont', 'fontAscii', 'csFont'].includes(key) &&
     // eslint-disable-next-line no-control-regex -- Font names cannot contain C0 control characters.
     (typeof value !== 'string' || value.length > 200 || /[<>\x00-\x1f]/.test(value))
@@ -178,6 +263,24 @@ export function validateAndNormalize(
     if (typeof node.attrs?.officeId === 'string') originals.set(node.attrs.officeId, node)
   })
   const seen = new Set<string>()
+  const sourceMarkValues = new WeakMap<EditorJSON, Map<string, Set<unknown>>>()
+  const hasSourceMarkValue = (source: EditorJSON, type: string, key: string, value: unknown) => {
+    let values = sourceMarkValues.get(source)
+    if (!values) {
+      values = new Map()
+      walk(source, (node) => {
+        for (const mark of node.marks ?? [])
+          for (const [attr, originalValue] of Object.entries(mark.attrs ?? {})) {
+            const name = `${mark.type}:${attr}`
+            let known = values!.get(name)
+            if (!known) values!.set(name, (known = new Set()))
+            known.add(originalValue)
+          }
+      })
+      sourceMarkValues.set(source, values)
+    }
+    return values.get(`${type}:${key}`)?.has(value) ?? false
+  }
   const result = structuredClone(candidate)
   const verify = (node: EditorJSON, originalBlock?: EditorJSON) => {
     const tracked = editable.has(node.type) || node.type === 'docProtected'
@@ -204,7 +307,8 @@ export function validateAndNormalize(
             encode(value) !== encode(original.attrs?.[key])
           )
             throw new Error(`Immutable attribute: ${key}`)
-          if (mutableAttrs.has(key)) assertAttrValue(key, value)
+          if (mutableAttrs.has(key) && !Object.is(value, original.attrs?.[key]))
+            assertAttrValue(key, value)
         }
         if (
           node.type !== original.type &&
@@ -254,20 +358,13 @@ export function validateAndNormalize(
     for (const mark of node.marks ?? []) {
       if (!simpleMarks.has(mark.type)) throw new Error('Unsupported mark')
       for (const [key, value] of Object.entries(mark.attrs ?? {})) {
-        if (textStyleAttrs.has(key) && mark.type === 'docTextStyle') assertAttrValue(key, value)
-        else if (value != null) {
-          let trusted = false
-          if (original)
-            walk(original, (source) => {
-              if (
-                source.marks?.some(
-                  (m) => m.type === mark.type && encode(m.attrs?.[key]) === encode(value),
-                )
-              )
-                trusted = true
-            })
-          if (!trusted) throw new Error(`Untrusted mark attribute: ${key}`)
-        }
+        const trusted =
+          original && value != null && hasSourceMarkValue(original, mark.type, key, value)
+        if (textStyleAttrs.has(key) && mark.type === 'docTextStyle') {
+          // Preserve existing authored values even when foreign documents use
+          // ranges outside the dialog's edit bounds. Validate newly changed values.
+          if (!trusted) assertAttrValue(key, value)
+        } else if (value != null && !trusted) throw new Error(`Untrusted mark attribute: ${key}`)
       }
     }
     for (const child of node.content ?? []) verify(child, original)

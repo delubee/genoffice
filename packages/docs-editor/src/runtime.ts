@@ -1,5 +1,5 @@
 import { Editor, Extension } from '@tiptap/core'
-import { EditorState, Plugin, TextSelection } from '@tiptap/pm/state'
+import { EditorState, Plugin, Selection, TextSelection } from '@tiptap/pm/state'
 import { Step } from '@tiptap/pm/transform'
 import { collab, getVersion, receiveTransaction, sendableSteps } from 'prosemirror-collab'
 import { documentExtensions } from './shared/schema'
@@ -12,8 +12,10 @@ import type {
   DocumentPresentation,
 } from './shared/protocol'
 import type { DocxOperation } from './shared/operations'
+import type { OfficeAction } from '@genoffice/xlsx-gateway/shared/office-actions'
 
 export interface DocumentBridge {
+  action?(request: OfficeAction): Promise<void>
   submit(request: StepRequest): Promise<Commit>
   history(direction: 'undo' | 'redo'): Promise<void>
   resync(): Promise<DocumentProjection>
@@ -29,6 +31,17 @@ export interface DocumentBridge {
 
 /** One native undo stack; collab retains only unacknowledged local steps. */
 export class DocumentRuntime {
+  get hasOfficeActions() {
+    return !!this.bridge.action
+  }
+  async officeAction(request: OfficeAction) {
+    if (!this.bridge.action) throw new Error('Office menu actions are unavailable in this host.')
+    if (!(await this.flush())) throw new Error('Finish editing before using this menu command.')
+    await this.bridge.action(request)
+  }
+  reportError(error: unknown) {
+    this.bridge.error(String(error))
+  }
   readonly editor: Editor
   private descriptor
   private readonly clientId = crypto.randomUUID()
@@ -262,11 +275,19 @@ export class DocumentRuntime {
     )
     const selection = this.editor.state.selection
     const doc = this.editor.schema.nodeFromJSON(projection.content)
+    let restoredSelection: Selection
+    try {
+      restoredSelection = Selection.fromJSON(doc, selection.toJSON())
+    } catch {
+      restoredSelection = TextSelection.near(
+        doc.resolve(Math.min(selection.from, doc.content.size)),
+      )
+    }
     this.editor.view.updateState(
       EditorState.create({
         schema: this.editor.schema,
         doc,
-        selection: TextSelection.near(doc.resolve(Math.min(selection.from, doc.content.size))),
+        selection: restoredSelection,
         plugins: [
           ...kept,
           collab({ version: projection.descriptor.collabVersion, clientID: this.clientId }),
@@ -276,6 +297,9 @@ export class DocumentRuntime {
     this.descriptor = projection.descriptor
     this.unavailable = false
     this.freeze(false)
+    // updateState bypasses Tiptap's transaction events. Refresh selection-driven
+    // controls now, before focus enters an input whose key depends on that state.
+    this.editor.view.dispatch(this.editor.state.tr.setMeta('officeRemote', true))
   }
 
   private present(presentation: DocumentPresentation) {

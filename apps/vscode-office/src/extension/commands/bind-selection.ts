@@ -11,6 +11,40 @@ const selectionSchema = z.strictObject({
   selection: z.object({ sheetId: z.string(), address: z.string() }).nullable(),
 })
 
+/** Capture without clipboard or notifications, shared by the ribbon's native chat actions. */
+export async function captureWorkbookBinding(
+  provider: Pick<WorkbookEditorProvider, 'getDocument' | 'bindings'>,
+  uri: vscode.Uri,
+  scope: 'document' | 'selection',
+) {
+  const document = provider.getDocument(uri)
+  if (!document) throw new WorkbookError('session_closed', 'The workbook is no longer open.')
+  const sessionId = document.sessionId
+  await flushCurrentEditor(document)
+  if (!document.bridge) throw new WorkbookError('view_unavailable', 'Open the workbook view first.')
+  const view = selectionSchema.parse(await document.bridge.request('view.selection', {}))
+  if (
+    provider.getDocument(uri) !== document ||
+    document.sessionId !== sessionId ||
+    view.stateId !== document.engine.state.stateId ||
+    view.revision !== document.engine.descriptor.revision
+  )
+    throw new WorkbookError(
+      'revision_conflict',
+      'The selection projection is stale; bind again.',
+      {},
+      true,
+    )
+  if (scope === 'selection' && !view.selection)
+    throw new WorkbookError('requires_target', 'Select cells in the workbook before binding.')
+  if (view.selection) parseRange(view.selection.address)
+  return provider.bindings.bind(
+    sessionId,
+    view.selection?.sheetId ?? document.engine.state.sheets[0]!.id,
+    scope === 'selection' ? view.selection!.address : null,
+  )
+}
+
 export function registerBindSelection(provider: WorkbookEditorProvider) {
   return vscode.commands.registerCommand('genoffice.bindSelection', async (uri?: vscode.Uri) => {
     const tab = vscode.window.tabGroups.activeTabGroup.activeTab?.input
@@ -25,28 +59,7 @@ export function registerBindSelection(provider: WorkbookEditorProvider) {
         'requires_target',
         'Focus an open GenOffice workbook before binding its selection.',
       )
-    await flushCurrentEditor(document)
-    if (!document.bridge)
-      throw new WorkbookError('view_unavailable', 'Open the workbook view to bind its selection.')
-    const view = selectionSchema.parse(await document.bridge.request('view.selection', {}))
-    if (!view.selection)
-      throw new WorkbookError('requires_target', 'Select cells in the workbook before binding.')
-    if (
-      view.stateId !== document.engine.state.stateId ||
-      view.revision !== document.engine.descriptor.revision
-    )
-      throw new WorkbookError(
-        'revision_conflict',
-        'The selection projection is stale; wait for the view and bind again.',
-        {},
-        true,
-      )
-    parseRange(view.selection.address)
-    const binding = provider.bindings.bind(
-      document.sessionId,
-      view.selection.sheetId,
-      view.selection.address,
-    )
+    const binding = await captureWorkbookBinding(provider, document.uri, 'selection')
     await vscode.env.clipboard.writeText(
       JSON.stringify({
         schemaVersion: 1,

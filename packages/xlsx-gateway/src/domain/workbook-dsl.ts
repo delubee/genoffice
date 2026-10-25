@@ -920,6 +920,7 @@ const deleteDefinedNameSchema = z.object({
 const borderPatchSchema = z.object({
   type: z.enum(['all', 'top', 'bottom', 'left', 'right', 'none']),
   color: styleColorSchema.optional(),
+  style: z.enum(['thin', 'medium', 'thick', 'double', 'hair', 'dashed', 'dotted']).optional(),
 })
 
 // Every field optional; null clears that property back to the default.
@@ -928,6 +929,10 @@ const formatPatchSchema = z
     bold: z.boolean().nullable().optional(),
     italic: z.boolean().nullable().optional(),
     underline: z.boolean().nullable().optional(),
+    underlineStyle: z.enum(['single', 'double']).optional(),
+    vertAlign: z.enum(['superscript', 'subscript']).nullable().optional(),
+    protectionLocked: z.boolean().optional(),
+    protectionHidden: z.boolean().optional(),
     strikethrough: z.boolean().nullable().optional(),
     fontFamily: z.string().min(1).max(128).nullable().optional(),
     fontSize: z.number().min(1).max(409).nullable().optional(),
@@ -935,7 +940,10 @@ const formatPatchSchema = z
     fillColor: styleColorSchema.nullable().optional(),
     fill: fillPatchSchema.nullable().optional(),
     numberFormat: z.string().min(1).max(255).nullable().optional(),
-    horizontalAlign: z.enum(['left', 'center', 'right']).nullable().optional(),
+    horizontalAlign: z
+      .enum(['left', 'center', 'right', 'justify', 'distributed'])
+      .nullable()
+      .optional(),
     verticalAlign: z.enum(['top', 'center', 'bottom']).nullable().optional(),
     wrapText: z.boolean().nullable().optional(),
     /** degrees, -90 (clockwise) to 90 (counterclockwise), or 'vertical' (stacked) */

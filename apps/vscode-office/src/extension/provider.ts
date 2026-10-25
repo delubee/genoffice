@@ -1,4 +1,7 @@
 import * as vscode from 'vscode'
+import { nativeOfficeActions } from './office-actions'
+import { captureWorkbookBinding } from './commands/bind-selection'
+import { flushCurrentEditor } from './tools/current-state'
 import { randomBytes } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -206,6 +209,29 @@ export class WorkbookEditorProvider
     panel.webview.options = { enableScripts: true, localResourceRoots: [root] }
     this.panelDetach.get(panel)?.()
     this.panelDetach.set(panel, document.attach(panel.webview))
+    const actionSession = document.sessionId
+    document.bridge!.handle(
+      'office.action',
+      nativeOfficeActions({
+        uri: document.uri,
+        available: () =>
+          this.getDocument(document.uri) === document && document.sessionId === actionSession,
+        active: () => panel.active,
+        flush: () => flushCurrentEditor(document),
+        bind: async (scope) => {
+          const binding = await captureWorkbookBinding(this, document.uri, scope)
+          return {
+            kind: 'xlsx',
+            scope,
+            documentUri: binding.documentUri,
+            bindingId: binding.bindingId,
+            revision: binding.boundRevision,
+            sheetId: binding.logicalSheetId,
+            range: binding.frozenRange,
+          }
+        },
+      }),
+    )
     const configuration = () =>
       vscode.workspace.getConfiguration('genoffice.workbook', document.uri)
     document.bridge!.handle('appearance.change', async (raw) => {

@@ -191,6 +191,7 @@ test('toolbar copy, fill, formats and sheet/row structure share the canonical st
   })
   const snapshot = () => page.evaluate(() => (window as any).toolbar.snapshot())
   try {
+    await page.locator('.workbook-additional-controls > summary').click()
     await page.getByLabel('Source range (current sheet)', { exact: true }).fill('A2')
     await page
       .getByRole('button', { name: 'Copy values and formulas to selection', exact: true })
@@ -201,8 +202,11 @@ test('toolbar copy, fill, formats and sheet/row structure share the canonical st
     await expect.poll(async () => (await snapshot()).sheets[0].cells.D10?.rawValue).toBe('North')
     await page.locator('summary').filter({ hasText: 'More formatting' }).click()
     await page.getByLabel('More formatting', { exact: true }).selectOption('fillColor')
-    await page.getByLabel('Fill color', { exact: true }).fill('#123456')
-    await page.locator('details').getByRole('button', { name: 'Apply', exact: true }).click()
+    await page.locator('input[aria-label="Fill color"]').fill('#123456')
+    await page
+      .locator('details:has(> summary:text-is("More formatting"))')
+      .getByRole('button', { name: 'Apply', exact: true })
+      .click()
     await expect
       .poll(async () => (await snapshot()).sheets[0].cells.D10?.style?.fillColor)
       .toBe('#123456')
@@ -218,14 +222,26 @@ test('toolbar copy, fill, formats and sheet/row structure share the canonical st
     await page.getByRole('button', { name: 'Delete sheet', exact: true }).click()
     await expect.poll(async () => (await snapshot()).sheets.length).toBe(1)
     await page.evaluate(() => (window as any).toolbar.select('A2'))
-    await page.getByRole('button', { name: 'Insert row', exact: true }).click()
+    await page
+      .locator('.workbook-additional-controls')
+      .getByRole('button', { name: 'Insert row', exact: true })
+      .click()
     await expect.poll(async () => (await snapshot()).sheets[0].cells.A3?.rawValue).toBe('North')
-    await page.getByRole('button', { name: 'Delete row', exact: true }).click()
+    await page
+      .locator('.workbook-additional-controls')
+      .getByRole('button', { name: 'Delete row', exact: true })
+      .click()
     await expect.poll(async () => (await snapshot()).sheets[0].cells.A2?.rawValue).toBe('North')
     await page.evaluate(() => (window as any).toolbar.select('B2'))
-    await page.getByRole('button', { name: 'Insert column', exact: true }).click()
+    await page
+      .locator('.workbook-additional-controls')
+      .getByRole('button', { name: 'Insert column', exact: true })
+      .click()
     await expect.poll(async () => (await snapshot()).sheets[0].cells.C2?.rawValue).toBe(120)
-    await page.getByRole('button', { name: 'Delete column', exact: true }).click()
+    await page
+      .locator('.workbook-additional-controls')
+      .getByRole('button', { name: 'Delete column', exact: true })
+      .click()
     await expect.poll(async () => (await snapshot()).sheets[0].cells.B2?.rawValue).toBe(120)
     await expect(page.getByRole('alert')).toHaveCount(0)
   } finally {
@@ -369,6 +385,7 @@ test('numeric sizes and native header drags commit persistent dimensions', async
     ;(window as any).toolbar.select('B2')
   })
   try {
+    await page.locator('.workbook-additional-controls > summary').click()
     await page.getByRole('spinbutton', { name: 'Column width (px)' }).fill('140')
     await page.getByRole('button', { name: 'Set column width', exact: true }).click()
     await expect
@@ -451,14 +468,17 @@ test('ribbon merges and unmerges the projected grid and refuses to hide existing
   })
   try {
     await page.getByRole('button', { name: 'Merge cells', exact: true }).click()
+    await page.getByRole('option', { name: /^Merge cells$/i }).click()
     await expect
       .poll(() => page.evaluate(() => (window as any).toolbar.merges()))
       .toEqual([{ startRow: 0, endRow: 1, startColumn: 2, endColumn: 3 }])
     await page.evaluate(() => (window as any).toolbar.select('D2'))
-    await page.getByRole('button', { name: 'Unmerge cells', exact: true }).click()
+    await page.getByRole('button', { name: 'Merge cells', exact: true }).click()
+    await page.getByRole('option', { name: /^Unmerge cells$/i }).click()
     await expect.poll(() => page.evaluate(() => (window as any).toolbar.merges())).toEqual([])
     await page.evaluate(() => (window as any).toolbar.select('A1:B1'))
     await page.getByRole('button', { name: 'Merge cells', exact: true }).click()
+    await page.getByRole('option', { name: /^Merge cells$/i }).click()
     await expect(page.getByRole('alert')).toContainText('Other cells contain data')
     expect(await page.evaluate(() => (window as any).toolbar.value('B1'))).toBe('Sales')
     expect(await page.evaluate(() => (window as any).toolbar.merges())).toEqual([])
@@ -502,7 +522,7 @@ test('seven ribbon tabs execute page, formula, data, review and view operations'
         .getByRole('tab', { name: 'Insert', exact: true }),
     ).toBeFocused()
     await tab('Page Layout')
-    await page.getByLabel('Orientation', { exact: true }).selectOption('landscape')
+    await page.locator('select[aria-label="Orientation"]').selectOption('landscape')
     await expect
       .poll(async () => (await snapshot()).sheets[0].features.pageSetupEdits.orientation)
       .toBe('landscape')

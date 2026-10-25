@@ -3,6 +3,7 @@ import { columnLabel, formatAddress } from '@genoffice/xlsx-gateway/domain/cell-
 import type { WorkbookOperation } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
 import type { WorkbookRuntime } from './runtime'
 import { editorText } from './i18n'
+import { DesktopHomeRibbon } from './DesktopHomeRibbon'
 
 const tabs = ['home', 'insert', 'pageLayout', 'formulas', 'data', 'review', 'view'] as const
 type Tab = (typeof tabs)[number]
@@ -105,31 +106,11 @@ export function WorkbookRibbon({
   const panels: Record<Tab, ReactNode> = {
     home: (
       <>
-        {home}
-        <RibbonGroup title={text.mergeCells}>
-          <button
-            onClick={() =>
-              submit(() => ({
-                op: 'merge_cells',
-                sheetId: selected().sheetId,
-                range: selected().address,
-              }))
-            }
-          >
-            {text.mergeCells}
-          </button>
-          <button
-            onClick={() =>
-              submit(() => ({
-                op: 'unmerge_cells',
-                sheetId: selected().sheetId,
-                range: selected().address,
-              }))
-            }
-          >
-            {text.unmergeCells}
-          </button>
-        </RibbonGroup>
+        <DesktopHomeRibbon runtime={runtime} locale={locale} onError={onError} />
+        <details className="workbook-additional-controls">
+          <summary>{text.cells}</summary>
+          <div className="workbook-toolbar">{home}</div>
+        </details>
       </>
     ),
     insert,
@@ -475,7 +456,7 @@ export function WorkbookRibbon({
           role="tabpanel"
           aria-labelledby={`ribbon-tab-${key}`}
           hidden={tab !== key}
-          className="workbook-ribbon-panel workbook-toolbar"
+          className={`workbook-ribbon-panel ${key === 'home' ? 'workbook-desktop-panel' : 'workbook-toolbar'}`}
         >
           {panels[key]}
         </div>

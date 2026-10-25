@@ -36,6 +36,7 @@ export default defineConfig({
       '@genoffice/ui/wordart-presets': local('../../packages/ui/src/wordart-presets.ts'),
       '@genoffice/ui/font-list': local('../../packages/ui/src/font-list.ts'),
       '@genoffice/ui/shape-gallery': local('../../packages/ui/src/shape-gallery.tsx'),
+      '@genoffice/ui/chrome': local('../../packages/ui/src/chrome.ts'),
       '@genoffice/ui': local('../../packages/ui/src/index.ts'),
       '@genoffice/xlsx-gateway/*': local('../../packages/xlsx-gateway/src/*'),
     },

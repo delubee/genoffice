@@ -3,6 +3,7 @@ import {
   HorizontalAlign,
   VerticalAlign,
   WrapStrategy,
+  BaselineOffset,
   type ICellData,
   type IStyleData,
 } from '@univerjs/core'
@@ -32,14 +33,30 @@ export function gridCell(cell: Omit<ViewCell, 'address'>): ICellData {
     s: IStyleData = {}
   if (style.bold !== undefined) s.bl = style.bold ? 1 : 0
   if (style.italic !== undefined) s.it = style.italic ? 1 : 0
-  if (style.underline !== undefined) s.ul = { s: style.underline ? 1 : 0 }
+  if (style.underline !== undefined || style.underlineStyle !== undefined)
+    s.ul = { s: style.underline === false ? 0 : 1, t: style.underlineStyle === 'double' ? 10 : 0 }
+  if (style.vertAlign !== undefined)
+    s.va =
+      style.vertAlign === 'superscript'
+        ? BaselineOffset.SUPERSCRIPT
+        : style.vertAlign === 'subscript'
+          ? BaselineOffset.SUBSCRIPT
+          : BaselineOffset.NORMAL
+  if (style.textRotation !== undefined)
+    s.tr =
+      style.textRotation === 255
+        ? { v: 1, a: 0 }
+        : { a: style.textRotation > 90 ? 90 - style.textRotation : style.textRotation }
+  if (style.indent !== undefined) s.pd = { l: style.indent * 8 }
   if (style.strikethrough !== undefined) s.st = { s: style.strikethrough ? 1 : 0 }
   if (style.fontFamily) s.ff = style.fontFamily
   if (style.fontSize) s.fs = style.fontSize
   if (typeof style.fontColor === 'string') s.cl = { rgb: style.fontColor }
   if (typeof style.fillColor === 'string') s.bg = { rgb: style.fillColor }
-  if (style.fontColor === null) s.cl = null
-  if (style.fillColor === null) s.bg = null
+  // Empty RGB pins an explicit clear; null is stripped by Univer and lets a
+  // row/column's original formatting show through again.
+  if (style.fontColor === null) s.cl = { rgb: '' }
+  if (style.fillColor === null || style.fill === null) s.bg = { rgb: '' }
   if (style.horizontalAlignment)
     s.ht = {
       left: HorizontalAlign.LEFT,

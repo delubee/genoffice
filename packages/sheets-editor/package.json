@@ -23,7 +23,9 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "zod": "^4.3.6",
-    "@univerjs/sheets": "^0.25.1"
+    "@univerjs/sheets": "^0.25.1",
+    "@genoffice/ui": "*",
+    "@genoffice/i18n": "*"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",

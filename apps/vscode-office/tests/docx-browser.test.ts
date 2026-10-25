@@ -4,6 +4,8 @@ import { createServer } from 'node:http'
 import { readFile } from 'node:fs/promises'
 import { resolve, extname } from 'node:path'
 import { DocxSession } from '@genoffice/docx-session/session'
+import { DocumentBindings } from '@genoffice/docx-session/bindings'
+import { officeActionHandler } from '../src/extension/office-action-handler'
 import { buildDocx } from '../../../packages/docx-engine/tests/helpers/build-docx'
 import { JsonBridge } from '@genoffice/xlsx-gateway/shared/session-bridge'
 import type { StepRequest } from '@genoffice/docs-editor/shared/protocol'
@@ -80,6 +82,49 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     await bridge.request('view.resync', projection())
     return { ready: true }
   })
+  const bindings = new DocumentBindings()
+  let menuSave: Uint8Array | undefined
+  const chats: { query: string; partial: boolean; scope: string; bindingId: string }[] = []
+  let capturedScope = 'document',
+    capturedBinding = ''
+  bridge.handle(
+    'office.action',
+    officeActionHandler({
+      available: () => true,
+      active: () => true,
+      flush: async () => {
+        expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
+      },
+      open: async () => {
+        throw new Error('File picker belongs to the native host')
+      },
+      save: async () => {
+        menuSave = await session.save()
+      },
+      bind: async (scope) => {
+        const uri = 'file:///workspace/browser.docx'
+        const view = (await bridge.request('view.selection', {})) as {
+          stateId: string
+          revision: number
+          from: number
+          to: number
+        }
+        const selection = scope === 'selection' ? session.selection(view) : undefined
+        capturedScope = scope
+        capturedBinding = bindings.bind(uri, session.sessionId, selection)
+        return {
+          kind: 'docx',
+          scope,
+          documentUri: uri,
+          bindingId: capturedBinding,
+          revision: session.descriptor().revision,
+        }
+      },
+      chat: async (query, partial) => {
+        chats.push({ query, partial, scope: capturedScope, bindingId: capturedBinding })
+      },
+    }),
+  )
   await page.exposeFunction('postToHost', (message: unknown) => incoming(message))
   try {
     const address = server.address() as { port: number }
@@ -92,6 +137,30 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     await page.keyboard.type(' world')
     expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
     expect(session.read().blocks[0]!.text).toBe('Hello world')
+    await page.getByTitle('Save', { exact: true }).click()
+    await page.waitForFunction(
+      () => !document.querySelector<HTMLButtonElement>('button[title="Save"]')?.disabled,
+    )
+    expect(menuSave).toBeDefined()
+    expect((await DocxSession.open(menuSave!)).read().blocks[0]!.text).toBe('Hello world')
+    await page.getByTitle('VS Code Chat', { exact: true }).click()
+    await page.waitForFunction(
+      () => !document.querySelector<HTMLButtonElement>('button[title="VS Code Chat"]')?.disabled,
+    )
+    expect(chats[0]).toMatchObject({ partial: true, scope: 'document' })
+    expect(bindings.resolve(chats[0]!.bindingId).selection).toBeUndefined()
+    await page.keyboard.press('Control+Home')
+    await page.keyboard.press('Control+Shift+ArrowRight')
+    await page.getByTitle('Ask about selection', { exact: true }).click()
+    await page.waitForFunction(
+      () =>
+        !document.querySelector<HTMLButtonElement>('button[title="Ask about selection"]')?.disabled,
+    )
+    expect(chats[1]).toMatchObject({ partial: true, scope: 'selection' })
+    expect(bindings.resolve(chats[1]!.bindingId).selection?.blocks.length).toBeGreaterThan(0)
+    expect(chats[1]!.query).not.toContain('Hello world')
+    await editor.click()
+    await page.keyboard.press('End')
     await page.keyboard.press('Enter')
     await page.keyboard.type('Second')
     expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
@@ -110,6 +179,43 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
         .content()
         .content![0]!.content!.some((node) => node.marks?.some((mark) => mark.type === 'bold')),
     ).toBe(true)
+    const beforeDialog = session.content()
+    await page.getByTitle('Font', { exact: true }).click()
+    let fontDialog = page.getByRole('dialog', { name: 'Font', exact: true })
+    await fontDialog.getByRole('tab', { name: 'Advanced', exact: true }).click()
+    await fontDialog.getByLabel('Scale (%)', { exact: true }).fill('80')
+    await fontDialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+    expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
+    expect(session.content()).toEqual(beforeDialog)
+    await page.getByTitle('Font', { exact: true }).click()
+    fontDialog = page.getByRole('dialog', { name: 'Font', exact: true })
+    await fontDialog.getByRole('tab', { name: 'Advanced', exact: true }).click()
+    await fontDialog.getByLabel('Scale (%)', { exact: true }).fill('80')
+    await fontDialog.getByRole('button', { name: 'Spacing', exact: true }).click()
+    await page.getByRole('option', { name: 'Expanded', exact: true }).click()
+    await fontDialog.getByLabel('By (pt)', { exact: true }).first().fill('1.5')
+    await page.screenshot({
+      path: resolve('../../test-results/desktop-menus/docx-font-advanced.png'),
+    })
+    await fontDialog.getByRole('button', { name: 'OK', exact: true }).click()
+    expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
+    const hasDialogFormatting = (content: ReturnType<DocxSession['content']>) =>
+      content.content![0]!.content!.some((node) =>
+        node.marks?.some(
+          (mark) =>
+            mark.type === 'docTextStyle' &&
+            mark.attrs?.charScalePct === 80 &&
+            mark.attrs?.charSpacingTwips === 30,
+        ),
+      )
+    expect(hasDialogFormatting(session.content())).toBe(true)
+    const reopenedDialog = await DocxSession.open(await session.save())
+    expect(hasDialogFormatting(reopenedDialog.content())).toBe(true)
+    // The entire dialog is one native undo entry, including derived scale attrs.
+    session.history('undo')
+    expect(session.content()).toEqual(beforeDialog)
+    session.history('redo')
+    await bridge.request('view.resync', projection())
     const beforeFontText = await editor.textContent()
     const sizeInput = page.getByLabel('Font Size', { exact: true })
     await sizeInput.focus()
@@ -138,6 +244,32 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
           ),
         ),
     ).toBe(true)
+    const beforeParagraph = session.content()
+    await page.getByTitle('Paragraph', { exact: true }).click()
+    const paragraphDialog = page.getByRole('dialog', { name: 'Paragraph', exact: true })
+    await paragraphDialog.getByLabel(/^Space before/).fill('12')
+    await paragraphDialog.getByRole('button', { name: 'Line spacing', exact: true }).click()
+    await page.getByRole('option', { name: '1.5 lines', exact: true }).click()
+    await paragraphDialog.getByRole('tab', { name: 'Line and Page Breaks' }).click()
+    await paragraphDialog.getByLabel('Keep with next', { exact: true }).check()
+    await paragraphDialog.getByRole('button', { name: 'OK', exact: true }).click()
+    expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
+    expect(session.content().content![0]!.attrs).toMatchObject({
+      spaceBefore: 240,
+      lineSpacing: 1.5,
+      keepNext: true,
+    })
+    expect(
+      (await DocxSession.open(await session.save())).content().content![0]!.attrs,
+    ).toMatchObject({
+      spaceBefore: 240,
+      lineSpacing: 1.5,
+      keepNext: true,
+    })
+    session.history('undo')
+    expect(session.content()).toEqual(beforeParagraph)
+    session.history('redo')
+    await bridge.request('view.resync', projection())
     await page.getByLabel('Paragraph', { exact: true }).selectOption('1')
     expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
     expect(session.content().content![0]!.type).toBe('docHeading')
@@ -168,6 +300,38 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
         .locator('.office-docx-page')
         .evaluate((element) => getComputedStyle(element).backgroundColor),
     ).toBe('rgb(255, 255, 255)')
+    expect(session.content()).toEqual(beforeTheme)
+    await page.evaluate(() => {
+      document.body.classList.add('vscode-dark')
+      for (const [name, value] of Object.entries({
+        '--vscode-foreground': 'rgb(220, 220, 220)',
+        '--vscode-descriptionForeground': 'rgb(170, 170, 170)',
+        '--vscode-panel-border': 'rgb(68, 68, 68)',
+        '--vscode-input-background': 'rgb(48, 48, 48)',
+        '--vscode-sideBar-background': 'rgb(37, 37, 38)',
+        '--vscode-button-background': 'rgb(14, 99, 156)',
+        '--vscode-button-foreground': 'rgb(255, 255, 255)',
+        '--vscode-button-hoverBackground': 'rgb(17, 119, 187)',
+        '--vscode-toolbar-hoverBackground': 'rgb(51, 51, 51)',
+      }))
+        document.documentElement.style.setProperty(name, value)
+    })
+    await page.getByTitle('Font', { exact: true }).click()
+    expect(
+      await page
+        .getByRole('dialog', { name: 'Font', exact: true })
+        .evaluate((element) => getComputedStyle(element).backgroundColor),
+    ).toBe('rgb(20, 20, 20)')
+    expect(
+      await page
+        .locator('.font-preview')
+        .evaluate((element) => getComputedStyle(element).backgroundColor),
+    ).toBe('rgb(255, 255, 255)')
+    await page.screenshot({
+      path: resolve('../../test-results/desktop-menus/docx-font-vscode-dark.png'),
+    })
+    await page.keyboard.press('Escape')
+    expect(await page.getByRole('dialog').count()).toBe(0)
     expect(session.content()).toEqual(beforeTheme)
     while (session.descriptor().revision < 60) {
       try {

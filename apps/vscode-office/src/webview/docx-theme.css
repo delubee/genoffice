@@ -1,3 +1,7 @@
+@import '@genoffice/ui/tokens.css';
+@import '@genoffice/ui/dropdown.css';
+@import '../../../docs/src/renderer/styles.css';
+
 :root {
   --office-docx-chrome: #f3f3f3;
   --office-docx-fg: #242424;
@@ -6,6 +10,15 @@
   --office-docx-border: #d1d1d1;
   --office-docx-canvas: #e6e6e6;
 }
+html[data-docx-appearance] {
+  --surface: var(--office-docx-chrome);
+  --text: var(--office-docx-fg);
+  --text-primary: var(--office-docx-fg);
+  --text-dim: var(--office-docx-fg);
+  --border: var(--office-docx-border);
+  --border-strong: var(--office-docx-border);
+  --accent: var(--office-docx-accent);
+}
 html[data-docx-appearance='vscode'] {
   --office-docx-chrome: var(--vscode-editor-background);
   --office-docx-fg: var(--vscode-foreground);
@@ -13,6 +26,12 @@ html[data-docx-appearance='vscode'] {
   --office-docx-accent-fg: var(--vscode-button-foreground);
   --office-docx-border: var(--vscode-panel-border);
   --office-docx-canvas: var(--vscode-sideBar-background);
+  --surface-subtle: var(--vscode-input-background, var(--office-docx-chrome));
+  --hover: var(--vscode-toolbar-hoverBackground, var(--office-docx-chrome));
+  --text-dim: var(--vscode-descriptionForeground, var(--office-docx-fg));
+  --color-btn-primary: var(--vscode-button-background);
+  --color-btn-primary-text: var(--vscode-button-foreground);
+  --color-btn-primary-hover: var(--vscode-button-hoverBackground);
 }
 html,
 body,

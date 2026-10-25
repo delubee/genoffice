@@ -57,19 +57,38 @@ function formatState(cell: TypedCell): CellFormatState {
     'bold',
     'italic',
     'underline',
+    'underlineStyle',
+    'vertAlign',
+    'protectionLocked',
+    'protectionHidden',
     'strikethrough',
     'fontFamily',
     'fontSize',
     'fontColor',
     'fillColor',
+    'fill',
     'numberFormat',
     'wrapText',
     'indent',
     'textRotation',
+    'borderTop',
+    'borderBottom',
+    'borderLeft',
+    'borderRight',
   ]
   return JSON.parse(
     JSON.stringify({
       ...Object.fromEntries(Object.entries(style).filter(([key]) => keys.includes(key))),
+      ...(style.textRotation !== undefined
+        ? {
+            textRotation:
+              style.textRotation === 255
+                ? 'vertical'
+                : style.textRotation > 90
+                  ? 90 - style.textRotation
+                  : style.textRotation,
+          }
+        : {}),
       ...(style.horizontalAlignment ? { horizontalAlign: style.horizontalAlignment } : {}),
       ...(style.verticalAlignment ? { verticalAlign: style.verticalAlignment } : {}),
       ...(cell.numberFormat ? { numberFormat: cell.numberFormat } : {}),
@@ -90,6 +109,14 @@ function typedStyle(
       ...(verticalAlign ? { verticalAlignment: verticalAlign } : {}),
     }),
   ) as NonNullable<TypedCell['style']>
+  if (Object.hasOwn(simple, 'fillColor') && !Object.hasOwn(simple, 'fill')) delete result.fill
+  if (format.textRotation !== undefined)
+    result.textRotation =
+      format.textRotation === 'vertical'
+        ? 255
+        : format.textRotation < 0
+          ? 90 - format.textRotation
+          : format.textRotation
   if (border)
     for (const edge of ['top', 'bottom', 'left', 'right'] as const)
       if (border.type === 'all' || border.type === 'none' || border.type === edge)
@@ -97,7 +124,7 @@ function typedStyle(
           border.type === 'none'
             ? null
             : {
-                style: 'thin',
+                style: border.style ?? 'thin',
                 ...(border.color ? { color: normalizeStyleColor(border.color) } : {}),
               }
   return result

@@ -29,6 +29,9 @@ const projection = new Promise<WorkbookRuntime>((resolve, reject) => {
 })
 void projection.catch(() => {})
 const host: EditorHost = {
+  action: async (request) => {
+    await bridge.request('office.action', request)
+  },
   read: (logicalSheetId, range, stateId) =>
     bridge.request('source.read', {
       logicalSheetId,
@@ -82,6 +85,7 @@ bridge.handle('view.presentation', async (raw) => {
   return {
     stateId: runtime.selectionContext.stateId,
     values: runtime.projectedValues(request.range),
+    styles: runtime.projectedStyles(request.range),
     merges: runtime.projectedMerges(),
     dimensions: runtime.projectedDimensions(request.range),
     view: runtime.projectedView(),

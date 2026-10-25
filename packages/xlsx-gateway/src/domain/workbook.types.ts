@@ -1,6 +1,7 @@
 import type {
   BorderPatch,
   CellFormatPatch,
+  FillPatch,
   ClearRangeOperation,
   ConvertToValuesOperation,
   CopyRangeOperation,
@@ -11,6 +12,7 @@ import type {
   StructuralOperation,
 } from './workbook-dsl'
 import type { SheetVisual } from './chart-visual'
+import type { WorkbookStyleEdit } from '../shared/edit-schemas'
 
 export type CellScalar = string | number | boolean | null
 
@@ -30,18 +32,27 @@ export interface CellFormatState {
   readonly bold?: boolean | undefined
   readonly italic?: boolean | undefined
   readonly underline?: boolean | undefined
+  readonly underlineStyle?: 'single' | 'double' | undefined
+  readonly vertAlign?: 'superscript' | 'subscript' | null | undefined
+  readonly protectionLocked?: boolean | undefined
+  readonly protectionHidden?: boolean | undefined
   readonly strikethrough?: boolean | undefined
   readonly fontFamily?: string | undefined
   readonly fontSize?: number | undefined
-  readonly fontColor?: string | undefined
-  readonly fillColor?: string | undefined
+  readonly fontColor?: string | null | undefined
+  readonly fillColor?: string | null | undefined
+  readonly fill?: FillPatch | null | undefined
   readonly numberFormat?: string | undefined
-  readonly horizontalAlign?: 'left' | 'center' | 'right' | undefined
+  readonly horizontalAlign?: 'left' | 'center' | 'right' | 'justify' | 'distributed' | undefined
   readonly verticalAlign?: 'top' | 'center' | 'bottom' | undefined
   readonly wrapText?: boolean | undefined
   readonly textRotation?: number | 'vertical' | undefined
   readonly indent?: number | undefined
   readonly border?: BorderPatch | undefined
+  readonly borderTop?: WorkbookStyleEdit['borderTop']
+  readonly borderBottom?: WorkbookStyleEdit['borderBottom']
+  readonly borderLeft?: WorkbookStyleEdit['borderLeft']
+  readonly borderRight?: WorkbookStyleEdit['borderRight']
 }
 
 export interface WorksheetState {

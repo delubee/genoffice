@@ -801,18 +801,40 @@ function mergeFormat(
   for (const [key, value] of Object.entries(patch)) {
     if (value === undefined) continue
     if (value === null) {
-      delete merged[key === 'fill' ? 'fillColor' : key]
+      if (['fontColor', 'fillColor', 'fill', 'vertAlign'].includes(key)) {
+        merged[key] = null
+        if (key === 'fill') merged.fillColor = null
+        if (key === 'fillColor') delete merged.fill
+      } else if (['bold', 'italic', 'underline', 'strikethrough'].includes(key)) merged[key] = false
+      else delete merged[key]
     } else if (key === 'fontColor' || key === 'fillColor') {
       merged[key] = resolveStyleColor(normalizeStyleColor(value as StyleColorInput))
+      if (key === 'fillColor') delete merged.fill
     } else if (key === 'fill') {
+      merged.fill = value
       const display = fillDisplayColor(value as FillPatch as FillSpec)
       if (display) merged.fillColor = resolveStyleColor(normalizeStyleColor(display))
     } else if (key === 'border') {
       const border = value as BorderPatch
+      // Keep the legacy preset echo while retaining independently composed edges.
       merged.border =
         border.color === undefined
           ? border
-          : { ...border, color: resolveStyleColor(normalizeStyleColor(border.color)) }
+          : {
+              ...border,
+              color: resolveStyleColor(normalizeStyleColor(border.color)),
+            }
+      for (const edge of ['top', 'bottom', 'left', 'right'])
+        if (border.type === 'all' || border.type === 'none' || border.type === edge)
+          merged[`border${edge[0]!.toUpperCase()}${edge.slice(1)}`] =
+            border.type === 'none'
+              ? null
+              : {
+                  style: border.style ?? 'thin',
+                  ...(border.color === undefined
+                    ? {}
+                    : { color: resolveStyleColor(normalizeStyleColor(border.color)) }),
+                }
     } else merged[key] = value
   }
   return Object.keys(merged).length > 0 ? (merged as CellFormatState) : null

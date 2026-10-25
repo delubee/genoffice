@@ -1,3 +1,8 @@
+@import '@genoffice/ui/tokens.css';
+@import '@genoffice/ui/dropdown.css';
+@import '@genoffice/ui/color-picker.css';
+@import '../../../sheets/src/renderer/styles.css';
+
 :root {
   --surface: var(--vscode-editor-background);
   --text: var(--vscode-editor-foreground);
@@ -10,6 +15,11 @@
   --workbook-accent-text: var(--vscode-button-foreground);
   --workbook-font: var(--vscode-font-family);
   --workbook-font-size: var(--vscode-font-size);
+  --chrome-bg: var(--chrome);
+  --text-primary: var(--text);
+  --text-dim: var(--text);
+  --border-strong: var(--border);
+  --accent: var(--workbook-accent);
   color-scheme: light dark;
 }
 /* This palette changes interface chrome only; authored cells keep their colors. */
@@ -198,6 +208,20 @@ body {
 }
 .workbook-ribbon-panel[hidden] {
   display: none;
+}
+.workbook-desktop-panel {
+  display: block;
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+}
+.workbook-additional-controls > summary {
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.workbook-additional-controls[open] > .workbook-toolbar {
+  max-height: 160px;
+  overflow: auto;
 }
 .workbook-ribbon-group {
   flex: 0 0 auto;

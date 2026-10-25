@@ -11,7 +11,7 @@ import {
   type SourceInfo,
   type TocEntry,
 } from '@genoffice/docx-engine'
-import { Dropdown } from '@genoffice/ui'
+import { Dropdown } from '@genoffice/ui/chrome'
 import { PromptModal } from './PromptModal'
 import { collectHeadings } from '../editor/headings'
 import { t, useI18n, type StringKey } from '../i18n/locale'

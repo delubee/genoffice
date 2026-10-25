@@ -236,11 +236,8 @@ export interface EditJournal {
 /// One printed header or footer: Excel's left/center/right sections. Text
 /// carries Excel field codes verbatim (&P page, &N pages, &D date, &T time,
 /// &F file name, &A sheet name, && literal ampersand).
-export interface HeaderFooterParts {
-  readonly left?: string
-  readonly center?: string
-  readonly right?: string
-}
+export type { HeaderFooterParts } from './ribbon-model'
+import type { HeaderFooterParts } from './ribbon-model'
 
 export interface PageSetupJournalState {
   orientation?: 'portrait' | 'landscape'

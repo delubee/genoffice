@@ -46,7 +46,7 @@ import {
   isSymbolFontFamily,
   useDismissablePopover,
   useRibbonCollapse,
-} from '@genoffice/ui'
+} from '@genoffice/ui/chrome'
 import { HIGHLIGHT_CSS } from '../editor/extensions'
 import { applyCase, type CaseMode } from '../editor/case-transform'
 import { isRtlUiLang, setParagraphDirection, setSelectionAlign } from '../editor/direction'

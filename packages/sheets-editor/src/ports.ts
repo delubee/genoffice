@@ -7,6 +7,9 @@ export interface GridRange {
 
 /** Browser ports contain data only; no extension or Node runtime handles. */
 export interface EditorHost {
+  action?(
+    request: import('@genoffice/xlsx-gateway/shared/office-actions').OfficeAction,
+  ): Promise<void>
   read(sheetId: string, range: GridRange, stateId: string): Promise<unknown>
   submit(intent: {
     transactionId: string

@@ -61,13 +61,8 @@ export interface TableDesignContext {
 }
 
 /// What the ribbon shows for the table under the selection.
-export interface SelectedTableRibbon extends TableStyleOptionFlags {
-  readonly key: string
-  readonly name: string
-  readonly rangeA1: string
-  readonly style: string | null
-  readonly isFile: boolean
-}
+export type { SelectedTableRibbon } from './ribbon-model'
+import type { SelectedTableRibbon } from './ribbon-model'
 
 type TableRef =
   | { readonly kind: 'session'; readonly sheetId: string; readonly add: WorkbookTableAdd }

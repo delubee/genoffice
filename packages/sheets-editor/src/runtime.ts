@@ -43,8 +43,65 @@ import { gridCell, type ViewCell } from './grid-cell'
 import { requestHostHistory } from './history-bridge'
 import type { SheetVisual } from '@genoffice/xlsx-gateway/domain/chart-visual'
 import type { WorkbookAppearance } from './appearance'
+import { toSelectionFormat } from '../../../apps/sheets/src/renderer/selection-format'
+import { ribbonIntents, type RibbonTarget } from './ribbon-intents'
 
 export class WorkbookRuntime implements EditorProjection {
+  get ribbonTarget(): RibbonTarget | null {
+    const selected = this.selection
+    if (!selected) return null
+    return {
+      sheetId: selected.sheetId,
+      address: selected.address,
+      format: toSelectionFormat(selected.style, selected.style.n?.pattern ?? 'General'),
+      doubleUnderline: selected.style.ul?.s === 1 && selected.style.ul.t === 10,
+    }
+  }
+  get ribbonEcho() {
+    const sheet = this.state?.sheets.find((item) => item.id === this.selection?.sheetId)
+    const original = sheet?.features?.originalMetadata as
+      { rowCount?: number; columnCount?: number } | undefined
+    return {
+      hasContent:
+        !!sheet &&
+        (Object.values(sheet.cells).some((cell) => cell.rawValue !== null || !!cell.formula) ||
+          (!!original?.rowCount && !!original.columnCount)),
+      protected: sheet?.protected ?? null,
+    }
+  }
+  async ribbonCommands(
+    commands: readonly string[],
+    frozen?: {
+      target: RibbonTarget
+      stateId: string
+      revision: number
+    },
+  ) {
+    if (!(await this.flushEditor())) throw new Error('Finish editing before using the ribbon.')
+    if (
+      frozen &&
+      (frozen.stateId !== this.selectionContext.stateId || frozen.revision !== this.revision)
+    )
+      throw new Error(
+        'The document changed while the dialog was open. Reopen the dialog and review its settings.',
+      )
+    const target = frozen?.target ?? this.ribbonTarget
+    if (!target) throw new Error('Select cells before using this ribbon command.')
+    const operations = commands.flatMap((command) => ribbonIntents(command, target))
+    if (operations.length) await this.enqueue(operations)
+  }
+  async ribbonSummary(fn: 'SUM' | 'AVERAGE' | 'COUNT' | 'MIN' | 'MAX') {
+    if (!(await this.flushEditor())) throw new Error('Finish editing before inserting a summary.')
+    await this.insertSummary(fn)
+  }
+  async ribbonChat(instruction = '') {
+    if (!this.host.action) throw new Error('Native chat is unavailable in this host.')
+    await this.host.action({
+      action: 'chat',
+      instruction,
+      scope: instruction ? 'selection' : 'document',
+    })
+  }
   private runtime: ReturnType<typeof createUniver>
   private state: CandidateState | undefined
   private revision = 0
@@ -735,6 +792,17 @@ export class WorkbookRuntime implements EditorProjection {
       ?.getActiveSheet()
       ?.getRange(range)
       .getRawValues()
+  }
+  projectedStyles(range: string) {
+    const bounds = parseRange(range)
+    if (rangeCellCount(bounds) > 2000) throw new Error('presentation_range_limit')
+    const sheet = this.runtime.univerAPI.getActiveWorkbook()?.getActiveSheet()
+    if (!sheet) throw new Error('view_unavailable')
+    const styles: Record<string, unknown> = {}
+    for (let row = bounds.startRow; row <= bounds.endRow; row++)
+      for (let column = bounds.startColumn; column <= bounds.endColumn; column++)
+        styles[formatAddress(row, column)] = sheet.getRange(row, column).getCellStyleData() ?? {}
+    return JSON.parse(JSON.stringify(styles))
   }
   get charts(): readonly SheetVisual[] {
     const sheetId = this.runtime.univerAPI.getActiveWorkbook()?.getActiveSheet()?.getSheetId()

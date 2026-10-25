@@ -26,7 +26,8 @@
     "./ai-skills.css": "./src/ai-skills.css",
     "./wordart-presets": "./src/wordart-presets.ts",
     "./font-list": "./src/font-list.ts",
-    "./shape-gallery": "./src/shape-gallery.tsx"
+    "./shape-gallery": "./src/shape-gallery.tsx",
+    "./chrome": "./src/chrome.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

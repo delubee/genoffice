@@ -1,4 +1,5 @@
 import * as vscode from 'vscode'
+import { nativeOfficeActions } from '../office-actions'
 import { randomBytes } from 'node:crypto'
 import { mkdir, readFile, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -86,6 +87,41 @@ export class DocxEditorProvider
     }))
     bridge.handle('view.ready', () => document.projection())
     bridge.handle('view.resync', () => document.projection())
+    const actionSession = document.session.sessionId
+    bridge.handle(
+      'office.action',
+      nativeOfficeActions({
+        uri: document.uri,
+        available: () =>
+          !document.isClosed &&
+          this.getDocument(document.uri) === document &&
+          document.session.sessionId === actionSession,
+        active: () => panel.active,
+        flush: () => document.flush(),
+        bind: async (scope) => {
+          const cancellation = new vscode.CancellationTokenSource()
+          try {
+            const context = (await this.invokeTool(
+              'context',
+              {
+                documentUri: document.uri.toString(),
+                selection: scope === 'selection',
+              },
+              cancellation.token,
+            )) as { bindingId: string; descriptor: { revision: number } }
+            return {
+              kind: 'docx',
+              scope,
+              documentUri: document.uri.toString(),
+              bindingId: context.bindingId,
+              revision: context.descriptor.revision,
+            }
+          } finally {
+            cancellation.dispose()
+          }
+        },
+      }),
+    )
     bridge.handle('view.presentation', (raw) => {
       const status = z
         .object({ ready: z.boolean().optional(), error: z.string().max(4096).optional() })

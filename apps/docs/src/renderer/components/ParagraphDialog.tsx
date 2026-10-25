@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Editor } from '@tiptap/core'
 import type { StyleInfo } from '@genoffice/docx-engine'
-import { Dropdown } from '@genoffice/ui'
+import { Dropdown } from '@genoffice/ui/chrome'
 import { useI18n, type StringKey } from '../i18n/locale'
 import { setParaAttrs, activeParaAttrs } from './ribbon-tabs'
 import { setSelectionAlign } from '../editor/direction'
@@ -237,7 +237,7 @@ export function ParagraphDialog({
       onKeyDown={modalKeys.onKeyDown}
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="modal">
+      <div className="modal" role="dialog" aria-modal="true" aria-label={t('appParagraph')}>
         <h2>{t('appParagraph')}</h2>
         <div className="dlg-tabs" role="tablist">
           {(['indents', 'breaks'] as const).map((k) => (

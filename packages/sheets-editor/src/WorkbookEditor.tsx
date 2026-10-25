@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { OfficeFileActions, OFFICE_ACTION_LABELS } from '@genoffice/ui/chrome'
+import { normalizeLang } from '@genoffice/i18n'
 import type { EditorHost } from './ports'
 import { WorkbookRuntime } from './runtime'
 import { editorText } from './i18n'
@@ -108,6 +110,16 @@ export function WorkbookEditor({
               <option value="vscode">{text.vscodeAppearance}</option>
             </select>
           </label>
+        )}
+        {host.action && (
+          <OfficeFileActions
+            labels={OFFICE_ACTION_LABELS[normalizeLang(locale ?? navigator.language)]}
+            onOpen={() => host.action!({ action: 'open' })}
+            onSave={() => host.action!({ action: 'save' })}
+            onSaveAs={() => host.action!({ action: 'saveAs' })}
+            onChat={(scope) => host.action!({ action: 'chat', scope, instruction: '' })}
+            onError={(error) => setError(editorError(error, text))}
+          />
         )}
         <button
           onClick={() => {

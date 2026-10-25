@@ -86,6 +86,11 @@ export function LocaleProvider({ initial, children }: { initial: Lang; children:
       }),
     [],
   )
+  return <LocaleScope lang={lang}>{children}</LocaleScope>
+}
+
+/** Controlled locale for embedded renderers whose host owns language changes. */
+export function LocaleScope({ lang, children }: { lang: Lang; children: ReactNode }) {
   return <LocaleContext.Provider value={lang}>{children}</LocaleContext.Provider>
 }
 

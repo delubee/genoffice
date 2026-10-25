@@ -7,7 +7,7 @@ import {
   useDismissablePopover,
   wordArtSolidColor,
   type WordArtPreset,
-} from '@genoffice/ui'
+} from '@genoffice/ui/chrome'
 import {
   buildLineParagraphXml,
   buildShapeParagraphXml,

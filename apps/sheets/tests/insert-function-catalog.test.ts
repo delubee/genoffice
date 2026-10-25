@@ -12,7 +12,7 @@ const here = dirname(fileURLToPath(import.meta.url))
 const read = (rel: string) => readFileSync(join(here, '..', rel), 'utf8')
 
 const dialogSrc = read('src/renderer/InsertFunctionDialog.tsx')
-const shellSrc = read('src/renderer/ExcelShell.tsx')
+const shellSrc = read('src/renderer/SheetsRibbon.tsx')
 
 const catalogCategories = new Set([...dialogSrc.matchAll(/category: '([^']+)'/g)].map((m) => m[1]!))
 /** Categories the ribbon buttons ask the dialog to open on */

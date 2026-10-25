@@ -149,6 +149,7 @@ export async function mountManualToolbar(appearanceControls = false, merged = fa
       }
     },
     snapshot: () => structuredClone(state),
+    revision: () => revision,
     darkTheme: () =>
       (
         projection as unknown as {

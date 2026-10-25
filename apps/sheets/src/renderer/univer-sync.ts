@@ -1,4 +1,6 @@
 import { keepActiveSheet } from './sheet-focus'
+import { gridCell } from '@genoffice/sheets-editor/grid-cell'
+import type { WorkbookStyleEdit } from '@genoffice/xlsx-gateway/shared/edit-schemas'
 /**
  * Univer runtime synchronization helpers for the sheets renderer.
  *
@@ -412,6 +414,10 @@ export function applyFormatPatchToRange(
     // throwing default branch; translate it first (same as the ribbon's align
     // command). null clears the alignment like the other null branches.
     if (patch.horizontalAlign === null) range.setValue({ s: { ht: null } } as unknown as ICellData)
+    else if (patch.horizontalAlign === 'justify' || patch.horizontalAlign === 'distributed')
+      range.setValue({
+        s: { ht: patch.horizontalAlign === 'justify' ? 4 : 6 },
+      } as unknown as ICellData)
     else
       range.setHorizontalAlignment(
         patch.horizontalAlign === 'right' ? 'normal' : patch.horizontalAlign,
@@ -445,9 +451,31 @@ export function applyFormatPatchToRange(
   if (patch.border !== undefined && patch.border !== null) {
     const type = BORDER_COMMAND_TYPES[patch.border.type]
     if (type) {
-      range.setBorder(type, BorderStyleTypes.THIN, displayColor(patch.border.color ?? '#000000')!)
+      const lineStyle = {
+        thin: BorderStyleTypes.THIN,
+        medium: BorderStyleTypes.MEDIUM,
+        thick: BorderStyleTypes.THICK,
+        double: BorderStyleTypes.DOUBLE,
+        hair: BorderStyleTypes.HAIR,
+        dashed: BorderStyleTypes.DASHED,
+        dotted: BorderStyleTypes.DOTTED,
+      }[patch.border.style ?? 'thin']
+      range.setBorder(type, lineStyle, displayColor(patch.border.color ?? '#000000')!)
     }
   }
+  const extras: WorkbookStyleEdit = {}
+  if (patch.underlineStyle !== undefined) {
+    extras.underlineStyle = patch.underlineStyle
+    if (patch.underline !== undefined) extras.underline = !!patch.underline
+  }
+  if (patch.vertAlign !== undefined) extras.vertAlign = patch.vertAlign
+  for (const key of ['borderTop', 'borderBottom', 'borderLeft', 'borderRight'] as const)
+    if ((format as CellFormatState)[key] !== undefined)
+      extras[key] = (format as CellFormatState)[key]
+  if (Object.keys(extras).length)
+    range.setValue({
+      s: gridCell({ kind: 'blank', rawValue: null, style: extras }).s,
+    } as unknown as ICellData)
 }
 
 /** Univer paints rgb only; theme slots resolve through the default palette here */

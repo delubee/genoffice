@@ -24,6 +24,26 @@ const bridge = new JsonBridge(sessionId, {
   },
 })
 const root = createRoot(document.getElementById('root')!)
+function applyAppearance(appearance: 'word' | 'vscode') {
+  document.documentElement.dataset.docxAppearance = appearance
+  const kind = document.body.dataset.vscodeThemeKind
+  document.documentElement.dataset.theme =
+    appearance === 'vscode' &&
+    (kind === 'vscode-dark' ||
+      kind === 'vscode-high-contrast' ||
+      document.body.classList.contains('vscode-dark') ||
+      document.body.classList.contains('vscode-high-contrast'))
+      ? 'dark'
+      : 'light'
+}
+applyAppearance(document.documentElement.dataset.docxAppearance === 'vscode' ? 'vscode' : 'word')
+const themeObserver = new MutationObserver(() => {
+  applyAppearance(document.documentElement.dataset.docxAppearance === 'vscode' ? 'vscode' : 'word')
+})
+themeObserver.observe(document.body, {
+  attributes: true,
+  attributeFilter: ['class', 'data-vscode-theme-kind'],
+})
 const present = (presentation: DocumentPresentation) => {
   let style = document.getElementById('office-docx-styles')
   if (!style) {
@@ -59,8 +79,7 @@ bridge.handle('view.resync', (raw) => {
   return { ready: true }
 })
 bridge.handle('appearance.changed', (raw) => {
-  document.documentElement.dataset.docxAppearance =
-    (raw as { appearance: string }).appearance === 'vscode' ? 'vscode' : 'word'
+  applyAppearance((raw as { appearance: string }).appearance === 'vscode' ? 'vscode' : 'word')
   return { ready: true }
 })
 void bridge
@@ -70,6 +89,9 @@ void bridge
     setModuleLang(normalizeLang(document.documentElement.lang))
     if (projection.presentation) present(projection.presentation)
     runtime = new DocumentRuntime(projection, {
+      action: async (request) => {
+        await bridge.request('office.action', request)
+      },
       submit: async (request) => (await bridge.request('view.intent', request)) as Commit,
       history: async (direction) => {
         await bridge.request('history.request', { direction })
@@ -92,6 +114,7 @@ void bridge
   })
   .catch((error) => showError(String(error)))
 window.addEventListener('unload', () => {
+  themeObserver.disconnect()
   runtime?.dispose()
   bridge.dispose()
 })
