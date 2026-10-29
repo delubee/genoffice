@@ -1,3 +1,9 @@
+import {
+  buildChartSeriesSelection,
+  chartSelectionReferences,
+  type SelectionVector,
+} from '@genoffice/xlsx-gateway/domain/chart-series-selection'
+import { applyChartStateEdit } from '@genoffice/xlsx-gateway/domain/chart-visual'
 /**
  * Chart/shape/image insertion (ribbon and AI ops). Extracted from App.tsx;
  * the App component passes a VisualActionContext built fresh per call so
@@ -5,23 +11,21 @@
  */
 import { columnLabel, parseAddress, parseRange } from '@genoffice/xlsx-gateway/domain/cell-address'
 import {
-  hasNumericYearAxis,
   recommendCharts,
   type ChartRecommendations,
 } from '@genoffice/xlsx-gateway/domain/chart-recommend'
-import { buildChartVisual, chartDataFromValues } from '@genoffice/xlsx-gateway/domain/chart-visual'
+import { buildChartVisual } from '@genoffice/xlsx-gateway/domain/chart-visual'
 import type { InMemoryWorkbookAdapter } from '@genoffice/xlsx-gateway/domain/in-memory-workbook'
 import { buildPivotChartData } from '@genoffice/xlsx-gateway/domain/pivot-chart'
 import type {
   AddChartOperation,
   AddImageOperation,
+  AddPictureOperation,
   AddShapeOperation,
   EditChartOperation,
   EditShapeOperation,
 } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
 import type { ChangePlan } from '@genoffice/xlsx-gateway/domain/workbook.types'
-import { IRenderManagerService, Vector2 } from '@univerjs/engine-render'
-import { SheetSkeletonManagerService } from '@univerjs/preset-sheets-core'
 import type { WorkbookVisualObject } from '../shared/desktop-api'
 import {
   isSheetRemoved,
@@ -35,19 +39,12 @@ import { filePivotAtSelection, type PivotActionContext } from './pivot-actions'
 import {
   fitPictureFrame,
   pictureFileProblem,
-  pictureMediaType,
-  pointInRect,
+  pickPictureFile,
+  readPictureFile,
   type PictureAnchor,
 } from './picture-paste'
 import { startSheetShapeDraw } from './shape-draw'
-import {
-  a1RangeRef,
-  a1RowRangeRef,
-  absRangeRef,
-  pushVisualUndo,
-  queueVisualInstall,
-  readChartGridValues,
-} from './univer-sync'
+import { absRangeRef, pushVisualUndo, queueVisualInstall, readChartGridValues } from './univer-sync'
 import type { LazyWorkbookState, UniverRuntime } from './univer-state'
 import {
   clearVisualSelection,
@@ -205,86 +202,19 @@ export async function handleInsertChart(
     ctx.setMessage(error instanceof Error ? error.message : t('appChartNeedsNumericColumn'))
     return
   }
-  // Scatter reads its X values from the first data vector.
-  let parsed = chartDataFromValues(
-    values,
-    chartKind === 'scatter' ? { numericCategoryColumn: true } : undefined,
-  )
-  if (!parsed) {
-    ctx.setMessage(t('appChartNeedsNumericColumn'))
+  let visual: WorkbookVisualObject
+  try {
+    visual = buildChartVisual({
+      id: `added-chart-${Date.now().toString(36)}-${state.editJournal.visualAdds.length + 1}`,
+      sheetId,
+      sheetName: worksheet.getSheetName(),
+      chartType: chartKind as AddChartOperation['chartType'],
+      dataRange: `${columnLabel(startColumn)}${startRow + 1}:${columnLabel(endColumn)}${endRow + 1}`,
+      values,
+    })
+  } catch (error) {
+    ctx.setMessage(error instanceof Error ? error.message : t('appChartNeedsNumericColumn'))
     return
-  }
-  // Keep Year/Value selections consistent with the recommendation previews:
-  // the year vector is the category axis, not a plotted series.
-  if (chartKind !== 'scatter' && hasNumericYearAxis(parsed)) {
-    parsed = chartDataFromValues(values, { numericCategoryColumn: true }) ?? parsed
-  }
-  const sheetName = worksheet.getSheetName()
-  const dataStartRow = startRow + (parsed.hasHeaderRow && !parsed.byRow ? 1 : 0)
-  // by-row orientation: series names come from the first column, categories
-  // from the first row
-  const dataStartColumn = startColumn + (parsed.hasHeaderRow && parsed.byRow ? 1 : 0)
-  const visual: WorkbookVisualObject = {
-    id: `added-chart-${Date.now().toString(36)}-${state.editJournal.visualAdds.length + 1}`,
-    sheetId,
-    kind: 'chart',
-    anchor: {
-      fromRow: startRow,
-      fromColumn: endColumn + 2,
-      fromRowOffset: 0,
-      fromColumnOffset: 0,
-      toRow: startRow + 15,
-      toColumn: endColumn + 9,
-      toRowOffset: 0,
-      toColumnOffset: 0,
-    },
-    chart: {
-      chartTypes:
-        chartKind === 'line'
-          ? ['lineChart']
-          : chartKind === 'area'
-            ? ['areaChart']
-            : chartKind === 'pie'
-              ? ['pieChart']
-              : chartKind === 'scatter'
-                ? ['scatterChart']
-                : chartKind === 'radar'
-                  ? ['radarChart']
-                  : chartKind === 'doughnut'
-                    ? ['doughnutChart']
-                    : chartKind === 'combo'
-                      ? ['barChart', 'lineChart']
-                      : ['barChart'],
-      ...(chartKind === 'column' || chartKind === 'bar' || chartKind === 'combo'
-        ? { barDirection: chartKind === 'bar' ? 'bar' : 'col' }
-        : {}),
-      title: parsed.series.length === 1 && parsed.series[0] ? parsed.series[0].name : 'Chart Title',
-      series: parsed.series.map((series) => ({
-        name: series.name,
-        categories: parsed.categories,
-        values: series.values,
-        ...(parsed.byRow
-          ? {
-              valuesRef: a1RowRangeRef(
-                sheetName,
-                startRow + series.column,
-                dataStartColumn,
-                endColumn,
-              ),
-              ...(parsed.hasCategoryColumn
-                ? {
-                    categoriesRef: a1RowRangeRef(sheetName, startRow, dataStartColumn, endColumn),
-                  }
-                : {}),
-            }
-          : {
-              valuesRef: a1RangeRef(sheetName, series.column + startColumn, dataStartRow, endRow),
-              ...(parsed.hasCategoryColumn
-                ? { categoriesRef: a1RangeRef(sheetName, startColumn, dataStartRow, endRow) }
-                : {}),
-            }),
-      })),
-    },
   }
   pushVisualAddUndo(ctx, runtime, state, visual)
   ctx.setPendingEdits(journalSize(state.editJournal))
@@ -480,10 +410,33 @@ export async function buildAiChartEdit(
     ...(op.title !== undefined ? { title: op.title } : {}),
     ...(op.chartType !== undefined ? { chartType: op.chartType } : {}),
     ...(op.seriesColors ? { seriesColors: op.seriesColors } : {}),
+    ...(op.pointColors === undefined ? {} : { pointColors: op.pointColors }),
+    ...(op.dataLabelPosition === undefined ? {} : { dataLabelPosition: op.dataLabelPosition }),
+    ...(op.dataLabelFormat === undefined ? {} : { dataLabelFormat: op.dataLabelFormat }),
+    ...(op.gridlines === undefined ? {} : { gridlines: op.gridlines }),
+    ...(op.valueAxis === undefined ? {} : { valueAxis: op.valueAxis }),
+    ...(op.gapWidthPct === undefined ? {} : { gapWidthPct: op.gapWidthPct }),
+    ...(op.holeSizePct === undefined ? {} : { holeSizePct: op.holeSizePct }),
+    ...(op.explosionPct === undefined ? {} : { explosionPct: op.explosionPct }),
+    ...(op.pointExplosions === undefined ? {} : { pointExplosions: op.pointExplosions }),
+
     ...(op.legend !== undefined ? { legend: op.legend } : {}),
     ...(op.dataLabels !== undefined ? { dataLabels: op.dataLabels } : {}),
     ...(op.grouping !== undefined ? { grouping: op.grouping } : {}),
     ...(op.axisTitles !== undefined ? { axisTitles: op.axisTitles } : {}),
+  }
+  if (op.seriesSelection) {
+    const visual = [...state.file.visuals, ...state.editJournal.visualAdds].find(
+      (item) => item.chartPath === op.chartPath || item.id === op.chartPath,
+    )
+    if (!visual?.chart) throw new Error('unknown_chart')
+    const chart = applyChartStateEdit(visual.chart, state.editJournal.chartEdits.get(op.chartPath))
+    const reads = new Map<string, SelectionVector>()
+    for (const reference of chartSelectionReferences(chart, op.seriesSelection))
+      reads.set(reference, await ctx.chartVectorRef.current(op.chartPath, reference))
+    edit.seriesSet = buildChartSeriesSelection(chart, op.seriesSelection, (reference) =>
+      reads.get(reference)!,
+    )
   }
   if (!op.seriesData || op.seriesData.length === 0) return edit
   const runtime = ctx.univerRef.current
@@ -523,6 +476,28 @@ export async function buildAiChartEdit(
     })
   }
   return { ...edit, series }
+}
+
+/** Canonical inline picture insertion shares the desktop visual journal. */
+export function insertInlinePictureVisual(
+  ctx: VisualActionContext,
+  runtime: UniverRuntime,
+  state: LazyWorkbookState,
+  op: AddPictureOperation,
+): void {
+  if (!runtime.univerAPI.getActiveWorkbook()?.getSheetBySheetId(op.sheetId))
+    throw new Error(`Unknown sheet: ${op.sheetId}`)
+  const visual: WorkbookVisualObject = {
+    id: `added-image-${Date.now().toString(36)}-${state.editJournal.visualAdds.length + 1}`,
+    sheetId: op.sheetId,
+    kind: 'image',
+    anchor: structuredClone(op.anchor),
+    mediaType: op.mediaType,
+    mediaDataUrl: `data:${op.mediaType};base64,${op.base64}`,
+    name: op.name,
+  }
+  pushVisualAddUndo(ctx, runtime, state, visual)
+  queueCtxVisualInstall(ctx, runtime)
 }
 
 /// AI add_image: same visual pipeline as the picker-based insert, sized
@@ -660,14 +635,9 @@ export function insertAiShapeVisual(
 
 export function handleInsertPicture(ctx: VisualActionContext): void {
   if (!pictureTargetReady(ctx)) return
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = 'image/png,image/jpeg,image/gif'
-  input.onchange = () => {
-    const file = input.files?.[0]
+  void pickPictureFile().then((file) => {
     if (file) handleInsertPictureFile(ctx, file)
-  }
-  input.click()
+  })
 }
 
 function pictureTargetReady(ctx: VisualActionContext): boolean {
@@ -693,60 +663,14 @@ export function handleInsertPictureFile(
     ctx.setMessage(t(problem === 'too-large' ? 'appPictureTooLarge' : 'appPictureBadType'))
     return
   }
-  const mediaType = pictureMediaType(file.type)
-  const reader = new FileReader()
-  reader.onload = () => {
-    const dataUrl = typeof reader.result === 'string' ? reader.result : null
-    if (!dataUrl) return
-    const image = new Image()
-    image.onload = () =>
-      insertPictureVisual(
-        ctx,
-        dataUrl,
-        mediaType,
-        file.name,
-        image.naturalWidth,
-        image.naturalHeight,
-        anchor,
-      )
-    image.onerror = () => insertPictureVisual(ctx, dataUrl, mediaType, file.name, 480, 320, anchor)
-    image.src = dataUrl
-  }
-  reader.readAsDataURL(file)
+  void readPictureFile(file)
+    .then(({ dataUrl, mediaType, width, height }) => {
+      insertPictureVisual(ctx, dataUrl, mediaType, file.name, width, height, anchor)
+    })
+    .catch(() => ctx.setMessage(t('appPictureBadType')))
 }
 
-/// Grid cell under a viewport point (drop target), mirroring Univer's own
-/// pointer hit-test; null off the sheet canvas.
-export function cellAtClientPoint(
-  runtime: UniverRuntime,
-  clientX: number,
-  clientY: number,
-): PictureAnchor | null {
-  const workbook = runtime.univerAPI.getActiveWorkbook()
-  if (!workbook) return null
-  const render = runtime.univer
-    .__getInjector()
-    .get(IRenderManagerService)
-    .getRenderById(workbook.getId())
-  const skeleton = render?.with(SheetSkeletonManagerService).getCurrentSkeleton()
-  if (!render || !skeleton) return null
-  const bounds = render.engine.getCanvasElement().getBoundingClientRect()
-  if (!pointInRect(clientX, clientY, bounds)) return null
-  const scene = render.scene
-  const relative = scene.getCoordRelativeToViewport(
-    Vector2.FromArray([clientX - bounds.left, clientY - bounds.top]),
-  )
-  const scrollXY = scene.getScrollXYInfoByViewport(relative)
-  const { scaleX, scaleY } = scene.getAncestorScale()
-  const { row, column } = skeleton.getCellIndexByOffset(
-    relative.x,
-    relative.y,
-    scaleX,
-    scaleY,
-    scrollXY,
-  )
-  return row < 0 || column < 0 ? null : { row, column }
-}
+export { cellAtClientPoint } from './picture-grid-target'
 
 /// Reads the selection the same way handleInsertChart does and ranks chart
 /// kinds for it; null (with a status message) when there is nothing to chart.

@@ -1352,3 +1352,14 @@ describe('cell picture journal', () => {
     expect(journal.cellImageAdds).toHaveLength(1)
   })
 })
+
+it('retains computed HTML clipboard colors in the saved neutral style', () => {
+  expect(
+    toNeutralStyle({ bg: { rgb: 'rgb(255, 238, 204)' }, cl: { rgb: 'rgb(17, 34, 51)' } }),
+  ).toEqual({ fillColor: '#FFEECC', fontColor: '#112233' })
+  expect(toNeutralStyle({ cl: { rgb: '#abc' }, bg: { rgb: 'rgba(1, 2, 3, 1)' } })).toEqual({
+    fontColor: '#AABBCC',
+    fillColor: '#010203',
+  })
+  expect(toNeutralStyle({ cl: { rgb: 'rgb(999, 0, 0)' } })).toBeUndefined()
+})

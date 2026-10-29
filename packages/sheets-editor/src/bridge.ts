@@ -16,7 +16,11 @@ const candidateRequestSchema = z.strictObject({
     state: workbookStateSchema,
     completeSheetIds: z.array(z.string()),
     referenceRanges: z.record(z.string(), z.array(z.string())).optional(),
+    hiddenRows: z
+      .record(z.string(), z.array(z.number().int().nonnegative().max(1048575)).max(1048576))
+      .optional(),
     writableSheetIds: z.array(z.string()),
+    viewWritableSheetIds: z.array(z.string()).optional(),
     allocation: z.strictObject({
       stateId: z.string().min(1),
       sheetIds: z.record(z.string(), z.string().min(1)),

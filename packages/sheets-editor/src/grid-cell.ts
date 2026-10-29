@@ -1,5 +1,6 @@
 import {
   BorderStyleTypes,
+  DEFAULT_STYLES,
   HorizontalAlign,
   VerticalAlign,
   WrapStrategy,
@@ -30,7 +31,7 @@ const borderStyles = {
 /** Document formatting is independent of the host's light/dark UI theme. */
 export function gridCell(cell: Omit<ViewCell, 'address'>): ICellData {
   const style = cell.style ?? {},
-    s: IStyleData = {}
+    s: IStyleData = cell.styleReset ? structuredClone(DEFAULT_STYLES) : {}
   if (style.bold !== undefined) s.bl = style.bold ? 1 : 0
   if (style.italic !== undefined) s.it = style.italic ? 1 : 0
   if (style.underline !== undefined || style.underlineStyle !== undefined)

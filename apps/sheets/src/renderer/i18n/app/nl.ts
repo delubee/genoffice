@@ -106,6 +106,7 @@ export const nl = {
   appLabelNumberFormat: 'Getalnotatie van label',
   appLabelFormatPlaceholder: 'bijv. 0.0% / #,##0',
   appGridlines: 'Rasterlijnen',
+  appChartAxisRangeInvalid: 'Het maximum moet groter zijn dan het minimum.',
   appAxisMin: 'Minimum',
   appAxisMax: 'Maximum',
   appBarSection: 'Kolom',
@@ -672,6 +673,14 @@ export const nl = {
   appNamesNeedFile:
     'Open eerst een XLSX-bestand — gedefinieerde namen worden in het bestand opgeslagen.',
   appNameGone: 'Die naam bestaat niet meer.',
+  appDefinedNameInvalid: 'Voer een geldige, niet-gereserveerde naam en verwijzing in.',
+  appDefinedNameDuplicate: 'Deze naam wordt al gebruikt binnen dit bereik.',
+  appDefinedNameBindingConflict:
+    'Deze wijziging conflicteert met een verborgen of werkbladgebonden definitie.',
+  appAuditPendingValues:
+    'De foutcontrole gebruikt opgeslagen formulewaarden; sommige resultaten wachten op herberekening.',
+  appDefinedNameLabelPending:
+    'Formuleresultaten van labels zijn niet geverifieerd. Gebruik tekstlabels om namen te maken.',
   appNameApplyFailed: 'De naam kon niet worden toegepast.',
   appNamesUpdated: 'Gedefinieerde namen bijgewerkt — sla op met ⌘S.',
   appLinkInternal: 'De koppeling wijst naar een locatie in de werkmap: {location}',
@@ -1580,4 +1589,12 @@ export const nl = {
   appVisualFlipV: 'Verticaal spiegelen',
   appVisualFlipH: 'Horizontaal spiegelen',
   appCtxPasteVisual: 'Afbeelding of vorm plakken',
+  appDocumentChangedDuringAction:
+    'Het document is gewijzigd tijdens het voorbereiden van deze actie. Probeer het opnieuw.',
+  appClipboardUnsupported:
+    'Deze inhoud kan nog niet worden geplakt. Er zijn geen cellen gewijzigd.',
+  appClipboardSelectionChanged: 'De selectie is gewijzigd vóór het plakken. Probeer het opnieuw.',
+  appClipboardBusy: 'Wacht tot de huidige bewerking is voltooid.',
+  appClipboardReadUnavailable:
+    'Het klembord kan niet worden gelezen. Gebruik {shortcut} om te plakken.',
 } satisfies Record<keyof typeof zh, string>

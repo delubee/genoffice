@@ -49,7 +49,7 @@ if (entries.length)
     platform: 'node',
     target: 'node22',
     format: 'cjs',
-    external: ['vscode', 'mocha'],
+    external: ['vscode', 'mocha', '@playwright/test'],
     sourcemap: true,
   })
 

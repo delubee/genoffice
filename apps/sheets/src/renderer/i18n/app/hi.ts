@@ -102,6 +102,7 @@ export const hi = {
   appLabelNumberFormat: 'लेबल संख्या स्वरूप',
   appLabelFormatPlaceholder: 'जैसे 0.0% / #,##0',
   appGridlines: 'ग्रिडलाइन',
+  appChartAxisRangeInvalid: 'अधिकतम मान न्यूनतम मान से बड़ा होना चाहिए।',
   appAxisMin: 'न्यूनतम',
   appAxisMax: 'अधिकतम',
   appBarSection: 'स्तंभ',
@@ -638,6 +639,13 @@ export const hi = {
   appScopeWorkbook: 'कार्यपुस्तिका',
   appNamesNeedFile: 'पहले एक XLSX फ़ाइल खोलें — परिभाषित नाम फ़ाइल में सहेजे जाते हैं।',
   appNameGone: 'वह नाम अब मौजूद नहीं है।',
+  appDefinedNameInvalid: 'मान्य, गैर-आरक्षित नाम और संदर्भ दर्ज करें।',
+  appDefinedNameDuplicate: 'इस दायरे में यह नाम पहले से उपयोग में है।',
+  appDefinedNameBindingConflict: 'यह बदलाव छिपी हुई या शीट-स्तरीय परिभाषा से टकराता है।',
+  appAuditPendingValues:
+    'त्रुटि जाँच सहेजे गए सूत्र मानों का उपयोग करती है; कुछ परिणाम पुनर्गणना की प्रतीक्षा में हैं।',
+  appDefinedNameLabelPending:
+    'लेबल सूत्रों के परिणाम सत्यापित नहीं हैं। नाम बनाने के लिए टेक्स्ट लेबल उपयोग करें।',
   appNameApplyFailed: 'नाम लागू नहीं किया जा सका।',
   appNamesUpdated: 'परिभाषित नाम अद्यतन किए गए — ⌘S से सहेजें।',
   appLinkInternal: 'लिंक कार्यपुस्तिका के भीतर इंगित करता है: {location}',
@@ -1539,4 +1547,11 @@ export const hi = {
   appVisualFlipV: 'लंबवत पलटें',
   appVisualFlipH: 'क्षैतिज पलटें',
   appCtxPasteVisual: 'चित्र या आकृति पेस्ट करें',
+  appDocumentChangedDuringAction:
+    'यह कार्रवाई तैयार करते समय दस्तावेज़ बदल गया। फिर से प्रयास करें।',
+  appClipboardUnsupported: 'यह सामग्री अभी चिपकाई नहीं जा सकती। कोई सेल नहीं बदला गया।',
+  appClipboardSelectionChanged: 'चिपकाने से पहले चयन बदल गया। फिर कोशिश करें।',
+  appClipboardBusy: 'वर्तमान संपादन पूरा होने तक प्रतीक्षा करें।',
+  appClipboardReadUnavailable:
+    'क्लिपबोर्ड पढ़ा नहीं जा सका। चिपकाने के लिए {shortcut} इस्तेमाल करें।',
 } satisfies Record<keyof typeof zh, string>

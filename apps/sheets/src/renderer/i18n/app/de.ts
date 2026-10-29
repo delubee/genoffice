@@ -108,6 +108,7 @@ export const de = {
   appLabelNumberFormat: 'Zahlenformat der Beschriftung',
   appLabelFormatPlaceholder: 'z. B. 0.0% / #,##0',
   appGridlines: 'Gitternetzlinien',
+  appChartAxisRangeInvalid: 'Das Maximum muss größer als das Minimum sein.',
   appAxisMin: 'Minimum',
   appAxisMax: 'Maximum',
   appBarSection: 'Säulen',
@@ -688,6 +689,14 @@ export const de = {
   appNamesNeedFile:
     'Öffnen Sie zuerst eine XLSX-Datei — definierte Namen werden in die Datei gespeichert.',
   appNameGone: 'Dieser Name existiert nicht mehr.',
+  appDefinedNameInvalid: 'Geben Sie einen gültigen, nicht reservierten Namen und Bezug ein.',
+  appDefinedNameDuplicate: 'Dieser Name wird in diesem Gültigkeitsbereich bereits verwendet.',
+  appDefinedNameBindingConflict:
+    'Diese Änderung steht im Konflikt mit einer ausgeblendeten oder blattbezogenen Definition.',
+  appAuditPendingValues:
+    'Die Fehlerprüfung verwendet gespeicherte Formelwerte; einige Ergebnisse müssen neu berechnet werden.',
+  appDefinedNameLabelPending:
+    'Die Formelergebnisse der Beschriftungen sind nicht geprüft. Verwenden Sie Textbeschriftungen.',
   appNameApplyFailed: 'Der Name konnte nicht angewendet werden.',
   appNamesUpdated: 'Definierte Namen aktualisiert — mit ⌘S speichern.',
   appLinkInternal: 'Der Link zeigt in die Arbeitsmappe: {location}',
@@ -1598,4 +1607,13 @@ export const de = {
   appVisualFlipV: 'Vertikal spiegeln',
   appVisualFlipH: 'Horizontal spiegeln',
   appCtxPasteVisual: 'Bild oder Form einfügen',
+  appDocumentChangedDuringAction:
+    'Das Dokument wurde während der Vorbereitung geändert. Versuchen Sie es erneut.',
+  appClipboardUnsupported:
+    'Dieser Inhalt kann noch nicht eingefügt werden. Keine Zellen wurden geändert.',
+  appClipboardSelectionChanged:
+    'Die Auswahl hat sich vor dem Einfügen geändert. Versuchen Sie es erneut.',
+  appClipboardBusy: 'Warten Sie, bis die aktuelle Bearbeitung abgeschlossen ist.',
+  appClipboardReadUnavailable:
+    'Die Zwischenablage kann nicht gelesen werden. Verwenden Sie {shortcut} zum Einfügen.',
 } satisfies Record<keyof typeof zh, string>

@@ -104,6 +104,7 @@ export const id = {
   appLabelNumberFormat: 'Format Angka Label',
   appLabelFormatPlaceholder: 'mis. 0.0% / #,##0',
   appGridlines: 'Garis kisi',
+  appChartAxisRangeInvalid: 'Nilai maksimum harus lebih besar daripada nilai minimum.',
   appAxisMin: 'Minimum',
   appAxisMax: 'Maksimum',
   appBarSection: 'Kolom',
@@ -636,6 +637,14 @@ export const id = {
   appScopeWorkbook: 'Buku Kerja',
   appNamesNeedFile: 'Buka file XLSX dahulu — nama yang ditentukan disimpan ke file.',
   appNameGone: 'Nama itu sudah tidak ada.',
+  appDefinedNameInvalid: 'Masukkan nama yang valid, tidak dicadangkan, dan referensi yang valid.',
+  appDefinedNameDuplicate: 'Nama tersebut sudah digunakan dalam cakupan ini.',
+  appDefinedNameBindingConflict:
+    'Perubahan ini bertentangan dengan definisi tersembunyi atau khusus lembar.',
+  appAuditPendingValues:
+    'Pemeriksaan kesalahan memakai nilai rumus tersimpan; beberapa hasil menunggu penghitungan ulang.',
+  appDefinedNameLabelPending:
+    'Hasil rumus label belum diverifikasi. Gunakan label teks untuk membuat nama.',
   appNameApplyFailed: 'Nama tidak dapat diterapkan.',
   appNamesUpdated: 'Nama yang ditentukan diperbarui — simpan dengan ⌘S.',
   appLinkInternal: 'Tautan menunjuk ke dalam buku kerja: {location}',
@@ -1543,4 +1552,9 @@ export const id = {
   appVisualFlipV: 'Balik Vertikal',
   appVisualFlipH: 'Balik Horizontal',
   appCtxPasteVisual: 'Tempel Gambar atau Bentuk',
+  appDocumentChangedDuringAction: 'Dokumen berubah saat tindakan ini disiapkan. Coba lagi.',
+  appClipboardUnsupported: 'Konten ini belum dapat ditempel. Tidak ada sel yang diubah.',
+  appClipboardSelectionChanged: 'Pilihan berubah sebelum ditempel. Coba lagi.',
+  appClipboardBusy: 'Tunggu hingga pengeditan saat ini selesai.',
+  appClipboardReadUnavailable: 'Papan klip tidak dapat dibaca. Gunakan {shortcut} untuk menempel.',
 } satisfies Record<keyof typeof zh, string>

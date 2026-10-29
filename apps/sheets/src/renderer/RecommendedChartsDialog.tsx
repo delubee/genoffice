@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react'
 import type {
   ChartRecommendations,
   RecommendedKind,
@@ -13,7 +14,7 @@ const W = 180
 const H = 104
 const PAD = 8
 
-const KIND_LABEL: Record<RecommendedKind, StringKey> = {
+export const CHART_KIND_LABEL: Record<RecommendedKind, StringKey> = {
   column: 'appChartColumn',
   bar: 'appChartBar',
   line: 'appChartLine',
@@ -275,13 +276,43 @@ export function RecommendedChartsDialog({
   onClose,
 }: {
   readonly recommendations: ChartRecommendations
-  readonly onPick: (kind: RecommendedKind) => void
+  readonly onPick: (kind: RecommendedKind) => void | Promise<boolean>
   readonly onClose: () => void
 }): React.JSX.Element {
   const { t } = useI18n()
-  const modal = useModalDialog(onClose)
+  const pendingRef = useRef(false)
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const close = () => {
+    if (!pendingRef.current) onClose()
+  }
+  const pick = (kind: RecommendedKind) => {
+    if (pendingRef.current) return
+    setError(null)
+    try {
+      const result = onPick(kind)
+      if (result instanceof Promise) {
+        pendingRef.current = true
+        setPending(true)
+        void result
+          .then(
+            (success) => {
+              if (success) onClose()
+            },
+            (error) => setError(String(error)),
+          )
+          .finally(() => {
+            pendingRef.current = false
+            setPending(false)
+          })
+      } else onClose()
+    } catch (error) {
+      setError(String(error))
+    }
+  }
+  const modal = useModalDialog(close)
   return (
-    <div className="dialog-backdrop" onClick={onClose}>
+    <div className="dialog-backdrop" onClick={close}>
       <div
         className="format-cells-dialog recommended-charts-dialog"
         role="dialog"
@@ -297,20 +328,23 @@ export function RecommendedChartsDialog({
               <button
                 key={item.kind}
                 type="button"
-                onClick={() => {
-                  onPick(item.kind)
-                  onClose()
-                }}
+                disabled={pending}
+                onClick={() => pick(item.kind)}
               >
                 <ChartPreview kind={item.kind} parsed={recommendations.parsed} />
-                <strong>{t(KIND_LABEL[item.kind])}</strong>
+                <strong>{t(CHART_KIND_LABEL[item.kind])}</strong>
                 <span>{t(REASON_LABEL[item.reason])}</span>
               </button>
             ))}
           </div>
         </section>
+        {error && (
+          <p className="dialog-note" role="alert">
+            {error}
+          </p>
+        )}
         <div className="dialog-actions">
-          <button className="secondary" onClick={onClose}>
+          <button className="secondary" disabled={pending} onClick={close}>
             {t('dlgClose')}
           </button>
         </div>

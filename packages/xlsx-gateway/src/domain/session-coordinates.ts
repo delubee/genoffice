@@ -33,3 +33,33 @@ export function originalAxisIndex(
   }
   return index
 }
+
+/** Resolve an immutable source coordinate into the current worksheet. */
+export function currentAxisIndex(
+  log: readonly WorkbookOperation[],
+  sheetId: string,
+  index: number,
+  axis: 'row' | 'column',
+): number | null {
+  for (const op of log) {
+    if (!('sheetId' in op) || op.sheetId !== sheetId) continue
+    if (
+      op.op !== 'insert_rows' &&
+      op.op !== 'delete_rows' &&
+      op.op !== 'insert_cols' &&
+      op.op !== 'delete_cols'
+    )
+      continue
+    const rows = op.op === 'insert_rows' || op.op === 'delete_rows'
+    const columns = op.op === 'insert_cols' || op.op === 'delete_cols'
+    if (axis === 'row' ? !rows : !columns) continue
+    const at =
+      op.op === 'insert_rows' || op.op === 'delete_rows' ? op.row - 1 : columnIndex(op.column)
+    const count = 'count' in op ? op.count : 0
+    if (op.op.startsWith('delete_')) {
+      if (index >= at && index < at + count) return null
+      if (index >= at + count) index -= count
+    } else if (index >= at) index += count
+  }
+  return index
+}

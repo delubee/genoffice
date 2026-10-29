@@ -71,7 +71,10 @@ outcomes; a visible command with an empty callback is incomplete.
 
 ## Current gap
 
-The plugin still displays its initial simplified ribbons. Extracting a reusable
-desktop ribbon makes the real UI available to the embedded host, but does not by
-itself implement plugin parity. Production adapters, complete DOCX capabilities,
-shared styles, full menu coverage and packaged runtime verification remain open.
+Home, Insert, Page Layout, Function Library, Defined Names, Formula Auditing and
+several drawing contextual bands now reuse desktop controls with production
+adapters and targeted native verification. Remaining Calculation, Data, Review,
+View and DOCX capabilities, full command coverage, styles/states, computation,
+large-file behavior and packaged platform verification still need completion.
+Sharing controls or passing an intermediate checkpoint does not establish full
+plugin parity.

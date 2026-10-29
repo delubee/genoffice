@@ -1415,7 +1415,7 @@ fn reads_saved_print_settings_and_print_names() {
     let (_dir, path) = open_fixture(&[
         (
             "xl/workbook.xml",
-            r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="S" sheetId="1" r:id="rId1"/></sheets><definedNames><definedName name="_xlnm.Print_Area" localSheetId="0">'S'!$A$1:$C$4</definedName><definedName name="_xlnm.Print_Titles" localSheetId="0">'S'!$1:$2</definedName><definedName name="Visible">S!$A$1</definedName></definedNames></workbook>"#,
+            r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="S" sheetId="1" r:id="rId1"/></sheets><definedNames><definedName name="_xlnm.Print_Area" localSheetId="0">'S'!$A$1:$C$4</definedName><definedName name="_xlnm.Print_Titles" localSheetId="0">'S'!$1:$2</definedName><definedName name="Visible">S!$A$1</definedName><definedName name="Hidden" hidden="1" localSheetId="0">&quot;private-formula-text&quot;</definedName><definedName name="Empty"/><definedName name="Blank">  </definedName></definedNames></workbook>"#,
         ),
         (
             "xl/_rels/workbook.xml.rels",
@@ -1446,6 +1446,17 @@ fn reads_saved_print_settings_and_print_names() {
     );
     assert_eq!(metadata.defined_names.len(), 1);
     assert_eq!(metadata.defined_names[0].name, "Visible");
+    assert!(metadata.name_bindings_complete);
+    assert_eq!(metadata.reserved_defined_names.len(), 3);
+    assert_eq!(metadata.reserved_defined_names[0].name, "Hidden");
+    assert_eq!(
+        metadata.reserved_defined_names[0].sheet_id.as_deref(),
+        Some(metadata.sheets[0].id.as_str())
+    );
+    let wire = serde_json::to_value(&metadata).unwrap();
+    assert!(!wire.to_string().contains("private-formula-text"));
+    assert!(wire["reservedDefinedNames"][0].get("formula").is_none());
+
     // The _xlnm print names above are localSheetId-scoped even though the
     // modeled defined_names omit them — the duplicate gate keys off this.
     assert!(metadata.sheets[0].has_scoped_defined_names);
@@ -4075,11 +4086,15 @@ fn serializes_sparklines_in_expected_shape() {
 
 /// The autoFilter's filterColumn criteria round-trip through the range
 /// result: checked values (with XML escapes and the blank flag), comparison
-/// criteria, and colId offsets. Color-filter columns and customSheetViews
-/// copies of the autoFilter are ignored.
+/// criteria, colors (standard DXF and desktop multicolor extensions), and
+/// colId offsets. customSheetViews copies of the autoFilter are ignored.
 #[test]
 fn reads_auto_filter_column_criteria() {
     let (_dir, path) = open_fixture(&[
+        (
+            "xl/styles.xml",
+            r#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dxfs count="2"><dxf><fill><patternFill patternType="solid"><fgColor rgb="FFFF0000"/><bgColor indexed="64"/></patternFill></fill></dxf><dxf><font><color rgb="FF0000FF"/></font></dxf></dxfs></styleSheet>"#,
+        ),
         (
             "xl/workbook.xml",
             r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="S" sheetId="1" r:id="rId1"/></sheets></workbook>"#,
@@ -4090,7 +4105,7 @@ fn reads_auto_filter_column_criteria() {
         ),
         (
             "xl/worksheets/sheet1.xml",
-            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>h</t></is></c></row><row r="2" hidden="1"><c r="A2"><v>1</v></c></row></sheetData><autoFilter ref="A1:C9"><filterColumn colId="0"><filters blank="1"><filter val="Tello &amp; Co"/><filter val="Café"/></filters></filterColumn><filterColumn colId="1"><customFilters and="1"><customFilter operator="greaterThan" val="5"/><customFilter operator="lessThanOrEqual" val="20"/></customFilters></filterColumn><filterColumn colId="2"><colorFilter dxfId="0"/></filterColumn></autoFilter><customSheetViews><customSheetView guid="{1}"><autoFilter ref="A1:A2"><filterColumn colId="0"><filters><filter val="stale"/></filters></filterColumn></autoFilter></customSheetView></customSheetViews></worksheet>"#,
+            r##"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>h</t></is></c></row><row r="2" hidden="1"><c r="A2"><v>1</v></c></row></sheetData><autoFilter ref="A1:F9"><filterColumn colId="0"><filters blank="1"><filter val="Tello &amp; Co"/><filter val="Café"/></filters></filterColumn><filterColumn colId="1"><customFilters and="1"><customFilter operator="greaterThan" val="5"/><customFilter operator="lessThanOrEqual" val="20"/></customFilters></filterColumn><filterColumn colId="2"><colorFilter dxfId="0"/></filterColumn><filterColumn colId="3"><extLst><ext uri="urn:genoffice:filter-colors:v1"><go:colors xmlns:go="urn:genoffice:filter-colors:v1" axis="fill"><go:color val="#FF0000"/><go:color val="none"/></go:colors></ext></extLst></filterColumn><filterColumn colId="4"><extLst><ext uri="urn:genoffice:filter-colors:v1"><go:colors xmlns:go="urn:genoffice:filter-colors:v1" axis="font"><go:color val="#000000"/><go:color val="#0000FF"/></go:colors></ext></extLst></filterColumn><filterColumn colId="5"><colorFilter dxfId="1" cellColor="0"/></filterColumn></autoFilter><customSheetViews><customSheetView guid="{1}"><autoFilter ref="A1:A2"><filterColumn colId="0"><filters><filter val="stale"/></filters></filterColumn></autoFilter></customSheetView></customSheetViews></worksheet>"##,
         ),
     ]);
     let mut sessions = WorkbookSessions::new();
@@ -4119,9 +4134,9 @@ fn reads_auto_filter_column_criteria() {
             area.end_row,
             area.end_column
         ),
-        (0, 0, 8, 2)
+        (0, 0, 8, 5)
     );
-    assert_eq!(result.auto_filter_columns.len(), 2);
+    assert_eq!(result.auto_filter_columns.len(), 6);
     let first = &result.auto_filter_columns[0];
     assert_eq!(first.col_id, 0);
     assert!(first.blank);
@@ -4143,6 +4158,46 @@ fn reads_auto_filter_column_criteria() {
     assert_eq!(
         customs.filters[1].operator.as_deref(),
         Some("lessThanOrEqual")
+    );
+    assert_eq!(
+        result.auto_filter_columns[2]
+            .colors
+            .as_ref()
+            .unwrap()
+            .fill
+            .as_ref()
+            .unwrap(),
+        &vec![Some("#FF0000".to_owned())]
+    );
+    assert_eq!(
+        result.auto_filter_columns[3]
+            .colors
+            .as_ref()
+            .unwrap()
+            .fill
+            .as_ref()
+            .unwrap(),
+        &vec![Some("#FF0000".to_owned()), None]
+    );
+    assert_eq!(
+        result.auto_filter_columns[4]
+            .colors
+            .as_ref()
+            .unwrap()
+            .font
+            .as_ref()
+            .unwrap(),
+        &vec!["#000000".to_owned(), "#0000FF".to_owned()]
+    );
+    assert_eq!(
+        result.auto_filter_columns[5]
+            .colors
+            .as_ref()
+            .unwrap()
+            .font
+            .as_ref()
+            .unwrap(),
+        &vec!["#0000FF".to_owned()]
     );
 }
 
@@ -5016,9 +5071,34 @@ fn preserves_error_kind_separately_from_literal_error_text() {
     let (_dir, path) = open_fixture(&entries);
     let mut sessions = WorkbookSessions::new();
     let metadata = sessions.open(&path).unwrap();
-    let result = sessions.read_range(&metadata.session_id, "sheet-1", &CellRange { start_row: 0, end_row: 0, start_column: 0, end_column: 1 }).unwrap();
-    assert!(result.cells.iter().find(|cell| cell.column == 0).unwrap().is_error);
-    assert!(!result.cells.iter().find(|cell| cell.column == 1).unwrap().is_error);
+    let result = sessions
+        .read_range(
+            &metadata.session_id,
+            "sheet-1",
+            &CellRange {
+                start_row: 0,
+                end_row: 0,
+                start_column: 0,
+                end_column: 1,
+            },
+        )
+        .unwrap();
+    assert!(
+        result
+            .cells
+            .iter()
+            .find(|cell| cell.column == 0)
+            .unwrap()
+            .is_error
+    );
+    assert!(
+        !result
+            .cells
+            .iter()
+            .find(|cell| cell.column == 1)
+            .unwrap()
+            .is_error
+    );
 }
 
 #[test]

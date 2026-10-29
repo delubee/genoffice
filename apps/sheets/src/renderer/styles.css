@@ -2427,7 +2427,17 @@ textarea:focus {
   font-size: 11px;
 }
 
-.chart-editor label {
+.chart-editor > fieldset {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.chart-editor label,
+.chart-editor-field {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
@@ -3048,6 +3058,14 @@ textarea:focus {
   gap: 10px;
 }
 
+.chart-format-pane > fieldset {
+  display: contents;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
 .chart-format-pane header {
   display: flex;
   align-items: center;
@@ -3075,7 +3093,8 @@ textarea:focus {
   color: var(--text-secondary);
 }
 
-.chart-format-pane label {
+.chart-format-pane label,
+.chart-pane-field {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -7299,4 +7318,10 @@ body:has(.note-pictures-pane) .threaded-comments-pane {
   font-size: 12px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* Capability-gated shared ribbon menus keep their disabled state visible. */
+.ribbon .ribbon-tool.is-disabled,
+.ribbon .styles-row.is-disabled {
+  opacity: 0.5;
 }

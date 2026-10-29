@@ -113,6 +113,7 @@ export interface FormatChange {
   readonly sheetId: string
   readonly range: string
   readonly format: CellFormatPatch
+  readonly reset?: boolean
   readonly label: string
 }
 

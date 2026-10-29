@@ -24,15 +24,21 @@ import {
   OUTLINE_GUTTER_PAD,
   OUTLINE_LEVEL_STEP,
   type OutlineGroup,
+  type SheetOutlineState,
 } from './outline-model'
-import { outlineGroupsFor, type OutlineAxis } from './outline-actions'
-import { sheetOutline } from './univer-sync'
-import type { LazyWorkbookState, UniverRuntime, UniverWorksheet } from './univer-state'
+import type { UniverRuntime, UniverWorksheet } from './univer-state'
+
+type OutlineAxis = 'rows' | 'cols'
+export type OutlineGutterState = Pick<
+  SheetOutlineState,
+  'rows' | 'cols' | 'summaryBelow' | 'summaryRight' | 'version'
+>
 
 export interface OutlineGutterDeps {
   readonly runtime: UniverRuntime
   readonly host: HTMLElement
-  readonly state: () => LazyWorkbookState | null
+  readonly outline: (sheetId: string) => OutlineGutterState | null
+  readonly groups: (worksheet: UniverWorksheet, axis: OutlineAxis) => OutlineGroup[]
   readonly onToggleGroup: (axis: OutlineAxis, group: OutlineGroup, collapsed: boolean) => void
   readonly onLevel: (axis: OutlineAxis, level: number) => void
 }
@@ -238,6 +244,9 @@ export function installOutlineGutter(deps: OutlineGutterDeps): OutlineGutterHand
         subUnitId: worksheet.getSheetId(),
         size: wanted,
       })
+      .catch(() => {
+        signature = ''
+      })
       .finally(() => {
         headerRequest = null
       })
@@ -245,17 +254,18 @@ export function installOutlineGutter(deps: OutlineGutterDeps): OutlineGutterHand
   }
 
   const resolveTarget = () => {
-    const state = deps.state()
     const workbook = runtime.univerAPI.getActiveWorkbook()
     const worksheet = workbook?.getActiveSheet()
-    if (!state || !workbook || !worksheet) return null
+    if (!workbook || !worksheet) return null
+    const outline = deps.outline(worksheet.getSheetId())
+    if (!outline) return null
     const render = runtime.univer
       .__getInjector()
       .get(IRenderManagerService)
       .getRenderById(workbook.getId())
     const skeleton = render?.with(SheetSkeletonManagerService).getCurrentSkeleton()
     if (!render || !skeleton) return null
-    return { state, worksheet, sheetId: worksheet.getSheetId(), render, skeleton }
+    return { outline, worksheet, sheetId: worksheet.getSheetId(), render, skeleton }
   }
 
   const palette = (): Palette => ({
@@ -412,8 +422,7 @@ export function installOutlineGutter(deps: OutlineGutterDeps): OutlineGutterHand
       if (shown) setShown(false, 0)
       return
     }
-    const { state, worksheet, sheetId, render, skeleton } = target
-    const outline = sheetOutline(state, sheetId)
+    const { outline, worksheet, sheetId, render, skeleton } = target
     const rowDepth = outlineMaxLevel(outline.rows)
     const colDepth = outlineMaxLevel(outline.cols)
     const unitId = runtime.univerAPI.getActiveWorkbook()?.getId() ?? ''
@@ -479,8 +488,8 @@ export function installOutlineGutter(deps: OutlineGutterDeps): OutlineGutterHand
     if (groupCache?.key !== cacheKey) {
       groupCache = {
         key: cacheKey,
-        rows: rowDepth > 0 ? outlineGroupsFor(state, worksheet, sheetId, 'rows') : [],
-        cols: colDepth > 0 ? outlineGroupsFor(state, worksheet, sheetId, 'cols') : [],
+        rows: rowDepth > 0 ? deps.groups(worksheet, 'rows') : [],
+        cols: colDepth > 0 ? deps.groups(worksheet, 'cols') : [],
       }
     }
     const colors = palette()

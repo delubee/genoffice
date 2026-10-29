@@ -41,6 +41,7 @@ import {
   anchorForBox,
   cellOrigin,
   frameBox,
+  frameChangeFromBox,
   sheetMetrics,
   type SheetMetrics,
 } from './visual-geometry'
@@ -53,7 +54,8 @@ import {
   type ShapeEditChanges,
 } from './WorkbookVisuals'
 
-export type VisualDialogKind = 'alt-text' | 'size' | 'hyperlink'
+import type { VisualDialogKind } from './VisualDialogs'
+export type { VisualDialogKind } from './VisualDialogs'
 
 export interface VisualArrangeContext {
   univerRef: { readonly current: UniverRuntime | null }
@@ -195,13 +197,21 @@ function activeMetrics(runtime: UniverRuntime, sheetId: string): SheetMetrics | 
   return worksheet ? sheetMetrics(worksheet) : null
 }
 
-function reorder(
-  ctx: VisualArrangeContext,
+export function reorder(
+  ctx: Pick<VisualArrangeContext, 'setMessage' | 'refreshLazyVisuals' | 'setPendingEdits'>,
   runtime: UniverRuntime,
   state: LazyWorkbookState,
   visual: WorkbookVisualObject,
-  op: ZOrderOp,
+  op: ZOrderOp | number,
 ): void {
+  const orderAt = (order: string[]) => {
+    if (typeof op !== 'number') return reorderZ(order, visual.id, op)
+    if (!Number.isInteger(op) || op < 0 || op >= order.length)
+      throw new Error('invalid_visual_z_index')
+    const next = order.filter((id) => id !== visual.id)
+    next.splice(op, 0, visual.id)
+    return next
+  }
   const journal = state.editJournal
   const isAdded = journal.visualAdds.some((candidate) => candidate.id === visual.id)
   if (isAdded) {
@@ -209,7 +219,7 @@ function reorder(
     // themselves on their sheet.
     const before = [...journal.visualAdds]
     const sheetIds = before.filter((v) => v.sheetId === visual.sheetId).map((v) => v.id)
-    const after = reorderZ(sheetIds, visual.id, op)
+    const after = orderAt(sheetIds)
     if (after.join() === sheetIds.join()) return
     // Position among the sheet's adds maps onto the global list through the
     // add now preceding it.
@@ -255,7 +265,7 @@ function reorder(
     journal.visualEdits,
   )
   const order = part.map((candidate) => candidate.id)
-  const after = reorderZ(order, visual.id, op)
+  const after = orderAt(order)
   const changes = changedPositions(order, after)
   if (changes.size === 0) return
   const snapshots = new Map(
@@ -424,25 +434,7 @@ export function frameChangeEdit(
   const metrics = activeMetrics(runtime, visual.sheetId)
   if (!frame || !metrics) return null
   const box = frameBox(frame, metrics)
-  const rotation = normalizeDegrees(next.rotation)
-  const aabb = rotatedAabb(next.width, next.height, rotation)
-  const anchor = anchorForBox(
-    {
-      x: box.x + box.width / 2 - aabb.width / 2,
-      y: box.y + box.height / 2 - aabb.height / 2,
-      width: aabb.width,
-      height: aabb.height,
-    },
-    metrics,
-  )
-  return {
-    anchor,
-    rotation,
-    frameSize: {
-      width: Math.max(1, Math.round(next.width * EMU_PER_PIXEL)),
-      height: Math.max(1, Math.round(next.height * EMU_PER_PIXEL)),
-    },
-  }
+  return frameChangeFromBox(box, next, metrics)
 }
 
 function rotateVisual(

@@ -108,6 +108,7 @@ export const es = {
   appLabelNumberFormat: 'Formato de número de la etiqueta',
   appLabelFormatPlaceholder: 'p. ej. 0.0% / #,##0',
   appGridlines: 'Líneas de cuadrícula',
+  appChartAxisRangeInvalid: 'El máximo debe ser mayor que el mínimo.',
   appAxisMin: 'Mínimo',
   appAxisMax: 'Máximo',
   appBarSection: 'Barras',
@@ -678,6 +679,14 @@ export const es = {
   appNamesNeedFile:
     'Abra primero un archivo XLSX — los nombres definidos se guardan en el archivo.',
   appNameGone: 'Ese nombre ya no existe.',
+  appDefinedNameInvalid: 'Introduzca un nombre no reservado y una referencia válidos.',
+  appDefinedNameDuplicate: 'Ese nombre ya se utiliza en este ámbito.',
+  appDefinedNameBindingConflict:
+    'Este cambio entra en conflicto con una definición oculta o de ámbito de hoja.',
+  appAuditPendingValues:
+    'La comprobación usa valores de fórmulas guardados; algunos resultados esperan un recálculo.',
+  appDefinedNameLabelPending:
+    'Los resultados de las fórmulas de las etiquetas no están verificados. Utilice etiquetas de texto.',
   appNameApplyFailed: 'No se pudo aplicar el nombre.',
   appNamesUpdated: 'Nombres definidos actualizados — guarde con ⌘S.',
   appLinkInternal: 'El vínculo apunta dentro del libro: {location}',
@@ -1587,4 +1596,10 @@ export const es = {
   appVisualFlipV: 'Voltear verticalmente',
   appVisualFlipH: 'Voltear horizontalmente',
   appCtxPasteVisual: 'Pegar imagen o forma',
+  appDocumentChangedDuringAction:
+    'El documento cambió mientras se preparaba esta acción. Inténtalo de nuevo.',
+  appClipboardUnsupported: 'Este contenido aún no se puede pegar. No se modificó ninguna celda.',
+  appClipboardSelectionChanged: 'La selección cambió antes de pegar. Inténtalo de nuevo.',
+  appClipboardBusy: 'Espera a que termine la edición actual.',
+  appClipboardReadUnavailable: 'No se puede leer el portapapeles. Usa {shortcut} para pegar.',
 } satisfies Record<keyof typeof zh, string>

@@ -20,12 +20,20 @@
     "@genoffice/xlsx-gateway": "*",
     "@univerjs/core": "^0.25.1",
     "@univerjs/preset-sheets-core": "^0.25.1",
+    "@univerjs/preset-sheets-data-validation": "^0.25.1",
+    "@univerjs/preset-sheets-filter": "^0.25.1",
+    "@univerjs/preset-sheets-sort": "^0.25.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "zod": "^4.3.6",
     "@univerjs/sheets": "^0.25.1",
     "@genoffice/ui": "*",
-    "@genoffice/i18n": "*"
+    "@genoffice/i18n": "*",
+    "@univerjs/engine-render": "^0.25.1",
+    "@univerjs/engine-formula": "^0.25.1",
+    "@univerjs/find-replace": "^0.25.1",
+    "rxjs": "^7.8.2",
+    "@univerjs/preset-sheets-drawing": "^0.25.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",

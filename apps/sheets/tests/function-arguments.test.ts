@@ -86,6 +86,12 @@ describe('buildFunctionCall / spliceFunctionCall / finishedFormula', () => {
     expect(spliceFunctionCall(formula, span, 'SUM(B1:B9, C1)')).toBe('=1+SUM(B1:B9, C1)*2')
   })
 
+  it('keeps the equals sign first when fx reports a zero caret', () => {
+    expect(finishedFormula({ formula: '=', caret: 0 }, null, 'SUM', ['A2', 'Other!A1'])).toBe(
+      '=SUM(A2, Other!A1)',
+    )
+  })
+
   it('becomes the whole formula of a plain cell, else lands at the caret', () => {
     expect(finishedFormula({ formula: '', caret: 0 }, null, 'SUM', ['A1'])).toBe('=SUM(A1)')
     expect(finishedFormula({ formula: '=1+', caret: 3 }, null, 'SUM', ['A1'])).toBe('=1+SUM(A1)')

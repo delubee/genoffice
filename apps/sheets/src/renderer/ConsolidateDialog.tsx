@@ -1,13 +1,14 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
-import { Dropdown } from '@genoffice/ui'
+import { Dropdown } from '@genoffice/ui/chrome'
 
 import {
   isValidConsolidateReference,
   type ConsolidateConfig,
   type ConsolidateFn,
 } from './consolidate'
-import { useI18n } from './i18n/locale'
+import { normalizeLang } from '@genoffice/i18n'
+import { useI18n, tFor, type TFunc } from './i18n/locale'
 import { useModalDialog } from './modal-dialog'
 
 /// Excel's Data → Consolidate: a function, a list of source references, and
@@ -17,17 +18,22 @@ import { useModalDialog } from './modal-dialog'
 export function ConsolidateDialog({
   defaultReference,
   targetLabel,
+  locale,
   onCreate,
   onClose,
 }: {
+  readonly locale?: string
   /// Prefill for the reference input, usually the current selection.
   readonly defaultReference: string
   readonly targetLabel: string
   /// Returns an error message, or null on success.
-  readonly onCreate: (config: ConsolidateConfig) => string | null
+  readonly onCreate: (config: ConsolidateConfig) => string | null | Promise<string | null>
   readonly onClose: () => void
 }): React.JSX.Element {
-  const { t } = useI18n()
+  const { t: desktopT } = useI18n()
+  const t: TFunc = locale ? (key, params) => tFor(normalizeLang(locale), key, params) : desktopT
+  const pendingApply = useRef(false)
+  const [busy, setBusy] = useState(false)
   const [fn, setFn] = useState<ConsolidateFn>('sum')
   const [references, setReferences] = useState<string[]>([])
   const [input, setInput] = useState(defaultReference)
@@ -49,9 +55,43 @@ export function ConsolidateDialog({
     return null
   }
 
-  const modal = useModalDialog(onClose)
+  const close = () => {
+    if (!pendingApply.current) onClose()
+  }
+  const apply = async () => {
+    if (pendingApply.current) return
+    // A typed-but-not-added reference still counts on OK.
+    const pending = input.trim()
+    let all = references
+    if (pending !== '') {
+      if (!isValidConsolidateReference(pending)) {
+        setError(t('dlgConsBadRef', { ref: pending }))
+        return
+      }
+      if (!references.includes(pending)) all = [...references, pending]
+    }
+    if (all.length === 0) {
+      setError(t('dlgConsNeedOneRef'))
+      return
+    }
+    pendingApply.current = true
+    setBusy(true)
+    setError(null)
+    try {
+      const failure = await onCreate({ fn, references: all, leftLabels })
+      setError(failure)
+      if (failure === null) onClose()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason))
+    } finally {
+      pendingApply.current = false
+      setBusy(false)
+    }
+  }
+
+  const modal = useModalDialog(close)
   return (
-    <div className="dialog-backdrop" onClick={onClose}>
+    <div className="dialog-backdrop" onClick={close}>
       <div
         className="format-cells-dialog"
         role="dialog"
@@ -60,11 +100,14 @@ export function ConsolidateDialog({
         onClick={(event) => event.stopPropagation()}
       >
         <header>{t('dlgConsTitle')}</header>
-        <div className="dialog-grid">
+        <fieldset
+          className="dialog-grid"
+          disabled={busy}
+          style={{ border: 0, margin: 0, minWidth: 0 }}
+        >
           <label>
             {t('dlgConsFunction')}
-            {/* max/min were disabled options in label mode; the shared Dropdown
-                has no per-option disabling, so they drop out of the list */}
+            {/* Label-based consolidation supports sum, count and average. */}
             <Dropdown
               ariaLabel={t('dlgConsFunction')}
               value={fn}
@@ -133,38 +176,17 @@ export function ConsolidateDialog({
               ? t('dlgConsNoteLabels', { target: targetLabel })
               : t('dlgConsNotePosition', { target: targetLabel })}
           </p>
-        </div>
+        </fieldset>
         {error && (
           <p className="dialog-note" role="alert">
             {error}
           </p>
         )}
         <div className="dialog-actions">
-          <button className="secondary" onClick={onClose}>
+          <button className="secondary" onClick={close} disabled={busy}>
             {t('dlgCancel')}
           </button>
-          <button
-            className="primary-action"
-            onClick={() => {
-              // A typed-but-not-added reference still counts on OK.
-              const pending = input.trim()
-              let all = references
-              if (pending !== '') {
-                if (!isValidConsolidateReference(pending)) {
-                  setError(t('dlgConsBadRef', { ref: pending }))
-                  return
-                }
-                if (!references.includes(pending)) all = [...references, pending]
-              }
-              if (all.length === 0) {
-                setError(t('dlgConsNeedOneRef'))
-                return
-              }
-              const failure = onCreate({ fn, references: all, leftLabels })
-              setError(failure)
-              if (failure === null) onClose()
-            }}
-          >
+          <button className="primary-action" disabled={busy} onClick={() => void apply()}>
             {t('dlgOk')}
           </button>
         </div>

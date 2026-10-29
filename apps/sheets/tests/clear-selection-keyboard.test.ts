@@ -190,3 +190,14 @@ describe('isFormulaBarKeyTarget', () => {
     expect(isFormulaBarKeyTarget(null)).toBe(false)
   })
 })
+
+it('recognizes the embedded grid focus host without depending on the desktop container ID', () => {
+  const target = keyEvent('v', ['[contenteditable="true"]']).target
+  const inside = { contains: () => true } as unknown as Element
+  const outside = { contains: () => false } as unknown as Element
+  expect(isGridKeyTarget(target)).toBe(false)
+  expect(isGridKeyTarget(target, inside)).toBe(true)
+  expect(isGridKeyTarget(target, outside)).toBe(false)
+  expect(isGridKeyTarget(keyEvent('v', ['input, textarea, select']).target, inside)).toBe(false)
+  expect(isGridKeyTarget(keyEvent('v', ['.shape-editable']).target, inside)).toBe(false)
+})

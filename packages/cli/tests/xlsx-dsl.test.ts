@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import JSZip from 'jszip'
 import { describe, expect, it } from 'vitest'
-import { patchToStyleEdit } from '../src/formats/xlsx-dsl'
+import { patchToStyleEdit, runWorkbookDsl } from '../src/formats/xlsx-dsl'
 import { xlsxSidecarPath } from '../src/resources'
 import { run, tempDir } from './helpers'
 import { book, cells } from './xlsx-helpers'
@@ -250,6 +250,72 @@ describe('genoffice sheet apply --ops (workbook DSL)', () => {
     })
   })
 
+  it('preserves authored character widths and writes desktop zero/maximum axis boundaries', async () => {
+    const dir = tempDir(),
+      out = await book(dir, [['a', 'b']]),
+      ops = join(dir, 'ops.json')
+    writeFileSync(
+      ops,
+      JSON.stringify([
+        { op: 'set_col_width', column: 'A', widthPx: 80, widthCharacters: 10 },
+        { op: 'set_col_width', column: 'B', widthPx: 2040, widthCharacters: 255 },
+        { op: 'set_col_width', column: 'C', widthPx: 0, widthCharacters: 0 },
+        { op: 'set_row_height', row: 2, heightPoints: 409.5 },
+        { op: 'set_row_height', row: 3, heightPoints: 0 },
+      ]),
+    )
+    const result = await run(['sheet', 'apply', out, '--ops', ops])
+    expect(result.code, result.stderr).toBe(0)
+    const sheet = await part(out, 'xl/worksheets/sheet1.xml')
+    expect(sheet).toMatch(/<col\b[^>]*min="1"[^>]*width="10"/)
+    expect(sheet).toMatch(/<col\b[^>]*min="2"[^>]*width="255"/)
+    expect(sheet).toMatch(/<col\b[^>]*min="3"[^>]*width="0"/)
+    expect(sheet).toMatch(/<row\b[^>]*r="2"[^>]*ht="409.5"/)
+    expect(sheet).toMatch(/<row\b[^>]*r="3"[^>]*ht="0"/)
+  })
+
+  it('resets existing cell formats before applying new patches without changing values', async () => {
+    const dir = tempDir(),
+      out = await book(dir, [['a', 'b']]),
+      ops = join(dir, 'ops.json')
+    writeFileSync(
+      ops,
+      JSON.stringify([
+        {
+          op: 'format_range',
+          range: 'A1:B1',
+          format: { bold: true, fillColor: '#FFFF00', indent: 3 },
+        },
+      ]),
+    )
+    expect((await run(['sheet', 'apply', out, '--ops', ops])).code).toBe(0)
+    writeFileSync(
+      ops,
+      JSON.stringify([
+        { op: 'format_range', range: 'A1', reset: true, format: { numberFormat: 'General' } },
+        { op: 'format_range', range: 'A1', format: { italic: true } },
+      ]),
+    )
+    const applied = await run(['sheet', 'apply', out, '--ops', ops])
+    expect(applied.code, applied.stderr).toBe(0)
+    expect((await cells(out, 'xl/worksheets/sheet1.xml')).get('A1')?.value).toBe('a')
+    const sheet = await part(out, 'xl/worksheets/sheet1.xml'),
+      styles = await part(out, 'xl/styles.xml')
+    const cell = /<c\b[^>]*r="A1"[^>]*>/.exec(sheet)![0]
+    const index = Number(/\bs="(\d+)"/.exec(cell)?.[1] ?? 0)
+    const xfs = /<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/
+      .exec(styles)![1]!
+      .match(/<xf\b[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g)!
+    expect(xfs[index]).toContain('fillId="0"')
+    expect(xfs[index]).not.toContain('indent=')
+    const fontId = Number(/fontId="(\d+)"/.exec(xfs[index]!)![1])
+    const fonts = /<fonts\b[^>]*>([\s\S]*?)<\/fonts>/
+      .exec(styles)![1]!
+      .match(/<font\b[^>]*?(?:\/>|>[\s\S]*?<\/font>)/g)!
+    expect(fonts[fontId]).toContain('<i/>')
+    expect(fonts[fontId]).not.toContain('<b/>')
+  })
+
   it('merges overlapping format patches, validates existing merges, and defaults to the active sheet', async () => {
     const dir = tempDir()
     const out = await book(dir, [['a', 'b', 'c']])
@@ -359,4 +425,54 @@ describe('genoffice sheet apply --ops (workbook DSL)', () => {
     expect(await part(out, 'xl/worksheets/sheet1.xml')).toContain('hit')
     expect(await part(out, 'xl/worksheets/sheet2.xml')).not.toContain('hit')
   })
+})
+
+it.each(['add_defined_name', 'delete_defined_name'])(
+  'rejects %s scopes in the standalone adapter instead of silently using workbook scope',
+  async (op) => {
+    await expect(
+      runWorkbookDsl(Buffer.alloc(0), [{ op, name: 'Local', ref: '1', scopeSheetId: 'logical' }]),
+    ).rejects.toThrow('authoritative workbook session')
+  },
+)
+
+it('serializes formula and grid view settings through the standalone page-setup adapter', async () => {
+  const dir = tempDir(),
+    out = await book(dir, [['value', 1]])
+  const ops = join(dir, 'view.json')
+  writeFileSync(
+    ops,
+    JSON.stringify([
+      {
+        op: 'set_page_setup',
+        sheet: 'table',
+        showFormulas: true,
+        showGridlines: false,
+        showHeadings: false,
+        zoomScale: 130,
+      },
+    ]),
+  )
+  const result = await run(['sheet', 'apply', out, '--ops', ops, '--json'])
+  expect(result.code, result.stdout + result.stderr).toBe(0)
+  const xml = await part(out, 'xl/worksheets/sheet1.xml')
+  expect(xml).toContain('showFormulas="1"')
+  expect(xml).toContain('showGridLines="0"')
+  expect(xml).toContain('showRowColHeaders="0"')
+  expect(xml).toContain('zoomScale="130"')
+})
+
+it('rejects session-only Subtotal before reading or mutating a standalone workbook', async () => {
+  await expect(
+    runWorkbookDsl(Buffer.alloc(0), [
+      {
+        op: 'subtotal',
+        sheetId: 'Data',
+        range: 'A1:B3',
+        groupColumn: 'A',
+        valueColumn: 'B',
+        agg: 'sum',
+      },
+    ]),
+  ).rejects.toThrow('Subtotal requires an authoritative workbook session.')
 })

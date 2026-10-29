@@ -105,6 +105,7 @@ export const ms = {
   appLabelNumberFormat: 'Format Nombor Label',
   appLabelFormatPlaceholder: 'cth. 0.0% / #,##0',
   appGridlines: 'Garis Grid',
+  appChartAxisRangeInvalid: 'Nilai maksimum mestilah lebih besar daripada nilai minimum.',
   appAxisMin: 'Minimum',
   appAxisMax: 'Maksimum',
   appBarSection: 'Lajur',
@@ -639,6 +640,14 @@ export const ms = {
   appScopeWorkbook: 'Buku Kerja',
   appNamesNeedFile: 'Buka fail XLSX dahulu — nama tertakrif disimpan ke dalam fail.',
   appNameGone: 'Nama itu tidak lagi wujud.',
+  appDefinedNameInvalid: 'Masukkan nama yang sah, tidak terpelihara, dan rujukan yang sah.',
+  appDefinedNameDuplicate: 'Nama ini sudah digunakan dalam skop ini.',
+  appDefinedNameBindingConflict:
+    'Perubahan ini bercanggah dengan takrif tersembunyi atau takrif setempat helaian.',
+  appAuditPendingValues:
+    'Semakan ralat menggunakan nilai formula tersimpan; sesetengah hasil menunggu pengiraan semula.',
+  appDefinedNameLabelPending:
+    'Hasil formula label belum disahkan. Gunakan label teks untuk mencipta nama.',
   appNameApplyFailed: 'Nama itu tidak dapat digunakan.',
   appNamesUpdated: 'Nama tertakrif dikemas kini — simpan dengan ⌘S.',
   appLinkInternal: 'Pautan menghala ke dalam buku kerja: {location}',
@@ -1543,4 +1552,9 @@ export const ms = {
   appVisualFlipV: 'Balikkan Menegak',
   appVisualFlipH: 'Balikkan Mendatar',
   appCtxPasteVisual: 'Tampal Gambar atau Bentuk',
+  appDocumentChangedDuringAction: 'Dokumen berubah semasa tindakan ini disediakan. Cuba lagi.',
+  appClipboardUnsupported: 'Kandungan ini belum dapat ditampal. Tiada sel diubah.',
+  appClipboardSelectionChanged: 'Pilihan berubah sebelum ditampal. Cuba lagi.',
+  appClipboardBusy: 'Tunggu sehingga penyuntingan semasa selesai.',
+  appClipboardReadUnavailable: 'Papan klip tidak dapat dibaca. Gunakan {shortcut} untuk menampal.',
 } satisfies Record<keyof typeof zh, string>

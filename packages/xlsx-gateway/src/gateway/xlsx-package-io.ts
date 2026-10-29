@@ -1,3 +1,4 @@
+import type { NameReferencePlan } from '../domain/defined-name-references'
 import { randomUUID } from 'node:crypto'
 import { closeSync, openSync, readFileSync, writeFileSync, writeSync } from 'node:fs'
 import { copyFile, mkdir, mkdtemp, rename, rm, stat, unlink } from 'node:fs/promises'
@@ -82,6 +83,7 @@ export interface ArchiveClient {
 }
 
 export interface StreamingSaveRequest {
+  readonly nameReferencePlan?: NameReferencePlan | null | undefined
   /** Clear unverified formula caches, then apply explicitly supplied fresh results. */
   readonly invalidateFormulaCaches?: boolean
   readonly client: ArchiveClient
@@ -189,6 +191,7 @@ export async function saveWorkbookViaSidecar(
       request.cellImageAdditions ?? [],
       request.redactionStates ?? [],
       request.invalidateFormulaCaches ?? false,
+      request.nameReferencePlan ?? null,
     )
 
     const replacements = await writePlanContents(workDir, 'replace', plan.replaced)

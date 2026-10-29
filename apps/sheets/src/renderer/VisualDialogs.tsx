@@ -2,12 +2,12 @@
  * Picture/shape right-click dialogs: Edit Alt Text, Size and Properties,
  * Hyperlink. Each hands a ShapeEditChanges back to the app.
  */
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 import type { WorkbookVisualObject } from '../shared/desktop-api'
 import { useI18n } from './i18n/locale'
 import { useModalDialog } from './modal-dialog'
-import type { VisualDialogKind } from './visual-arrange-actions'
+export type VisualDialogKind = 'alt-text' | 'size' | 'hyperlink'
 import { EMU_PER_PIXEL, type ShapeEditChanges } from './WorkbookVisuals'
 
 const EMU_PER_CM = 360_000
@@ -27,14 +27,47 @@ export interface VisualDialogProps {
   readonly visual: WorkbookVisualObject
   /// Unzoomed frame in sheet pixels (the true, unrotated frame).
   readonly frame: { readonly width: number; readonly height: number } | null
-  readonly onApply: (changes: ShapeEditChanges | SizeDialogResult) => void
+  readonly onApply: (changes: ShapeEditChanges | SizeDialogResult) => void | Promise<void>
   readonly onClose: () => void
 }
 
+interface DialogContentProps extends Omit<VisualDialogProps, 'onApply'> {
+  readonly onApply: (changes: ShapeEditChanges | SizeDialogResult) => Promise<boolean>
+  readonly pending: boolean
+  readonly error: string
+}
 export function VisualDialog(props: VisualDialogProps): React.JSX.Element {
-  if (props.kind === 'alt-text') return <AltTextDialog {...props} />
-  if (props.kind === 'hyperlink') return <HyperlinkDialog {...props} />
-  return <SizePropertiesDialog {...props} />
+  const busy = useRef(false),
+    [pending, setPending] = useState(false),
+    [error, setError] = useState('')
+  const onApply = async (changes: ShapeEditChanges | SizeDialogResult) => {
+    if (busy.current) return false
+    busy.current = true
+    setPending(true)
+    setError('')
+    try {
+      await props.onApply(changes)
+      return true
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason))
+      return false
+    } finally {
+      busy.current = false
+      setPending(false)
+    }
+  }
+  const guarded = {
+    ...props,
+    onApply,
+    pending,
+    error,
+    onClose: () => {
+      if (!busy.current) props.onClose()
+    },
+  }
+  if (props.kind === 'alt-text') return <AltTextDialog {...guarded} />
+  if (props.kind === 'hyperlink') return <HyperlinkDialog {...guarded} />
+  return <SizePropertiesDialog {...guarded} />
 }
 
 function Frame({
@@ -42,10 +75,14 @@ function Frame({
   onClose,
   onApply,
   children,
+  pending,
+  error,
 }: {
   readonly title: string
   readonly onClose: () => void
-  readonly onApply: () => void
+  readonly onApply: () => void | Promise<void>
+  readonly pending: boolean
+  readonly error: string
   readonly children: React.ReactNode
 }): React.JSX.Element {
   const { t } = useI18n()
@@ -66,17 +103,26 @@ function Frame({
             !(event.target instanceof HTMLTextAreaElement)
           ) {
             event.preventDefault()
-            onApply()
+            void onApply()
           }
         }}
       >
         <header>{title}</header>
-        <section className="dialog-body">{children}</section>
+        <section className="dialog-body" aria-busy={pending}>
+          <fieldset disabled={pending} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+            {children}
+          </fieldset>
+        </section>
+        {error && (
+          <div role="alert" className="chart-editor-error">
+            {error}
+          </div>
+        )}
         <div className="dialog-actions">
-          <button className="secondary" onClick={onClose}>
+          <button disabled={pending} className="secondary" onClick={onClose}>
             {t('dlgCancel')}
           </button>
-          <button className="primary-action" onClick={onApply}>
+          <button disabled={pending} className="primary-action" onClick={() => void onApply()}>
             {t('dlgOk')}
           </button>
         </div>
@@ -85,18 +131,31 @@ function Frame({
   )
 }
 
-function AltTextDialog({ visual, onApply, onClose }: VisualDialogProps): React.JSX.Element {
+function AltTextDialog({
+  visual,
+  onApply,
+  onClose,
+  pending,
+  error,
+}: DialogContentProps): React.JSX.Element {
   const { t } = useI18n()
   const [text, setText] = useState(visual.altText ?? '')
-  const apply = (): void => {
-    if (text.trim() !== (visual.altText ?? '')) onApply({ altText: text.trim() })
+  const apply = async (): Promise<void> => {
+    if (text.trim() !== (visual.altText ?? '') && !(await onApply({ altText: text.trim() }))) return
     onClose()
   }
   return (
-    <Frame title={t('dlgAltTextTitle')} onClose={onClose} onApply={apply}>
+    <Frame
+      title={t('dlgAltTextTitle')}
+      onClose={onClose}
+      onApply={apply}
+      pending={pending}
+      error={error}
+    >
       <p className="dialog-note">{t('dlgAltTextHint')}</p>
       <textarea
         className="visual-dialog-textarea"
+        aria-label={t('dlgAltTextTitle')}
         autoFocus
         rows={4}
         value={text}
@@ -106,16 +165,28 @@ function AltTextDialog({ visual, onApply, onClose }: VisualDialogProps): React.J
   )
 }
 
-function HyperlinkDialog({ visual, onApply, onClose }: VisualDialogProps): React.JSX.Element {
+function HyperlinkDialog({
+  visual,
+  onApply,
+  onClose,
+  pending,
+  error,
+}: DialogContentProps): React.JSX.Element {
   const { t } = useI18n()
   const [address, setAddress] = useState(visual.hyperlink ?? '')
-  const apply = (): void => {
+  const apply = async (): Promise<void> => {
     const next = address.trim()
-    if (next !== (visual.hyperlink ?? '')) onApply({ hyperlink: next })
+    if (next !== (visual.hyperlink ?? '') && !(await onApply({ hyperlink: next }))) return
     onClose()
   }
   return (
-    <Frame title={t('dlgHyperlinkTitle')} onClose={onClose} onApply={apply}>
+    <Frame
+      title={t('dlgHyperlinkTitle')}
+      onClose={onClose}
+      onApply={apply}
+      pending={pending}
+      error={error}
+    >
       <label className="visual-dialog-field">
         <span>{t('dlgHyperlinkAddress')}</span>
         <input
@@ -131,8 +202,9 @@ function HyperlinkDialog({ visual, onApply, onClose }: VisualDialogProps): React
           type="button"
           className="secondary visual-dialog-remove"
           onClick={() => {
-            onApply({ hyperlink: '' })
-            onClose()
+            void onApply({ hyperlink: '' }).then((ok) => {
+              if (ok) onClose()
+            })
           }}
         >
           {t('dlgHyperlinkRemove')}
@@ -147,7 +219,9 @@ function SizePropertiesDialog({
   frame,
   onApply,
   onClose,
-}: VisualDialogProps): React.JSX.Element {
+  pending,
+  error: hostError,
+}: DialogContentProps): React.JSX.Element {
   const { t } = useI18n()
   const canResize = frame !== null && visual.kind !== 'chart'
   const [width, setWidth] = useState(format(pxToCm(frame?.width ?? 0)))
@@ -174,7 +248,7 @@ function SizePropertiesDialog({
     if (lockAspect && Number.isFinite(cm) && cm > 0) setWidth(format(cm * ratio))
   }
 
-  const apply = (): void => {
+  const apply = async (): Promise<void> => {
     const nextWidth = cmToPx(Number(width))
     const nextHeight = cmToPx(Number(height))
     const nextRotation = Number(rotation)
@@ -195,7 +269,7 @@ function SizePropertiesDialog({
         result.size = { width: nextWidth, height: nextHeight, rotation: nextRotation }
       }
     }
-    if (result.size || result.editAs) onApply(result)
+    if ((result.size || result.editAs) && !(await onApply(result))) return
     onClose()
   }
 
@@ -212,7 +286,13 @@ function SizePropertiesDialog({
   )
 
   return (
-    <Frame title={t('dlgSizeTitle')} onClose={onClose} onApply={apply}>
+    <Frame
+      title={t('dlgSizeTitle')}
+      onClose={onClose}
+      onApply={apply}
+      pending={pending}
+      error={hostError}
+    >
       {canResize && (
         <fieldset className="visual-dialog-size">
           <legend>{t('dlgSizeSection')}</legend>

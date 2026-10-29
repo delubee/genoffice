@@ -5,6 +5,7 @@
  * per-sheet print settings; nothing renders in the grid (Univer has no
  * page-layout view), everything lands in the saved file.
  */
+import { pageSettingsCommand, type PageSettingsPatch } from './page-settings-command'
 import { isMetafileMime, metafileToDataUrl } from '@genoffice/docx-engine/metafile'
 import type { PrinterInfo, WorkbookExportPdfRequest } from '../shared/desktop-api'
 import type { FWorksheet } from '@univerjs/sheets/facade'
@@ -99,6 +100,7 @@ export function handlePageLayoutCommand(ctx: PageLayoutContext, rest: string): v
   const worksheet = runtime.univerAPI.getActiveWorkbook()?.getActiveSheet()
   const sheetId = worksheet?.getSheetId()
   if (!sheetId || isSheetRemoved(state.editJournal, sheetId)) return
+  let sharedPatch: PageSettingsPatch | null = null
   const recordDirect = (patch: PageSetupJournalState, note: string): void => {
     recordPageSetup(state.editJournal, sheetId, patch)
     ctx.setPendingEdits(journalSize(state.editJournal))
@@ -108,6 +110,7 @@ export function handlePageLayoutCommand(ctx: PageLayoutContext, rest: string): v
   // Fields set_page_setup carries (fitToPage is derived by the executor);
   // breaks and print titles have no op yet and journal directly.
   const record = (patch: PageSetupJournalState, note: string): void => {
+    patch = sharedPatch ?? patch
     if (!Object.keys(patch).every((key) => PAGE_SETUP_OP_FIELDS.has(key))) {
       recordDirect(patch, note)
       return
@@ -133,6 +136,16 @@ export function handlePageLayoutCommand(ctx: PageLayoutContext, rest: string): v
   const key = separator === -1 ? rest : rest.slice(0, separator)
   const value = separator === -1 ? '' : rest.slice(separator + 1)
   const prior = state.editJournal.pageSetup.get(sheetId) ?? {}
+  const selection = runtime.univerAPI.getActiveWorkbook()?.getActiveRange()
+  if (selection && worksheet)
+    sharedPatch = pageSettingsCommand(rest, {
+      sheetId,
+      address: selection.getA1Notation(),
+      dimensions: { rows: worksheet.getMaxRows(), columns: worksheet.getMaxColumns() },
+      prior,
+      breaks: effectivePageBreaks(state, sheetId) ?? { rowBreaks: [], colBreaks: [] },
+    })
+
   switch (key) {
     case 'orientation':
       if (value !== 'portrait' && value !== 'landscape') return

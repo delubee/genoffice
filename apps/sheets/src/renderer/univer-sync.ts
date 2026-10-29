@@ -1,3 +1,18 @@
+import type { ColorFilterCriteria } from '@genoffice/xlsx-gateway/domain/color-filter'
+import {
+  fromUniverColorFilter,
+  toUniverColorFilter,
+} from '@genoffice/xlsx-gateway/domain/univer-color-filter'
+import { dvRuleToWireRule } from '@genoffice/xlsx-gateway/gateway/xlsx-dv'
+export { a1RangeRef, a1RowRangeRef } from './defined-name-label'
+import { installNameDefinitions } from './defined-name-projection'
+import { projectVisualOrder } from '@genoffice/xlsx-gateway/domain/visual-order'
+import { normalizeLinkTarget } from './link-target'
+import { orderDefinedNames } from './defined-name-order'
+import { revealCellBelowFreeze } from './reveal-cell'
+export { revealCellBelowFreeze } from './reveal-cell'
+import { measureNormalFontMdw, resolveNormalMdwFamily } from './normal-font-metrics'
+export { measureNormalFontMdw, resolveNormalMdwFamily } from './normal-font-metrics'
 import { keepActiveSheet } from './sheet-focus'
 import { gridCell } from '@genoffice/sheets-editor/grid-cell'
 import type { WorkbookStyleEdit } from '@genoffice/xlsx-gateway/shared/edit-schemas'
@@ -128,12 +143,7 @@ import { DEFAULT_SHORT_DATE, setSystemShortDate } from '@genoffice/xlsx-gateway/
 import { getWorkbookMdw, REORDER_JOURNAL_MAX_CELLS, setWorkbookMdw } from './app-constants'
 import { excelRowPitchPx } from './autofit-line-pitch'
 import { batchWrapRowHeights, createUniverWrapMeasurer } from './wrap-row-height-batch'
-import {
-  EXCEL_DIGIT_PER_PT,
-  fontAvailable,
-  formatForMeasure,
-  SHRINK_TO_FIT_KEY,
-} from './numfmt-fix'
+import { formatForMeasure, SHRINK_TO_FIT_KEY } from './numfmt-fix'
 import { t } from './i18n/locale'
 import { mapProtectedRanges } from './protected-ranges'
 import {
@@ -600,36 +610,6 @@ export function paddedBaseColumnWidth(base: number | null | undefined): number {
   return Math.trunc(((chars * mdw + 5) / mdw) * 256) / 256
 }
 
-const CJK_FAMILY_NAME =
-  /[\u1100-\u11ff\u3000-\u303f\u3040-\u30ff\u3130-\u318f\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]/
-
-const clampMdw = (mdw: number): number => Math.max(4, Math.min(30, mdw))
-
-/// The face Excel derives the column-width MDW from. For scheme fonts the
-/// sidecar substitutes the theme latin face into styles[0], but Excel lays
-/// CJK workbooks out per the Normal font's author-locale resolution — the
-/// literal cached <name val> (e.g. MS PGothic under theme latin Calibri) —
-/// with the theme's minor <a:ea> face as the fallback when no name is
-/// cached. Only trust a differing literal that names a face we know.
-export function resolveNormalMdwFamily(file: WorkbookFile): string {
-  const normal = file.styles?.[0]
-  const themeResolved = normal?.fontFamily ?? 'Calibri'
-  // ja vertical-text names prefix the base face with '@'.
-  let literal = (file.normalFontName ?? '').replace(/^@/, '')
-  if (literal === '' && normal?.fontScheme === 'minor') {
-    literal = file.themeFonts?.minorEa ?? ''
-  }
-  if (literal === '' || literal === themeResolved) return themeResolved
-  if (
-    EXCEL_DIGIT_PER_PT[literal] !== undefined ||
-    CJK_FAMILY_NAME.test(literal) ||
-    fontAvailable(literal)
-  ) {
-    return literal
-  }
-  return themeResolved
-}
-
 /// Excel keeps a sheet's default row height in sync with the Normal font
 /// unless sheetFormatPr/@customHeight fixes it: the stored value is a cache
 /// that other writers leave stale (Excel Online 21.6 over Calibri 11) or
@@ -665,55 +645,9 @@ export function resolveDefaultRowHeightPt(
 /// measurement: alias-substituted faces (Aptos Narrow → Carlito, CJK names →
 /// macOS faces) measure the substitute's digits, which is wrong in either
 /// direction.
-const MAC_EXCEL_MDW_8_AT_11 = new Set(['Calibri', 'Malgun Gothic', '맑은 고딕'])
-
-export function measureNormalFontMdw(file: WorkbookFile): number {
-  const size = file.styles?.[0]?.fontSize ?? 11
-  const family = resolveNormalMdwFamily(file)
-  // Mac Excel (the fidelity reference) lays Calibri 11 out at MDW 8, not the
-  // Windows GDI 7: live probes and ref print geometry both fit
-  // floor((w+16/256)*8) within 1pt across corpora (50.86ch→305pt,
-  // 32.44ch→195pt, 13.71ch→82pt) while MDW 7
-  // misses by 12%+, wrapping borderline text a line early. Malgun Gothic 11
-  // (Korean Excel's default) prints the same way: a reference grid at
-  // scale 64 gives 112/89/137/101/113 px for 14/11.25/17.125/12.625/14.125
-  // ch — floor((w+16/256)*8) exactly, MDW 7 short by 12%.
-  if (MAC_EXCEL_MDW_8_AT_11.has(family) && size === 11) return 8
-  const perPt = EXCEL_DIGIT_PER_PT[family]
-  if (perPt !== undefined) return clampMdw(Math.round(perPt * size))
-  // CJK faces without a table entry: canvas would measure a macOS
-  // substitute; every grounded legacy CJK face is em/2 → 8px at 11pt.
-  if (CJK_FAMILY_NAME.test(family)) return clampMdw(Math.round((8 / 11) * size))
-  if (typeof document === 'undefined') return 7
-  try {
-    const context = document.createElement('canvas').getContext('2d')
-    if (!context) return 7
-    // Quote the family: an unquoted leading digit or '@' silently no-ops
-    // the whole ctx.font assignment and measures the 10px canvas default.
-    context.font = `${(size * 96) / 72}px "${family.replace(/["\\]/g, '')}"`
-    const width = context.measureText('0').width
-    // Round with a 0.4 threshold: Arial 10 measures 7.42px and prints at
-    // MDW 8 (plain round loses 12% of every column), while Arial 11 (8.16)
-    // and Century Gothic 11 (8.13) print at 8 (ceil overshoots them 12% the
-    // other way). Any threshold in [0.58, 0.84) fits all calibrated refs.
-    return width > 0 ? clampMdw(Math.floor(width + 0.6)) : 7
-  } catch {
-    return 7
-  }
-}
-
 /// Normalizes dialog input into the wire target format: '#Sheet!A1' for
 /// internal anchors, a full URL otherwise. Bare domains get https://.
-export function normalizeLinkTarget(input: string): string | null {
-  const trimmed = input.trim()
-  if (trimmed.length === 0 || trimmed.length > 2083) return null
-  if (/^(https?:\/\/|mailto:)/i.test(trimmed)) return trimmed
-  if (/^#?'?[^'!]+'?!\$?[A-Za-z]{1,3}\$?[0-9]+$/.test(trimmed)) {
-    return trimmed.startsWith('#') ? trimmed : `#${trimmed}`
-  }
-  if (/^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(trimmed)) return `https://${trimmed}`
-  return null
-}
+export { normalizeLinkTarget } from './link-target'
 
 /// Effective workbook structure lock: the session's desired state when
 /// toggled, else the file's. Gates sheet add/remove/rename/reorder/hide.
@@ -897,21 +831,12 @@ export function applyAiDataValidation(
     range.setDataValidation(null)
     return
   }
-  const rule = op.validation
-  const builder = runtime.univerAPI.newDataValidation()
-  const built =
-    rule.kind === 'list'
-      ? builder.requireValueInList([...rule.values], false, true)
-      : rule.kind === 'listRef'
-        ? builder.requireValueInRange(worksheet.getRange(rule.range), false, true)
-        : rule.kind === 'numberBetween'
-          ? builder.requireNumberBetween(rule.min, rule.max)
-          : rule.kind === 'dateBetween'
-            ? builder.requireDateBetween(new Date(rule.start), new Date(rule.end))
-            : rule.kind === 'checkbox'
-              ? builder.requireCheckbox()
-              : builder.requireFormulaSatisfied(rule.formula)
-  range.setDataValidation(built.build())
+  const built = runtime.univerAPI.newDataValidation().requireFormulaSatisfied('=TRUE').build()
+  const model = (built as unknown as { rule: Record<string, unknown> }).rule
+  delete model.formula1
+  delete model.formula2
+  Object.assign(model, dvRuleToWireRule(op.validation))
+  range.setDataValidation(built)
 }
 
 /// Jumps to an internal link target like `Sheet1!A1` or `'My Sheet'!B2`.
@@ -923,115 +848,6 @@ export function applyAiDataValidation(
  * the scroll, re-scroll by the measured overshoot — converges immediately
  * for uniform-height regions and stops as soon as the target is visible.
  */
-/** newest reveal wins: rapid Find Next/Previous must not let an older
- *  correction loop keep scrolling after a newer one started */
-let revealGeneration = 0
-
-function isRtlFacadeSheet(sheet: {
-  getSheet?(): { getConfig(): { rightToLeft?: BooleanNumber } }
-}): boolean {
-  try {
-    return sheet.getSheet?.().getConfig().rightToLeft === BooleanNumber.TRUE
-  } catch {
-    return false
-  }
-}
-
-export async function revealCellBelowFreeze(
-  sheet: {
-    scrollToCell(row: number, column: number): unknown
-    getVisibleRange(): IRange | null
-    getSheet?(): { getConfig(): { rightToLeft?: BooleanNumber } }
-  },
-  row: number,
-  column: number,
-): Promise<void> {
-  // aim one row above the target: the offset error is fractional rows, so a
-  // position converged exactly on the target can still leave it half-sliced
-  // under the pane — with the predecessor as the boundary row the target is
-  // whole. Every scrollToCell call re-applies the same broken offset, so the
-  // compensation folds into one running aim; the scroll and its viewport
-  // update settle asynchronously, hence the waits between measurements.
-  const generation = ++revealGeneration
-  if (isRtlFacadeSheet(sheet)) {
-    // On an RTL sheet scrollToCell parks the target at the viewport's
-    // visually-left (max-column) edge — a full jump, not a reveal. Univer's
-    // own minimal reveal (rtl-grid-mirror) has usually just made the target
-    // visible; once that scroll has rendered, keep its position.
-    await new Promise((resolve) => setTimeout(resolve, 60))
-    if (generation !== revealGeneration) return
-    let visible: IRange | null
-    try {
-      visible = sheet.getVisibleRange()
-    } catch {
-      return
-    }
-    if (
-      visible &&
-      row >= visible.startRow &&
-      row <= visible.endRow &&
-      column >= visible.startColumn &&
-      column <= visible.endColumn
-    )
-      return
-  }
-  // Already fully visible → nothing to reveal. getVisibleRange starts below
-  // the frozen pane, so a target hidden under it reads as out of range and
-  // still gets the corrective scroll. Without this short-circuit every
-  // re-emission of an unchanged match (find research after streamed patches)
-  // re-scrolls the viewport.
-  try {
-    const visible = sheet.getVisibleRange()
-    if (
-      visible &&
-      row >= visible.startRow &&
-      row <= visible.endRow &&
-      column >= visible.startColumn &&
-      column <= visible.endColumn
-    ) {
-      return
-    }
-  } catch {
-    // no scroll render controller yet — proceed with the reveal
-  }
-  const aimRow = Math.max(0, row - 1)
-  let scrollRow = aimRow
-  let scrollColumn = column
-  let lastStartRow = -1
-  let lastStartColumn = -1
-  sheet.scrollToCell(scrollRow, scrollColumn)
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 60))
-    if (generation !== revealGeneration) return // superseded by a newer reveal
-    let visible: IRange | null
-    try {
-      visible = sheet.getVisibleRange()
-    } catch {
-      return
-    }
-    if (!visible) return
-    // over*: the viewport starts past the aim (target hidden under the pane).
-    // under*: a correction clamped at 0 left the target below/right of the
-    // viewport — the aim being visible is not enough, the target must be too.
-    // The two cannot both be positive: overRows > 0 puts the whole viewport
-    // at or past the target row.
-    const overRows = Math.max(0, visible.startRow - aimRow)
-    const underRows = Math.max(0, row - visible.endRow)
-    const overColumns = Math.max(0, visible.startColumn - column)
-    const underColumns = Math.max(0, column - visible.endColumn)
-    if (overRows === 0 && overColumns === 0 && underRows === 0 && underColumns === 0) return
-    // an aim inside the frozen pane (target on the first scrollable row) can
-    // never be reached — the viewport clamps at the pane edge with the target
-    // visible right below it, so a correction that moved nothing is done
-    if (visible.startRow === lastStartRow && visible.startColumn === lastStartColumn) return
-    lastStartRow = visible.startRow
-    lastStartColumn = visible.startColumn
-    scrollRow = Math.max(0, scrollRow - overRows + underRows)
-    scrollColumn = Math.max(0, scrollColumn - overColumns + underColumns)
-    sheet.scrollToCell(scrollRow, scrollColumn)
-  }
-}
-
 /** The find bar's own reveal shares the broken freeze offset: re-reveal each
  *  navigated-to match (r135). The match position comes from the find service —
  *  the find bar highlights matches WITHOUT moving the active range. */
@@ -1162,17 +978,7 @@ export function applyDefinedNames(
   // definition used to shadow it for the whole book. Load each name's
   // live workbook-level definition first and push #REF! residues last. This
   // is a stopgap until the engine models (name, scope) pairs.
-  const groups = new Map<string, typeof file.definedNames>()
-  for (const defined of file.definedNames) {
-    const list = groups.get(defined.name) ?? []
-    list.push(defined)
-    groups.set(defined.name, list)
-  }
-  const rank = (defined: (typeof file.definedNames)[number]): number =>
-    defined.formula.includes('#REF!') ? 2 : defined.sheetIndex === undefined ? 0 : 1
-  const ordered = [...groups.values()].flatMap((list) =>
-    [...list].sort((a, b) => rank(a) - rank(b)),
-  )
+  const ordered = orderDefinedNames(file.definedNames)
   journalSuppression.active = true
   try {
     for (const defined of ordered) {
@@ -1182,23 +988,14 @@ export function applyDefinedNames(
         if (defined.sheetIndex !== undefined && localSheetId === undefined) {
           throw new Error('Scope index out of range.')
         }
-        const wb = workbook as unknown as {
-          newDefinedNameBuilder(): {
-            load(param: Record<string, unknown>): { build(): unknown }
-          }
-          insertDefinedNameBuilder(param: unknown): void
-        }
-        wb.insertDefinedNameBuilder(
-          wb
-            .newDefinedNameBuilder()
-            .load({
-              name: defined.name,
-              formulaOrRefString: defined.formula,
-              // Univer's workbook-scope sentinel; sheet scope carries the sheet id.
-              localSheetId: localSheetId ?? 'AllDefaultWorkbook',
-            })
-            .build(),
-        )
+        const rejected = installNameDefinitions(workbook, [
+          {
+            name: defined.name,
+            formula: defined.formula,
+            ...(localSheetId === undefined ? {} : { sheetId: localSheetId }),
+          },
+        ])
+        for (const name of rejected) state.uninstalledDefinedNames.add(name)
       } catch {
         // Names the engine can't model stay file-only; the save keeps them.
         state.uninstalledDefinedNames.add(defined.name)
@@ -2377,30 +2174,7 @@ export function projectVisualEdits(
         ...(edit.hyperlink === undefined ? {} : { hyperlink: edit.hyperlink }),
       }
     })
-  // Same rule as the gateway: visuals carrying a zIndex permute among their
-  // own slots within a drawing part; everything else stays where it is.
-  const key = (visual: WorkbookVisualObject): number | undefined =>
-    visualEdits.get(visual.id)?.zIndex
-  const byPart = new Map<string, number[]>()
-  projected.forEach((visual, at) => {
-    if (key(visual) === undefined) return
-    const part = visual.drawingPath ?? visual.sheetId
-    byPart.set(part, [...(byPart.get(part) ?? []), at])
-  })
-  if (byPart.size === 0) return projected
-  const result = [...projected]
-  for (const slots of byPart.values()) {
-    const sorted = slots
-      .map((at) => projected[at]!)
-      .sort(
-        (left, right) =>
-          key(left)! - key(right)! || (left.drawingIndex ?? 0) - (right.drawingIndex ?? 0),
-      )
-    slots.forEach((at, index) => {
-      result[at] = sorted[index]!
-    })
-  }
-  return result
+  return projectVisualOrder(projected, (visual) => visualEdits.get(visual.id)?.zIndex)
 }
 
 /// Journal snapshot/restore for one visual, backing the undo closures.
@@ -6251,9 +6025,10 @@ function restoreFilterCriteria(
         }
       }
     }
-    if (!filters && !customFilters) continue
+    if (!filters && !customFilters && !column.colors) continue
     const criteria: IFilterColumn = {
       colId: col,
+      ...(column.colors ? { colorFilters: toUniverColorFilter(column.colors) } : {}),
       ...(filters === undefined ? {} : { filters }),
       ...(customFilters === undefined ? {} : { customFilters }),
     }
@@ -6507,6 +6282,7 @@ export function applyFilterCriteria(
   column: string,
   criteria:
     | { readonly values: readonly string[] }
+    | { readonly colors: ColorFilterCriteria }
     | {
         readonly customs: {
           readonly and: boolean
@@ -6527,6 +6303,13 @@ export function applyFilterCriteria(
     return
   }
   const colId = filterColumn - filterBounds.startColumn
+  if ('colors' in criteria) {
+    filter.setColumnFilterCriteria(filterColumn, {
+      colId,
+      colorFilters: toUniverColorFilter(criteria.colors),
+    })
+    return
+  }
   if ('values' in criteria) {
     filter.setColumnFilterCriteria(filterColumn, {
       colId,
@@ -6597,12 +6380,10 @@ export function collectFilterStates(
     for (let column = range.startColumn; column <= range.endColumn; column += 1) {
       const criteria = filter.getColumnFilterCriteria(column)
       if (!criteria) continue
-      if (criteria.colorFilters) {
-        throw new Error(t('appColorFiltersUnsaveable'))
-      }
-      if (!criteria.filters && !criteria.customFilters) continue
+      if (!criteria.filters && !criteria.customFilters && !criteria.colorFilters) continue
       columns.push({
         colId: column - range.startColumn,
+        ...(criteria.colorFilters ? { colors: fromUniverColorFilter(criteria.colorFilters) } : {}),
         ...(criteria.filters?.filters ? { values: [...criteria.filters.filters] } : {}),
         ...(criteria.filters?.blank ? { blank: true } : {}),
         ...(criteria.customFilters
@@ -7846,29 +7627,6 @@ export function absRangeRef(sheetName: string, range: string): string {
     `'${name}'!$${columnLabel(bounds.startColumn)}$${bounds.startRow + 1}` +
     `:$${columnLabel(bounds.endColumn)}$${bounds.endRow + 1}`
   )
-}
-
-/// Absolute A1 ref over one column, rows in 0-based coordinates.
-export function a1RangeRef(
-  sheetName: string,
-  column: number,
-  fromRow: number,
-  toRow: number,
-): string {
-  const col = columnLetter(column)
-  const name = sheetName.replace(/'/g, "''")
-  return `'${name}'!$${col}$${fromRow + 1}:$${col}$${toRow + 1}`
-}
-
-/// Absolute A1 ref over one row, columns in 0-based coordinates.
-export function a1RowRangeRef(
-  sheetName: string,
-  row: number,
-  fromColumn: number,
-  toColumn: number,
-): string {
-  const name = sheetName.replace(/'/g, "''")
-  return `'${name}'!$${columnLetter(fromColumn)}$${row + 1}:$${columnLetter(toColumn)}$${row + 1}`
 }
 
 /// The sheet the float installs should target, resolved at timer-fire time —

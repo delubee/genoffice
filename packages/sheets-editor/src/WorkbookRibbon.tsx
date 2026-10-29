@@ -1,12 +1,29 @@
-import { useRef, useState, type ReactNode } from 'react'
-import { columnLabel, formatAddress } from '@genoffice/xlsx-gateway/domain/cell-address'
-import type { WorkbookOperation } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
+import { SubtotalDialog } from '../../../apps/sheets/src/renderer/SubtotalDialog'
+import {
+  DataToolsRibbonGroup,
+  ForecastRibbonGroup,
+  GetDataRibbonGroup,
+  OutlineRibbonGroup,
+  SortFilterRibbonGroup,
+} from '../../../apps/sheets/src/renderer/SheetsRibbon'
+import { AdvancedFilterDialog } from '../../../apps/sheets/src/renderer/AdvancedFilterDialog'
+import { RemoveDuplicatesDialog } from '../../../apps/sheets/src/renderer/RemoveDuplicatesDialog'
+import { GoalSeekDialog } from '../../../apps/sheets/src/renderer/GoalSeekDialog'
+import { tFor, LocaleScope } from '../../../apps/sheets/src/renderer/i18n/locale'
+import { normalizeLang } from '@genoffice/i18n'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { formatAddress } from '@genoffice/xlsx-gateway/domain/cell-address'
+import type { DvRule, WorkbookOperation } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
 import type { WorkbookRuntime } from './runtime'
 import { editorText } from './i18n'
 import { DesktopHomeRibbon } from './DesktopHomeRibbon'
+import { DataValidationDialog } from './DataValidationDialog'
+import { ConsolidateDialog } from '../../../apps/sheets/src/renderer/ConsolidateDialog'
+import { SortDialog } from '../../../apps/sheets/src/renderer/SortDialog'
+import type { ConsolidateConfig } from '../../../apps/sheets/src/renderer/consolidate'
 
 const tabs = ['home', 'insert', 'pageLayout', 'formulas', 'data', 'review', 'view'] as const
-type Tab = (typeof tabs)[number]
+type Tab = (typeof tabs)[number] | 'chartDesign' | 'shapeFormat' | 'pictureFormat'
 export function RibbonGroup({ title, children }: { title: string; children: ReactNode }) {
   return (
     <fieldset className="workbook-ribbon-group">
@@ -29,15 +46,58 @@ export function WorkbookRibbon({
   onError(message: string): void
 }) {
   const text = editorText(locale)
+  const hasChart = !!runtime?.chartRibbonTarget
+  const shapeKind = runtime?.shapeRibbonTarget?.kind
+  const visibleTabs: Tab[] = [
+    ...tabs,
+    ...(hasChart ? ['chartDesign' as const] : []),
+    ...(shapeKind === 'shape'
+      ? ['shapeFormat' as const]
+      : shapeKind === 'image'
+        ? ['pictureFormat' as const]
+        : []),
+  ]
+  const [homeAnchor, setHomeAnchor] = useState<HTMLDivElement | null>(null)
+  const [formulaAnchor, setFormulaAnchor] = useState<HTMLDivElement | null>(null)
+  const [insertAnchor, setInsertAnchor] = useState<HTMLDivElement | null>(null)
   const [tab, setTab] = useState<Tab>('home'),
     [formula, setFormula] = useState('=SUM(A1:A10)')
-  const [fn, setFn] = useState<'SUM' | 'AVERAGE' | 'COUNT' | 'MIN' | 'MAX'>('SUM')
-  const [hasHeader, setHasHeader] = useState(true),
-    [find, setFind] = useState(''),
+  const [find, setFind] = useState(''),
     [replace, setReplace] = useState('')
+  const [subtotalContext, setSubtotalContext] = useState<Awaited<
+    ReturnType<WorkbookRuntime['subtotalContext']>
+  > | null>(null)
+  const [goalSeekContext, setGoalSeekContext] = useState<WorkbookRuntime['goalSeekContext']>(null)
+  const [dedupeContext, setDedupeContext] = useState<Awaited<
+    ReturnType<WorkbookRuntime['removeDuplicatesContext']>
+  > | null>(null)
+  const [dedupeNotice, setDedupeNotice] = useState<number | null>(null)
+  const [csvNotice, setCsvNotice] = useState<{
+    rows: number
+    columns: number
+    cell: string
+  } | null>(null)
+  const [advancedFilterContext, setAdvancedFilterContext] = useState<Awaited<
+    ReturnType<WorkbookRuntime['advancedFilterContext']>
+  > | null>(null)
+  const [dataValidationOpen, setDataValidationOpen] = useState(false)
+  const [sortContext, setSortContext] = useState<Awaited<
+    ReturnType<WorkbookRuntime['customSortContext']>
+  > | null>(null)
+  const [consolidateTarget, setConsolidateTarget] = useState<
+    | (NonNullable<WorkbookRuntime['consolidateDialogContext']> & {
+        defaultReference: string
+        targetLabel: string
+      })
+    | null
+  >(null)
+  const [dataValidationInitial, setDataValidationInitial] = useState<DvRule | undefined>()
+  const [dataValidationTarget, setDataValidationTarget] = useState<{
+    target: { sheetId: string; address: string }
+    stateId: string
+    revision: number
+  } | null>(null)
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({})
-  const [filterColumn, setFilterColumn] = useState('A'),
-    [filterValues, setFilterValues] = useState('')
   const buttons = useRef<(HTMLButtonElement | null)[]>([])
   const selectedNote = runtime?.selectedNote ?? ''
   const noteIdentity = () => {
@@ -48,11 +108,6 @@ export function WorkbookRibbon({
   }
   const note = noteDrafts[noteIdentity()] ?? selectedNote
   const features: Record<string, unknown> = runtime?.selectedFeatures ?? {}
-  const filePage = (features.filePageSetup ?? {}) as {
-    orientation?: 'portrait' | 'landscape'
-    paperSize?: number
-    margins?: 'normal' | 'wide' | 'narrow'
-  }
   const page = (features.pageSetupEdits ?? {}) as {
     orientation?: 'portrait' | 'landscape'
     paperSize?: number
@@ -75,6 +130,32 @@ export function WorkbookRibbon({
     const value = runtime?.selection
     if (!value) throw new Error(text.selectFirst)
     return value
+  }
+  const openDataValidation = () => {
+    try {
+      const selection = selected(),
+        context = runtime!.selectionContext
+      setDataValidationTarget({
+        target: { sheetId: selection.sheetId, address: selection.address },
+        stateId: context.stateId,
+        revision: context.revision,
+      })
+      setDataValidationInitial(runtime!.dataValidationDraft(selection.sheetId, selection.address))
+      setDataValidationOpen(true)
+      onError('')
+    } catch (error) {
+      onError(String(error))
+    }
+  }
+  const openConsolidate = () => {
+    try {
+      const context = runtime?.consolidateDialogContext
+      if (!context) throw new Error(text.selectFirst)
+      setConsolidateTarget(context)
+      onError('')
+    } catch (error) {
+      onError(error instanceof Error ? error.message : String(error))
+    }
   }
   const submit = (make: () => WorkbookOperation) => run(() => runtime!.enqueue([make()]))
   const pageSetting = (
@@ -103,145 +184,174 @@ export function WorkbookRibbon({
         return next
       })
     })
+  useEffect(() => {
+    if (
+      (!hasChart && tab === 'chartDesign') ||
+      (tab === 'shapeFormat' && shapeKind !== 'shape') ||
+      (tab === 'pictureFormat' && shapeKind !== 'image')
+    )
+      setTab('home')
+  }, [hasChart, shapeKind, tab])
+  const currentTab =
+    (tab === 'chartDesign' && !hasChart) ||
+    (tab === 'shapeFormat' && shapeKind !== 'shape') ||
+    (tab === 'pictureFormat' && shapeKind !== 'image')
+      ? 'home'
+      : tab
+  const [visualAnchor, setVisualAnchor] = useState<HTMLDivElement | null>(null)
+  const [pageAnchor, setPageAnchor] = useState<HTMLDivElement | null>(null)
+  const [chartAnchor, setChartAnchor] = useState<HTMLDivElement | null>(null)
   const panels: Record<Tab, ReactNode> = {
+    chartDesign: <div ref={setChartAnchor} />,
+    shapeFormat: <div ref={setVisualAnchor} />,
+    pictureFormat: <div ref={setVisualAnchor} />,
     home: (
       <>
-        <DesktopHomeRibbon runtime={runtime} locale={locale} onError={onError} />
+        <div ref={setHomeAnchor} />
         <details className="workbook-additional-controls">
           <summary>{text.cells}</summary>
           <div className="workbook-toolbar">{home}</div>
         </details>
       </>
     ),
-    insert,
-    pageLayout: (
+    insert: (
       <>
-        <RibbonGroup title={text.pageSetup}>
-          <label>
-            {text.orientation}
-            <select
-              aria-label={text.orientation}
-              value={page.orientation ?? filePage.orientation ?? 'portrait'}
-              onChange={(event) =>
-                pageSetting({ orientation: event.target.value as 'portrait' | 'landscape' })
-              }
-            >
-              <option value="portrait">{text.portrait}</option>
-              <option value="landscape">{text.landscape}</option>
-            </select>
-          </label>
-          <label>
-            {text.paperSize}
-            <select
-              aria-label={text.paperSize}
-              value={page.paperSize ?? filePage.paperSize ?? 9}
-              onChange={(event) => pageSetting({ paperSize: Number(event.target.value) })}
-            >
-              <option value="9">A4</option>
-              <option value="8">A3</option>
-              <option value="1">Letter</option>
-              <option value="11">A5</option>
-            </select>
-          </label>
-          <label>
-            {text.margins}
-            <select
-              aria-label={text.margins}
-              value={page.margins ?? filePage.margins ?? 'normal'}
-              onChange={(event) =>
-                pageSetting({ margins: event.target.value as 'normal' | 'wide' | 'narrow' })
-              }
-            >
-              <option value="normal">{text.normal}</option>
-              <option value="narrow">{text.narrow}</option>
-              <option value="wide">{text.wide}</option>
-            </select>
-          </label>
-        </RibbonGroup>
-        <RibbonGroup title={text.printArea}>
-          <button onClick={() => pageSetting({ printArea: selected().address })}>
-            {text.setPrintArea}
-          </button>
-          <button onClick={() => pageSetting({ printArea: null })}>{text.clearPrintArea}</button>
-          <button onClick={() => pageSetting({ fitToWidth: 1, fitToHeight: 0 })}>
-            {text.fitOnePageWide}
-          </button>
-          <button onClick={() => pageSetting({ scale: 100 })}>{text.actualSize}</button>
-        </RibbonGroup>
+        <div ref={setInsertAnchor} />
+        <details className="workbook-additional-controls">
+          <summary>{text.cells}</summary>
+          <div className="workbook-toolbar">{insert}</div>
+        </details>
       </>
     ),
+    pageLayout: <div ref={setPageAnchor} />,
     formulas: (
       <>
-        <RibbonGroup title={text.functionLibrary}>
-          <select
-            aria-label={text.functionLibrary}
-            value={fn}
-            onChange={(event) => setFn(event.target.value as typeof fn)}
-          >
-            {['SUM', 'AVERAGE', 'COUNT', 'MIN', 'MAX'].map((name) => (
-              <option key={name}>{name}</option>
-            ))}
-          </select>
-          <button onClick={() => run(() => runtime!.insertSummary(fn))}>{text.autoSum}</button>
-          <button onClick={() => run(() => runtime!.recalculate())}>{text.calculateNow}</button>
-        </RibbonGroup>
-        <RibbonGroup title={text.insertFormula}>
-          <input
-            aria-label={text.formulaText}
-            value={formula}
-            onChange={(event) => setFormula(event.target.value)}
-          />
-          <button
-            onClick={() =>
-              submit(() => {
-                const s = selected()
-                return {
-                  op: 'set_formula',
-                  sheetId: s.sheetId,
-                  address: formatAddress(s.range.startRow, s.range.startColumn),
-                  formula,
-                }
-              })
-            }
-          >
-            {text.insertFormula}
-          </button>
-        </RibbonGroup>
-      </>
-    ),
-    data: (
-      <>
-        <RibbonGroup title={text.sort}>
-          <label>
+        <div ref={setFormulaAnchor} />
+        <details className="workbook-additional-controls">
+          <summary>{text.insertFormula}</summary>
+          <RibbonGroup title={text.insertFormula}>
             <input
-              type="checkbox"
-              checked={hasHeader}
-              onChange={(event) => setHasHeader(event.target.checked)}
+              aria-label={text.formulaText}
+              value={formula}
+              onChange={(event) => setFormula(event.target.value)}
             />
-            {text.hasHeader}
-          </label>
-          {(['asc', 'desc'] as const).map((order) => (
             <button
-              key={order}
               onClick={() =>
                 submit(() => {
                   const s = selected()
                   return {
-                    op: 'sort_range',
+                    op: 'set_formula',
                     sheetId: s.sheetId,
-                    range: s.address,
-                    byColumn: columnLabel(s.range.startColumn),
-                    order,
-                    hasHeader,
+                    address: formatAddress(s.range.startRow, s.range.startColumn),
+                    formula,
                   }
                 })
               }
             >
-              {order === 'asc' ? text.sortAscending : text.sortDescending}
+              {text.insertFormula}
             </button>
-          ))}
-        </RibbonGroup>
+          </RibbonGroup>
+          <button onClick={() => run(() => runtime!.recalculate())}>{text.calculateNow}</button>
+        </details>
+      </>
+    ),
+    data: (
+      <>
+        <LocaleScope lang={normalizeLang(locale ?? navigator.language)}>
+          <div className="ribbon workbook-shared-sort-filter" data-ribbon-body="">
+            <GetDataRibbonGroup
+              onCommand={(command) => {
+                if (command === 'import-csv')
+                  run(async () => {
+                    setCsvNotice(null)
+                    const imported = await runtime!.importCsv(
+                      normalizeLang(locale ?? navigator.language),
+                    )
+                    if (imported) setCsvNotice(imported)
+                  })
+                else if (command === 'refresh-all') run(() => runtime!.refreshAll())
+                else if (command === 'merge-workbooks')
+                  onError('Merge Workbooks is not available in VS Code yet.')
+                else onError(`Unknown Get Data command: ${command}`)
+              }}
+            />
+            <SortFilterRibbonGroup
+              onCommand={(command) => {
+                if (command === 'sort-custom-open')
+                  run(async () => setSortContext(await runtime!.customSortContext()))
+                else if (command === 'filter-advanced')
+                  run(async () => setAdvancedFilterContext(await runtime!.advancedFilterContext()))
+                else if (
+                  command === 'filter-toggle' ||
+                  command === 'filter-clear' ||
+                  command === 'filter-reapply' ||
+                  command === 'sort:asc' ||
+                  command === 'sort:desc'
+                )
+                  run(() => runtime!.sortFilterCommand(command))
+                else onError(`Unknown Sort & Filter command: ${command}`)
+              }}
+            />
+            <DataToolsRibbonGroup
+              onCommand={(command) => {
+                if (command === 'flash-fill') run(() => runtime!.flashFill())
+                else if (command === 'remove-duplicates-open')
+                  run(async () => {
+                    setDedupeNotice(null)
+                    setDedupeContext(await runtime!.removeDuplicatesContext())
+                  })
+                else if (command === 'dv-open') openDataValidation()
+                else if (command === 'consolidate-open') openConsolidate()
+                else if (command === 'text-to-columns:1') run(() => runtime!.textToColumns(1))
+                else if (command === 'text-to-columns:2') run(() => runtime!.textToColumns(2))
+                else if (command === 'text-to-columns:4') run(() => runtime!.textToColumns(4))
+                else if (command === 'text-to-columns:8') run(() => runtime!.textToColumns(8))
+                else onError(`Unknown Data Tools command: ${command}`)
+              }}
+            />
+            <ForecastRibbonGroup
+              onCommand={(command) => {
+                if (command === 'goal-seek-open')
+                  run(async () => {
+                    if (!runtime || !(await runtime.flushEditor()))
+                      throw new Error(text.selectFirst)
+                    const context = runtime?.goalSeekContext
+                    if (!context) throw new Error(text.selectFirst)
+                    setGoalSeekContext(context)
+                  })
+                else onError(`Unknown Forecast command: ${command}`)
+              }}
+            />
+            <OutlineRibbonGroup
+              outlineSummary={runtime?.outlineSummary ?? { below: true, right: true }}
+              onCommand={(command) => {
+                if (command === 'subtotal-open')
+                  run(async () => setSubtotalContext(await runtime!.subtotalContext()))
+                else if (command === 'outline-summary-below')
+                  run(() => runtime!.outlineCommand('summary-below'))
+                else if (command === 'outline-summary-right')
+                  run(() => runtime!.outlineCommand('summary-right'))
+                else if (command === 'outline-clear') run(() => runtime!.outlineCommand('clear'))
+                else {
+                  const match =
+                    /^outline-(group|ungroup|hide-detail|show-detail):(rows|cols)$/.exec(command)
+                  if (match)
+                    run(() =>
+                      runtime!.outlineCommand(
+                        match[1] as 'group' | 'ungroup' | 'hide-detail' | 'show-detail',
+                        match[2] as 'rows' | 'cols',
+                      ),
+                    )
+                  else onError(`Unknown Outline command: ${command}`)
+                }
+              }}
+            />
+          </div>
+        </LocaleScope>
         <RibbonGroup title={text.dataTools}>
+          <button onClick={() => run(() => runtime!.setDataValidation(null))}>
+            {text.clearValidation}
+          </button>
           <button
             onClick={() =>
               submit(() => ({
@@ -254,50 +364,6 @@ export function WorkbookRibbon({
             {text.clearContents}
           </button>
           <p>{text.rangeOperationsHint}</p>
-        </RibbonGroup>
-        <RibbonGroup title={text.filter}>
-          <button
-            onClick={() =>
-              submit(() => ({
-                op: 'set_filter',
-                sheetId: selected().sheetId,
-                range: selected().address,
-              }))
-            }
-          >
-            {text.createFilter}
-          </button>
-          <label>
-            {text.filterColumn}
-            <input
-              aria-label={text.filterColumn}
-              value={filterColumn}
-              onChange={(event) => setFilterColumn(event.target.value.toUpperCase())}
-            />
-          </label>
-          <textarea
-            aria-label={text.filterValues}
-            placeholder={text.filterValues}
-            value={filterValues}
-            onChange={(event) => setFilterValues(event.target.value)}
-          />
-          <button
-            onClick={() =>
-              submit(() => ({
-                op: 'set_filter_criteria',
-                sheetId: selected().sheetId,
-                column: filterColumn,
-                values: filterValues.split('\n'),
-              }))
-            }
-          >
-            {text.applyFilter}
-          </button>
-          <button
-            onClick={() => submit(() => ({ op: 'clear_filter', sheetId: selected().sheetId }))}
-          >
-            {text.clearFilter}
-          </button>
         </RibbonGroup>
       </>
     ),
@@ -420,7 +486,7 @@ export function WorkbookRibbon({
   return (
     <div className="workbook-ribbon">
       <div className="workbook-ribbon-tabs" role="tablist" aria-label={text.ribbon}>
-        {tabs.map((key, index) => (
+        {visibleTabs.map((key, index) => (
           <button
             key={key}
             ref={(button) => {
@@ -429,38 +495,172 @@ export function WorkbookRibbon({
             id={`ribbon-tab-${key}`}
             type="button"
             role="tab"
-            aria-selected={tab === key}
+            aria-selected={currentTab === key}
             aria-controls={`ribbon-panel-${key}`}
-            tabIndex={tab === key ? 0 : -1}
+            tabIndex={currentTab === key ? 0 : -1}
             onClick={() => setTab(key)}
             onKeyDown={(event) => {
               let next: number
-              if (event.key === 'ArrowRight') next = (index + 1) % tabs.length
-              else if (event.key === 'ArrowLeft') next = (index + tabs.length - 1) % tabs.length
+              if (event.key === 'ArrowRight') next = (index + 1) % visibleTabs.length
+              else if (event.key === 'ArrowLeft')
+                next = (index + visibleTabs.length - 1) % visibleTabs.length
               else if (event.key === 'Home') next = 0
-              else if (event.key === 'End') next = tabs.length - 1
+              else if (event.key === 'End') next = visibleTabs.length - 1
               else return
               event.preventDefault()
-              setTab(tabs[next]!)
+              event.stopPropagation()
+              setTab(visibleTabs[next]!)
               buttons.current[next]?.focus()
             }}
           >
-            {text[key]}
+            {key === 'shapeFormat' || key === 'pictureFormat'
+              ? tFor(
+                  normalizeLang(locale ?? navigator.language),
+                  key === 'shapeFormat' ? 'appTabShapeFormat' : 'appTabPictureFormat',
+                )
+              : key === 'chartDesign'
+                ? tFor(normalizeLang(locale ?? navigator.language), 'appTabChartDesign')
+                : text[key]}
           </button>
         ))}
       </div>
-      {tabs.map((key) => (
+      <DesktopHomeRibbon
+        runtime={runtime}
+        locale={locale}
+        onError={onError}
+        activeTab={
+          currentTab === 'shapeFormat'
+            ? 'Shape Format'
+            : currentTab === 'pictureFormat'
+              ? 'Picture Format'
+              : currentTab === 'chartDesign'
+                ? 'Chart Design'
+                : currentTab === 'formulas'
+                  ? 'Formulas'
+                  : currentTab === 'pageLayout'
+                    ? 'Page Layout'
+                    : currentTab === 'insert'
+                      ? 'Insert'
+                      : 'Home'
+        }
+        ribbonContainer={
+          currentTab === 'home'
+            ? homeAnchor
+            : currentTab === 'formulas'
+              ? formulaAnchor
+              : currentTab === 'pageLayout'
+                ? pageAnchor
+                : currentTab === 'insert'
+                  ? insertAnchor
+                  : currentTab === 'chartDesign'
+                    ? chartAnchor
+                    : currentTab === 'shapeFormat' || currentTab === 'pictureFormat'
+                      ? visualAnchor
+                      : null
+        }
+      />
+      {visibleTabs.map((key) => (
         <div
           key={key}
           id={`ribbon-panel-${key}`}
           role="tabpanel"
           aria-labelledby={`ribbon-tab-${key}`}
-          hidden={tab !== key}
-          className={`workbook-ribbon-panel ${key === 'home' ? 'workbook-desktop-panel' : 'workbook-toolbar'}`}
+          hidden={currentTab !== key}
+          className={`workbook-ribbon-panel ${['home', 'insert', 'pageLayout', 'formulas', 'chartDesign', 'shapeFormat', 'pictureFormat'].includes(key) ? 'workbook-desktop-panel' : 'workbook-toolbar'}`}
         >
           {panels[key]}
         </div>
       ))}
+      {dedupeNotice !== null && (
+        <p role="status">
+          {tFor(
+            normalizeLang(locale ?? navigator.language),
+            dedupeNotice ? 'appDuplicatesRemoved' : 'appNoDuplicates',
+            { count: dedupeNotice },
+          )}
+        </p>
+      )}
+      {csvNotice && (
+        <p role="status">
+          {tFor(normalizeLang(locale ?? navigator.language), 'appCsvImported', csvNotice)}
+        </p>
+      )}
+      {advancedFilterContext && runtime && (
+        <AdvancedFilterDialog
+          locale={locale}
+          columns={advancedFilterContext.columns}
+          onApply={async (criteria) => {
+            await runtime.advancedFilter(criteria, advancedFilterContext)
+            return null
+          }}
+          onClose={() => setAdvancedFilterContext(null)}
+        />
+      )}
+      {subtotalContext && runtime && (
+        <SubtotalDialog
+          locale={locale ?? navigator.language}
+          fields={subtotalContext.fields}
+          onCreate={async (config) => {
+            await runtime.subtotal(config, subtotalContext)
+            return null
+          }}
+          onClose={() => setSubtotalContext(null)}
+        />
+      )}
+      {dedupeContext && runtime && (
+        <RemoveDuplicatesDialog
+          locale={locale}
+          onCommand={async (command) => {
+            if (!/^remove-duplicates:[01]$/.test(command))
+              throw new Error('Invalid duplicate removal settings.')
+            setDedupeNotice(
+              await runtime.removeDuplicates(command === 'remove-duplicates:1', dedupeContext),
+            )
+          }}
+          onClose={() => setDedupeContext(null)}
+        />
+      )}
+      {dataValidationOpen && runtime && dataValidationTarget && (
+        <DataValidationDialog
+          runtime={runtime}
+          target={dataValidationTarget}
+          initial={dataValidationInitial}
+          locale={locale}
+          onClose={() => setDataValidationOpen(false)}
+          onError={onError}
+        />
+      )}
+      {consolidateTarget && runtime && (
+        <ConsolidateDialog
+          locale={locale}
+          defaultReference={consolidateTarget.defaultReference}
+          targetLabel={consolidateTarget.targetLabel}
+          onCreate={async (config: ConsolidateConfig) => {
+            await runtime.consolidate(config, consolidateTarget)
+            onError('')
+            return null
+          }}
+          onClose={() => setConsolidateTarget(null)}
+        />
+      )}
+      {goalSeekContext && runtime && (
+        <GoalSeekDialog
+          locale={locale}
+          initialSetCell={goalSeekContext.initialSetCell}
+          onSolve={(setCell, value, byCell) =>
+            runtime.goalSeek(setCell, value, byCell, goalSeekContext)
+          }
+          onClose={() => setGoalSeekContext(null)}
+        />
+      )}
+      {sortContext && runtime && (
+        <SortDialog
+          locale={locale}
+          columns={sortContext.columns}
+          onCommand={(command) => runtime.customSort(command, sortContext)}
+          onClose={() => setSortContext(null)}
+        />
+      )}
     </div>
   )
 }

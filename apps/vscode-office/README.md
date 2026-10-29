@@ -77,11 +77,24 @@ undoable document operations as native agent tools.
 | ----------- | ----------------------------------------------------------------------------------------------------------- |
 | Home        | Fonts/basic formats, alignment, copy/fill, worksheet and row/column operations, row height and column width |
 | Insert      | Session column, bar, line and pie charts                                                                    |
-| Page Layout | Paper size, orientation, margins, print area and print scaling                                              |
-| Formulas    | Explicit formula input, SUM/AVERAGE/COUNT/MIN/MAX summaries and recalculation                               |
+| Page Layout | Shared desktop paper/orientation/margins, print area/titles, scaling, page breaks and separate view/print flags                                              |
+| Formulas    | Shared live function catalog/categories, Function Arguments, per-column AutoSum; additional formula input/recalculation                               |
 | Data        | Sort by the first selected column, value filters and clearing contents                                      |
 | Review      | Read/add/change/delete text notes; find and replace in the selected range                                   |
 | View        | Gridlines, headings, zoom and frozen rows/columns                                                           |
+
+Use **Formulas → Insert Function**, its category buttons, grid **Shift+F3**, or the
+formula bar **fx** button. Choose a function, enter its arguments (or use the
+range picker), then confirm. Existing calls open directly in Function Arguments.
+Confirmation is one undoable edit; a failed submission keeps your inputs.
+The dialog keeps its original destination when the grid selection changes.
+AutoSum places a formula below each selected column as one transaction.
+
+Function previews read current static references, including source cells outside
+the visible page. Formula precedents, names, dynamic/external references and
+preview reads over 2,000 cells currently have no verified preview. Insertion is
+still available. Name Manager, formula auditing and full calculation menus are
+not yet replicated. Page Layout document theme controls are also pending.
 
 Hover over the middle of a row/column header separator until its resize grip
 appears, then drag; or select cells and use **Home → Row and column sizes**. Row height is in points; column width is in pixels. Original

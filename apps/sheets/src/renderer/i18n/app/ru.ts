@@ -102,6 +102,7 @@ export const ru = {
   appLabelNumberFormat: 'Числовой формат подписи',
   appLabelFormatPlaceholder: 'напр. 0.0% / #,##0',
   appGridlines: 'Сетка',
+  appChartAxisRangeInvalid: 'Максимум должен быть больше минимума.',
   appAxisMin: 'Минимум',
   appAxisMax: 'Максимум',
   appBarSection: 'Гистограмма',
@@ -655,6 +656,14 @@ export const ru = {
   appScopeWorkbook: 'Книга',
   appNamesNeedFile: 'Сначала откройте файл XLSX — определённые имена сохраняются в файл.',
   appNameGone: 'Это имя больше не существует.',
+  appDefinedNameInvalid: 'Введите допустимое незарезервированное имя и ссылку.',
+  appDefinedNameDuplicate: 'Это имя уже используется в данной области.',
+  appDefinedNameBindingConflict:
+    'Изменение конфликтует со скрытым определением или определением уровня листа.',
+  appAuditPendingValues:
+    'Проверка использует сохранённые значения формул; некоторые результаты ожидают пересчёта.',
+  appDefinedNameLabelPending:
+    'Результаты формул меток не проверены. Используйте текстовые метки для создания имён.',
   appNameApplyFailed: 'Не удалось применить имя.',
   appNamesUpdated: 'Определённые имена обновлены — сохраните с помощью ⌘S.',
   appLinkInternal: 'Ссылка указывает внутрь книги: {location}',
@@ -1558,4 +1567,11 @@ export const ru = {
   appVisualFlipV: 'Отразить сверху вниз',
   appVisualFlipH: 'Отразить слева направо',
   appCtxPasteVisual: 'Вставить рисунок или фигуру',
+  appDocumentChangedDuringAction:
+    'Документ изменился во время подготовки действия. Повторите попытку.',
+  appClipboardUnsupported: 'Это содержимое пока нельзя вставить. Ячейки не изменены.',
+  appClipboardSelectionChanged: 'Выделение изменилось перед вставкой. Повторите попытку.',
+  appClipboardBusy: 'Дождитесь завершения текущего редактирования.',
+  appClipboardReadUnavailable:
+    'Не удалось прочитать буфер обмена. Используйте {shortcut} для вставки.',
 } satisfies Record<keyof typeof zh, string>

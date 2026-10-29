@@ -14,6 +14,7 @@ use uuid::Uuid;
 use zip::ZipArchive;
 
 pub mod archive;
+pub mod calculation_context;
 pub mod convert;
 pub mod find;
 pub mod odf;
@@ -286,6 +287,7 @@ impl WorkbookSessions {
             locale,
             short_date_format,
         )?;
+        color_context.filter_styles = dxf_styles.clone();
         let custom_table_styles = read_custom_table_styles(&mut archive, &dxf_styles);
         let rich_value_images = richdata::read_rich_value_images(&mut archive);
         let wps_cell_images = read_wps_cell_images(&mut archive);
@@ -470,7 +472,14 @@ impl WorkbookSessions {
             &color_context,
             &mut source_formats,
         )?;
-        let (defined_names, print_names, scoped_sheets) = read_defined_names(&mut archive)?;
+        let (defined_names, mut reserved_defined_names, print_names, scoped_sheets) =
+            read_defined_names(&mut archive)?;
+        for reserved in &mut reserved_defined_names {
+            reserved.sheet_id = reserved
+                .sheet_index
+                .and_then(|index| sheets.get(index))
+                .map(|sheet| sheet.id.clone());
+        }
         for (sheet_index, sheet) in sheets.iter_mut().enumerate() {
             if let Some(names) = print_names.get(&sheet_index) {
                 sheet.print_area = names.area.clone();
@@ -519,6 +528,8 @@ impl WorkbookSessions {
             dxf_styles,
             visuals: visual_objects,
             defined_names,
+            reserved_defined_names,
+            name_bindings_complete: true,
             theme_colors,
             theme_fonts,
             normal_font_name,

@@ -1,3 +1,14 @@
+import { colorFilterCriteriaSchema } from './color-filter'
+import { customFilterCriteriaSchema } from './custom-filter'
+import { setOutlineSchema, setOutlineSettingsSchema } from './session-outline'
+import { cellRecordSchema } from '../shared/cell-record'
+import { chartSeriesSelectionSchema } from './chart-series-selection'
+import {
+  drawingAnchorSchema,
+  workbookChartEditSchema,
+  workbookVisualEditSchema,
+  styleEditBorderSchema,
+} from '../shared/edit-schemas'
 import { z } from 'zod'
 import {
   SHEET_PROTECTION_PERMISSIONS,
@@ -139,6 +150,108 @@ const setCellSchema = z.object({
   expectedValue: cellScalarSchema.optional(),
 })
 
+/** A typed clipboard block preserves literals, dates, errors and independent
+ * formats without expanding the command into thousands of scalar edits. */
+const pasteCellsSchema = z
+  .object({
+    op: z.literal('paste_cells'),
+    sheetId: z.string().min(1),
+    start: cellAddressSchema,
+    cells: z.array(z.array(cellRecordSchema).min(1).max(2000)).min(1).max(2000),
+    /** Selective paste fields; omitted fields retain ordinary full-paste behavior. */
+    writeValues: z.boolean().optional(),
+    format: z.enum(['all', 'none', 'number', 'except-borders']).optional(),
+    skipCells: z.array(cellAddressSchema).max(2000).optional(),
+    /** Replace merges inside this block; partial existing merges reject. */
+    merges: z.array(cellRangeSchema).max(1000).optional(),
+  })
+  .refine(
+    (op) => {
+      const width = op.cells[0]!.length,
+        origin = parseAddress(op.start)
+      if (!(
+        op.cells.every((row) => row.length === width) &&
+        op.cells.length * width <= 2000 &&
+        origin.row + op.cells.length <= MAX_GRID_ROWS &&
+        origin.column + width <= MAX_GRID_COLUMNS
+      ))
+        return false
+      if (
+        op.merges !== undefined &&
+        (op.writeValues === false ||
+          (op.format !== undefined && op.format !== 'all') ||
+          op.skipCells?.length)
+      )
+        return false
+      for (const address of op.skipCells ?? []) {
+        const point = parseAddress(address)
+        if (
+          point.row < origin.row ||
+          point.row >= origin.row + op.cells.length ||
+          point.column < origin.column ||
+          point.column >= origin.column + width
+        )
+          return false
+      }
+      const seen: ReturnType<typeof parseRange>[] = []
+      for (const address of op.merges ?? []) {
+        const m = parseRange(address)
+        if (
+          m.startRow < origin.row ||
+          m.startColumn < origin.column ||
+          m.endRow >= origin.row + op.cells.length ||
+          m.endColumn >= origin.column + width ||
+          rangeCellCount(m) < 2
+        )
+          return false
+        if (
+          seen.some(
+            (p) =>
+              p.startRow <= m.endRow &&
+              p.endRow >= m.startRow &&
+              p.startColumn <= m.endColumn &&
+              p.endColumn >= m.startColumn,
+          )
+        )
+          return false
+        for (let r = m.startRow; r <= m.endRow; r++)
+          for (let c = m.startColumn; c <= m.endColumn; c++) {
+            const cell = op.cells[r - origin.row]![c - origin.column]!
+            if (
+              (r !== m.startRow || c !== m.startColumn) &&
+              (cell.rawValue !== null || cell.formula)
+            )
+              return false
+          }
+        seen.push(m)
+      }
+      return true
+    },
+    { message: 'Clipboard cells must be a bounded rectangle of at most 2000 cells.' },
+  )
+
+/** Atomic cut/paste with workbook-wide dependency updates in canonical sessions. */
+const relocateRangeSchema = z
+  .object({
+    op: z.literal('relocate_range'),
+    sheetId: z.string().min(1),
+    sourceSheetId: z.string().min(1),
+    source: cellRangeSchema,
+    start: cellAddressSchema,
+  })
+  .refine(
+    (op) => {
+      const source = parseRange(op.source),
+        target = parseAddress(op.start)
+      return (
+        rangeCellCount(source) <= 2000 &&
+        target.row + source.endRow - source.startRow < MAX_GRID_ROWS &&
+        target.column + source.endColumn - source.startColumn < MAX_GRID_COLUMNS
+      )
+    },
+    { message: 'Moved cells must fit the grid and the 2000-cell transaction budget.' },
+  )
+
 const setFormulaSchema = z.object({
   op: z.literal('set_formula'),
   sheetId: z.string().min(1),
@@ -187,6 +300,8 @@ const fillRangeSchema = z.object({
   sourceSheetId: z.string().min(1).optional(),
   /** range to fill; each dimension must be a whole multiple of the source's */
   target: cellRangeSchema,
+  /** Copy the donor cell formatting too; omitted retains destination formatting. */
+  copyFormat: z.boolean().optional(),
 })
 
 // Copy one block to one destination (Excel copy → paste as one operation):
@@ -235,6 +350,15 @@ const convertToValuesSchema = z.object({
   op: z.literal('convert_to_values'),
   sheetId: z.string().min(1),
   range: cellRangeSchema,
+})
+
+const subtotalSchema = z.object({
+  op: z.literal('subtotal'),
+  sheetId: z.string().min(1),
+  range: cellRangeSchema,
+  groupColumn: columnLabelSchema,
+  valueColumn: columnLabelSchema,
+  agg: z.enum(['sum', 'count', 'average']),
 })
 
 const insertRowsSchema = z
@@ -300,6 +424,21 @@ const editChartSchema = z.object({
   chartType: z.enum(['column', 'bar', 'line', 'area', 'pie', 'doughnut']).optional(),
   /** series index ("0"-based, as string) → #RRGGBB */
   seriesColors: z.record(z.string().regex(/^[0-9]{1,3}$/), hexColorSchema).optional(),
+  /** series index → point index → authored #RRGGBB */
+  pointColors: z
+    .record(
+      z.string().regex(/^[0-9]{1,3}$/),
+      z.record(z.string().regex(/^[0-9]{1,3}$/), hexColorSchema),
+    )
+    .optional(),
+  dataLabelPosition: workbookChartEditSchema.shape.dataLabelPosition,
+  dataLabelFormat: workbookChartEditSchema.shape.dataLabelFormat,
+  gridlines: workbookChartEditSchema.shape.gridlines,
+  valueAxis: workbookChartEditSchema.shape.valueAxis,
+  gapWidthPct: workbookChartEditSchema.shape.gapWidthPct,
+  holeSizePct: workbookChartEditSchema.shape.holeSizePct,
+  explosionPct: workbookChartEditSchema.shape.explosionPct,
+  pointExplosions: workbookChartEditSchema.shape.pointExplosions,
   /** 'none' hides the legend; a side moves it (creating it if absent) */
   legend: z.enum(['none', 'right', 'bottom', 'top', 'left']).optional(),
   /** plot-level data labels; 'none' removes them */
@@ -313,6 +452,7 @@ const editChartSchema = z.object({
       value: z.string().max(255).nullable().optional(),
     })
     .optional(),
+  seriesSelection: chartSeriesSelectionSchema.optional(),
   /** rename a series and/or repoint its data at new single-row/column ranges */
   seriesData: z
     .array(
@@ -353,14 +493,60 @@ const addChartSchema = z.object({
   anchorCell: cellAddressSchema.optional(),
 })
 
+const boundedDrawingAnchorSchema = drawingAnchorSchema.refine(
+  (anchor) =>
+    anchor.fromRow < MAX_GRID_ROWS &&
+    anchor.toRow < MAX_GRID_ROWS &&
+    anchor.fromColumn < MAX_GRID_COLUMNS &&
+    anchor.toColumn < MAX_GRID_COLUMNS &&
+    anchor.fromRowOffset >= 0 &&
+    anchor.fromColumnOffset >= 0 &&
+    anchor.toRowOffset >= 0 &&
+    anchor.toColumnOffset >= 0 &&
+    (anchor.toRow > anchor.fromRow ||
+      (anchor.toRow === anchor.fromRow && anchor.toRowOffset > anchor.fromRowOffset)) &&
+    (anchor.toColumn > anchor.fromColumn ||
+      (anchor.toColumn === anchor.fromColumn && anchor.toColumnOffset > anchor.fromColumnOffset)),
+  'Visual anchor must have positive size inside the worksheet grid.',
+)
+
 const addShapeSchema = z.object({
   op: z.literal('add_shape'),
+  anchor: boundedDrawingAnchorSchema.optional(),
   sheetId: z.string().min(1),
   shapeType: z.enum([...ADDABLE_SHAPE_TYPES, 'textbox']),
   anchorCell: cellAddressSchema,
   fillColor: hexColorSchema.optional(),
   text: z.string().max(1000).optional(),
 })
+
+/** Inline picture bytes are data, never a renderer-provided filesystem handle. */
+const addPictureSchema = z
+  .object({
+    op: z.literal('add_picture'),
+    sheetId: z.string().min(1),
+    anchor: boundedDrawingAnchorSchema,
+    name: z.string().min(1).max(255),
+    mediaType: z.enum(['image/png', 'image/jpeg', 'image/gif']),
+    base64: z
+      .string()
+      .min(4)
+      .max(27_962_028)
+      .regex(/^[A-Za-z0-9+/]+={0,2}$/),
+  })
+  .refine(
+    (v) => {
+      if (v.base64.length % 4 !== 0) return false
+      const padding = v.base64.endsWith('==') ? 2 : v.base64.endsWith('=') ? 1 : 0
+      if ((v.base64.length / 4) * 3 - padding > 20 * 1024 * 1024) return false
+      return v.mediaType === 'image/png'
+        ? v.base64.startsWith('iVBORw0KGgo')
+        : v.mediaType === 'image/jpeg'
+          ? v.base64.startsWith('/9j/')
+          : v.base64.startsWith('R0lGODdh') || v.base64.startsWith('R0lGODlh')
+    },
+    { message: 'Invalid picture bytes or media type.' },
+  )
 
 // Edits a shape/text box ADDED THIS SESSION (ids listed by
 // read_sheet_features); file-original drawings stay read-only. At least one
@@ -656,14 +842,32 @@ const clearFilterSchema = z.object({
   sheetId: z.string().min(1),
 })
 
+const clearFilterCriteriaSchema = z.object({
+  op: z.literal('clear_filter_criteria'),
+  sheetId: z.string().min(1),
+})
+const reapplyFilterSchema = z.object({
+  op: z.literal('reapply_filter'),
+  sheetId: z.string().min(1),
+})
+
 // Checkbox-style column criteria on an existing auto-filter: rows whose cell
 // text is in `values` stay visible. values: null clears the column's criteria.
-const setFilterCriteriaSchema = z.object({
-  op: z.literal('set_filter_criteria'),
-  sheetId: z.string().min(1),
-  column: columnLabelSchema,
-  values: z.array(z.string().max(32_767)).min(1).max(1000).nullable(),
-})
+const setFilterCriteriaSchema = z
+  .object({
+    op: z.literal('set_filter_criteria'),
+    sheetId: z.string().min(1),
+    column: columnLabelSchema,
+    values: z.array(z.string().max(32_767)).min(1).max(1000).nullable().optional(),
+    customs: customFilterCriteriaSchema.optional(),
+    colors: colorFilterCriteriaSchema.optional(),
+  })
+  .refine(
+    (criteria) =>
+      [criteria.values, criteria.customs, criteria.colors].filter((value) => value !== undefined)
+        .length === 1,
+    'Provide exactly one of values, customs or colors.',
+  )
 
 const cfFormatSchema = z
   .object({
@@ -748,32 +952,90 @@ const clearConditionalFormatsSchema = z.object({
   sheetId: z.string().min(1),
 })
 
+const dvOptionsSchema = z.strictObject({
+  allowBlank: z.boolean().optional(),
+  showInputMessage: z.boolean().optional(),
+  promptTitle: z.string().max(255).optional(),
+  prompt: z.string().max(255).optional(),
+  showErrorMessage: z.boolean().optional(),
+  errorStyle: z.enum(['stop', 'warning', 'information']).optional(),
+  errorTitle: z.string().max(255).optional(),
+  error: z.string().max(255).optional(),
+  showDropdown: z.boolean().optional(),
+})
+const dvListSourceSchema = z
+  .string()
+  .max(8192)
+  .refine(
+    (source) =>
+      /^[A-Z]{1,3}[1-9][0-9]{0,6}(?::[A-Z]{1,3}[1-9][0-9]{0,6})?$/.test(source) ||
+      /^(?:'(?:[^']|'')+'|[A-Za-z_][\w. ]*)!\$?[A-Za-z]{1,3}\$?[1-9][0-9]{0,6}(?::\$?[A-Za-z]{1,3}\$?[1-9][0-9]{0,6})?$/.test(
+        source,
+      ),
+    'Use a cell range, optionally qualified with a worksheet name.',
+  )
+
 export const dvRuleSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('any'), options: dvOptionsSchema.optional() }),
   z.object({
     kind: z.literal('list'),
     values: z.array(z.string().min(1).max(255)).min(1).max(100),
+    options: dvOptionsSchema.optional(),
   }),
   z.object({
     kind: z.literal('listRef'),
     /** range whose cell values form the dropdown options */
-    range: cellRangeSchema,
+    range: dvListSourceSchema,
+    options: dvOptionsSchema.optional(),
   }),
   z.object({
     kind: z.literal('numberBetween'),
     min: z.number().finite(),
     max: z.number().finite(),
+    options: dvOptionsSchema.optional(),
   }),
   z.object({
     kind: z.literal('dateBetween'),
     /** ISO dates, e.g. "2026-01-31" */
     start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    options: dvOptionsSchema.optional(),
   }),
-  z.object({ kind: z.literal('checkbox') }),
+  z.object({ kind: z.literal('checkbox'), options: dvOptionsSchema.optional() }),
   z.object({
     kind: z.literal('formula'),
     formula: z.string().startsWith('=').max(8192),
+    options: dvOptionsSchema.optional(),
   }),
+  z
+    .object({
+      kind: z.literal('criterion'),
+      type: z.enum(['whole', 'decimal', 'date', 'time', 'textLength']),
+      operator: z.enum([
+        'between',
+        'notBetween',
+        'equal',
+        'notEqual',
+        'greaterThan',
+        'greaterThanOrEqual',
+        'lessThan',
+        'lessThanOrEqual',
+      ]),
+      formula1: z.string().min(1).max(8192),
+      formula2: z.string().min(1).max(8192).optional(),
+      options: dvOptionsSchema.optional(),
+    })
+    .superRefine((rule, context) => {
+      if (
+        (rule.operator === 'between' || rule.operator === 'notBetween') &&
+        rule.formula2 === undefined
+      )
+        context.addIssue({
+          code: 'custom',
+          path: ['formula2'],
+          message: 'This operator needs a second value.',
+        })
+    }),
 ])
 
 // validation: null clears any rule on the range.
@@ -826,6 +1088,7 @@ const setPageSetupSchema = z.object({
   op: z.literal('set_page_setup'),
   sheetId: z.string().min(1),
   showGridlines: z.boolean().optional(),
+  showFormulas: z.boolean().optional(),
   showHeadings: z.boolean().optional(),
   zoomScale: z.number().int().min(10).max(400).optional(),
   orientation: z.enum(['portrait', 'landscape']).optional(),
@@ -906,13 +1169,40 @@ const moveSheetSchema = z.object({
 // (no leading =), as defined names are stored in the file.
 const addDefinedNameSchema = z.object({
   op: z.literal('add_defined_name'),
+  scopeSheetId: z
+    .string()
+    .min(1)
+    .optional()
+    .describe('Logical worksheet ID for sheet scope; omit for workbook scope.'),
   name: z.string().regex(/^[\p{L}_\\][\p{L}\p{N}_.\\]{0,254}$/u),
   ref: z.string().min(1).max(8192),
 })
 
 const deleteDefinedNameSchema = z.object({
   op: z.literal('delete_defined_name'),
+  scopeSheetId: z
+    .string()
+    .min(1)
+    .optional()
+    .describe('Logical worksheet ID for sheet scope; omit for workbook scope.'),
   name: z.string().min(1).max(255),
+})
+
+const addDefinedNamesSchema = z.object({
+  op: z.literal('add_defined_names'),
+  names: z
+    .array(addDefinedNameSchema.omit({ op: true }))
+    .min(1)
+    .max(2000),
+})
+
+const manageDefinedNameSchema = z.object({
+  op: z.literal('manage_defined_name'),
+  name: z.string().min(1).max(255),
+  scopeSheetId: z.string().min(1).optional(),
+  replacement: z
+    .object({ name: z.string().min(1).max(255), ref: z.string().min(1).max(8192) })
+    .nullable(),
 })
 
 // Per-cell edge semantics: every cell in the range gets the named edge(s);
@@ -954,6 +1244,11 @@ const formatPatchSchema = z
     /** OOXML indent steps (0 or null clears); renders as left cell padding */
     indent: z.number().int().min(0).max(250).nullable().optional(),
     border: borderPatchSchema.optional(),
+    /** Independent copied edges retain all native styles and explicit clears. */
+    borderTop: styleEditBorderSchema.optional(),
+    borderBottom: styleEditBorderSchema.optional(),
+    borderLeft: styleEditBorderSchema.optional(),
+    borderRight: styleEditBorderSchema.optional(),
   })
   .refine((patch) => Object.values(patch).some((value) => value !== undefined), {
     message: 'format must set at least one property',
@@ -964,6 +1259,8 @@ const formatRangeSchema = z.object({
   sheetId: z.string().min(1),
   range: cellRangeSchema,
   format: formatPatchSchema,
+  /** Reset the prior cell format before applying the patch. */
+  reset: z.boolean().optional(),
 })
 
 const sortRangeSchema = z.object({
@@ -973,6 +1270,11 @@ const sortRangeSchema = z.object({
   byColumn: columnLabelSchema,
   order: z.enum(['asc', 'desc']),
   hasHeader: z.boolean().optional(),
+  levels: z
+    .array(z.object({ byColumn: columnLabelSchema, order: z.enum(['asc', 'desc']) }))
+    .min(1)
+    .max(3)
+    .optional(),
 })
 
 const mergeCellsSchema = z.object({
@@ -994,8 +1296,8 @@ const setRowHeightSchema = z
     /** 1-based first row */
     row: rowStartSchema,
     count: z.number().int().min(1).max(500).default(1),
-    /** Excel points (2–409) */
-    heightPoints: z.number().min(2).max(409),
+    /** Excel points; zero collapses the row. */
+    heightPoints: z.number().min(0).max(409.5),
   })
   .refine(rowSpanFits, ROW_SPAN_ERROR)
 
@@ -1004,8 +1306,10 @@ const setColWidthSchema = z.object({
   sheetId: z.string().min(1),
   column: columnLabelSchema,
   count: z.number().int().min(1).max(100).default(1),
-  /** pixels (10–2000) */
-  widthPx: z.number().min(10).max(2000),
+  /** Pixels; zero collapses the column. */
+  widthPx: z.number().min(0).max(8000),
+  /** Preserve explicitly authored desktop character units when supplied. */
+  widthCharacters: z.number().min(0).max(255).optional(),
 })
 
 const renameSheetSchema = z.object({
@@ -1017,6 +1321,38 @@ const renameSheetSchema = z.object({
 // Deletes a floating visual (chart/shape/image). Charts accept the chart
 // part path or the visual id; shapes/images use the visual id (both listed
 // in get_workbook_context / read_sheet_features).
+const setVisualAnchorSchema = z.object({
+  op: z.literal('set_visual_anchor'),
+  sheetId: z.string().min(1),
+  visualId: z.string().min(1).max(300),
+  anchor: boundedDrawingAnchorSchema,
+})
+
+const editVisualSchema = z
+  .object({
+    op: z.literal('edit_visual'),
+    visualId: z.string().min(1).max(300),
+    altText: z.string().max(2000).optional(),
+    editAs: z.enum(['twoCell', 'oneCell', 'absolute']).optional(),
+    zIndex: z.number().int().min(0).max(10000).optional(),
+    fillColor: workbookVisualEditSchema.shape.fillColor,
+    lineColor: workbookVisualEditSchema.shape.lineColor,
+    rotation: workbookVisualEditSchema.shape.rotation,
+    flipH: workbookVisualEditSchema.shape.flipH,
+    flipV: workbookVisualEditSchema.shape.flipV,
+    frameSize: workbookVisualEditSchema.shape.frameSize,
+  })
+  .strict()
+  .refine(
+    (op) =>
+      Object.entries(op).some(
+        ([key, value]) => key !== 'op' && key !== 'visualId' && value !== undefined,
+      ),
+    {
+      message: 'A visual edit needs a property.',
+    },
+  )
+
 const deleteVisualSchema = z.object({
   op: z.literal('delete_visual'),
   visualId: z.string().min(1).max(300),
@@ -1058,7 +1394,12 @@ const findReplaceSchema = z.object({
 })
 
 export const workbookOperationSchema = z.discriminatedUnion('op', [
+  subtotalSchema,
+  setOutlineSchema,
+  setOutlineSettingsSchema,
   setCellSchema,
+  pasteCellsSchema,
+  relocateRangeSchema,
   setFormulaSchema,
   clearCellSchema,
   setRangeSchema,
@@ -1076,6 +1417,7 @@ export const workbookOperationSchema = z.discriminatedUnion('op', [
   editChartSchema,
   addChartSchema,
   addShapeSchema,
+  addPictureSchema,
   editShapeSchema,
   addImageSchema,
   addTableSchema,
@@ -1090,11 +1432,15 @@ export const workbookOperationSchema = z.discriminatedUnion('op', [
   protectSheetSchema,
   setFilterSchema,
   clearFilterSchema,
+  clearFilterCriteriaSchema,
+  reapplyFilterSchema,
   setFilterCriteriaSchema,
   addConditionalFormatSchema,
   clearConditionalFormatsSchema,
   setDataValidationSchema,
   addDefinedNameSchema,
+  manageDefinedNameSchema,
+  addDefinedNamesSchema,
   deleteDefinedNameSchema,
   setPageSetupSchema,
   setFreezeSchema,
@@ -1111,6 +1457,8 @@ export const workbookOperationSchema = z.discriminatedUnion('op', [
   moveSheetSchema,
   renameSheetSchema,
   deleteVisualSchema,
+  setVisualAnchorSchema,
+  editVisualSchema,
   deleteTableSchema,
   findReplaceSchema,
   addSparklineSchema,
@@ -1167,6 +1515,7 @@ export function describeOperationErrors(ops: readonly unknown[], error: z.ZodErr
     lines.join('\n')
   )
 }
+export type PasteCellsOperation = z.infer<typeof pasteCellsSchema>
 export type SetCellOperation = z.infer<typeof setCellSchema>
 export type SetRangeOperation = z.infer<typeof setRangeSchema>
 export type SetFormulaOperation = z.infer<typeof setFormulaSchema>
@@ -1190,6 +1539,7 @@ export type StructuralOperation =
   | z.infer<typeof moveSheetSchema>
 export type EditChartOperation = z.infer<typeof editChartSchema>
 export type AddChartOperation = z.infer<typeof addChartSchema>
+export type AddPictureOperation = z.infer<typeof addPictureSchema>
 export type AddShapeOperation = z.infer<typeof addShapeSchema>
 export type EditShapeOperation = z.infer<typeof editShapeSchema>
 export type AddImageOperation = z.infer<typeof addImageSchema>
@@ -1207,6 +1557,13 @@ export type CfRule = z.infer<typeof cfRuleSchema>
 export type DvRule = z.infer<typeof dvRuleSchema>
 /** sheet-layout edits: no address shifts, so they may mix with content ops */
 export type LayoutOperation =
+  | z.infer<typeof subtotalSchema>
+  | z.infer<typeof setOutlineSchema>
+  | z.infer<typeof setOutlineSettingsSchema>
+  | PasteCellsOperation
+  | z.infer<typeof relocateRangeSchema>
+  | z.infer<typeof setVisualAnchorSchema>
+  | z.infer<typeof editVisualSchema>
   | z.infer<typeof mergeCellsSchema>
   | z.infer<typeof unmergeCellsSchema>
   | z.infer<typeof setRowHeightSchema>
@@ -1214,6 +1571,7 @@ export type LayoutOperation =
   | EditChartOperation
   | AddChartOperation
   | AddShapeOperation
+  | AddPictureOperation
   | EditShapeOperation
   | AddImageOperation
   | AddTableOperation
@@ -1228,11 +1586,15 @@ export type LayoutOperation =
   | z.infer<typeof protectSheetSchema>
   | z.infer<typeof setFilterSchema>
   | z.infer<typeof clearFilterSchema>
+  | z.infer<typeof clearFilterCriteriaSchema>
+  | z.infer<typeof reapplyFilterSchema>
   | z.infer<typeof setFilterCriteriaSchema>
   | AddConditionalFormatOperation
   | z.infer<typeof clearConditionalFormatsSchema>
   | SetDataValidationOperation
   | z.infer<typeof addDefinedNameSchema>
+  | z.infer<typeof manageDefinedNameSchema>
+  | z.infer<typeof addDefinedNamesSchema>
   | z.infer<typeof deleteDefinedNameSchema>
   | SetPageSetupOperation
   | z.infer<typeof setFreezeSchema>
@@ -1280,6 +1642,9 @@ const STRUCTURAL_OPS = new Set([
   'move_sheet',
 ])
 const LAYOUT_OPS = new Set([
+  'subtotal',
+  'paste_cells',
+  'relocate_range',
   'merge_cells',
   'unmerge_cells',
   'set_row_height',
@@ -1287,6 +1652,7 @@ const LAYOUT_OPS = new Set([
   'edit_chart',
   'add_chart',
   'add_shape',
+  'add_picture',
   'edit_shape',
   'add_image',
   'add_table',
@@ -1301,17 +1667,25 @@ const LAYOUT_OPS = new Set([
   'protect_sheet',
   'set_filter',
   'clear_filter',
+  'clear_filter_criteria',
+  'reapply_filter',
   'set_filter_criteria',
   'add_conditional_format',
   'clear_conditional_formats',
   'set_data_validation',
   'add_defined_name',
+  'manage_defined_name',
+  'add_defined_names',
   'delete_defined_name',
   'set_page_setup',
+  'set_outline',
+  'set_outline_settings',
   'set_freeze',
   'set_note',
   'refresh_pivot',
   'delete_visual',
+  'set_visual_anchor',
+  'edit_visual',
   'delete_table',
   'add_sparkline',
 ])
@@ -1710,7 +2084,7 @@ function setRangeOrigin(operation: SetRangeOperation): { startRow: number; start
 export function expandToPrimitiveOps(
   operations: readonly WorkbookOperation[],
   readCell?: ExpandCellReader,
-  options: { sortLocale?: string } = {},
+  options: { sortLocale?: string; sortRowVisible?: (row: number, sheetId: string) => boolean } = {},
 ): PrimitiveOperation[] {
   const convertBatchError = convertToValuesBatchError(operations)
   if (convertBatchError) throw new Error(convertBatchError)
@@ -1852,6 +2226,12 @@ export function expandToPrimitiveOps(
         }
       }
     } else if (operation.op === 'sort_range') {
+      const sortBounds = parseRange(operation.range)
+      for (const level of operation.levels ?? [{ byColumn: operation.byColumn }]) {
+        const column = columnIndex(level.byColumn)
+        if (column < sortBounds.startColumn || column > sortBounds.endColumn)
+          throw new Error(`Sort column ${level.byColumn} is outside the selected range.`)
+      }
       const sortCells = rangeCellCount(parseRange(operation.range))
       if (sortCells > MAX_RANGE_OP_CELLS) {
         throw new Error(
@@ -1870,9 +2250,13 @@ export function expandToPrimitiveOps(
       const changes = computeSortChanges(
         {
           range: operation.range,
+          ...(options.sortRowVisible
+            ? { rowVisible: (row: number) => options.sortRowVisible!(row, operation.sheetId) }
+            : {}),
           byColumn: operation.byColumn,
           ascending: operation.order === 'asc',
           hasHeader: operation.hasHeader ?? false,
+          ...(operation.levels === undefined ? {} : { levels: operation.levels }),
           ...(options.sortLocale !== undefined ? { locale: options.sortLocale } : {}),
         },
         (address) => readCell(address, operation.sheetId),
@@ -1974,10 +2358,26 @@ export function expandToPrimitiveOps(
       }
       expanded.push(operation)
     } else if (operation.op === 'edit_chart') {
+      if (operation.seriesSelection && operation.seriesData)
+        throw new Error('chart_series_edit_conflict')
       if (
+        operation.seriesSelection === undefined &&
         operation.title === undefined &&
         operation.chartType === undefined &&
         (!operation.seriesColors || Object.keys(operation.seriesColors).length === 0) &&
+        (!operation.pointColors ||
+          Object.values(operation.pointColors).every(
+            (points) => Object.keys(points).length === 0,
+          )) &&
+        operation.dataLabelPosition === undefined &&
+        operation.dataLabelFormat === undefined &&
+        operation.gridlines === undefined &&
+        operation.valueAxis === undefined &&
+        operation.gapWidthPct === undefined &&
+        operation.holeSizePct === undefined &&
+        operation.explosionPct === undefined &&
+        (operation.pointExplosions === undefined ||
+          Object.keys(operation.pointExplosions).length === 0) &&
         operation.legend === undefined &&
         operation.axisTitles === undefined &&
         operation.dataLabels === undefined &&
@@ -1985,7 +2385,7 @@ export function expandToPrimitiveOps(
         (!operation.seriesData || operation.seriesData.length === 0)
       ) {
         throw new Error(
-          'edit_chart needs at least one of title / chartType / seriesColors / legend / dataLabels / grouping / axisTitles / seriesData.',
+          'edit_chart needs at least one of title / chartType / seriesColors / pointColors / legend / dataLabels / grouping / axisTitles / seriesData.',
         )
       }
       for (const entry of operation.seriesData ?? []) {
@@ -2093,6 +2493,10 @@ export function formatOpLabel(op: FormatRangeOperation): string {
 
 export function layoutOpLabel(op: LayoutOperation): string {
   switch (op.op) {
+    case 'edit_visual':
+      return `Edit visual ${op.visualId}`
+    case 'set_visual_anchor':
+      return `Move/resize visual ${op.visualId}`
     case 'delete_visual':
       return `Delete visual ${op.visualId}`
     case 'delete_table':
@@ -2113,6 +2517,23 @@ export function layoutOpLabel(op: LayoutOperation): string {
         : `Set columns ${op.column}–${columnLabel(columnIndex(op.column) + op.count - 1)} width to ${op.widthPx}px`
     case 'edit_chart': {
       const parts: string[] = []
+      if (op.seriesSelection)
+        parts.push(
+          op.seriesSelection.mode === 'transpose' ? 'switch rows/columns' : 'replace series',
+        )
+      if (
+        [
+          op.dataLabelPosition,
+          op.dataLabelFormat,
+          op.gridlines,
+          op.valueAxis,
+          op.gapWidthPct,
+          op.holeSizePct,
+          op.explosionPct,
+          op.pointExplosions,
+        ].some((value) => value !== undefined)
+      )
+        parts.push('chart formatting')
       if (op.title !== undefined) parts.push(`title "${op.title}"`)
       if (op.chartType !== undefined) parts.push(`type ${op.chartType}`)
       if (op.seriesColors && Object.keys(op.seriesColors).length > 0) {
@@ -2122,6 +2543,11 @@ export function layoutOpLabel(op: LayoutOperation): string {
             .join(', ')}`,
         )
       }
+      if (
+        op.pointColors &&
+        Object.values(op.pointColors).some((points) => Object.keys(points).length > 0)
+      )
+        parts.push('point colors')
       if (op.legend !== undefined) {
         parts.push(op.legend === 'none' ? 'hide legend' : `legend ${op.legend}`)
       }
@@ -2151,6 +2577,10 @@ export function layoutOpLabel(op: LayoutOperation): string {
       }
       return `Edit chart ${op.chartPath}: ${parts.join(', ')}`
     }
+    case 'relocate_range':
+      return `Move ${op.source} to ${op.start}`
+    case 'paste_cells':
+      return `Paste ${op.cells.length}×${op.cells[0]!.length} typed cells at ${op.start}`
     case 'add_chart':
       return `Insert ${op.chartType} chart from ${op.dataRange}${op.title ? ` "${op.title}"` : ''}`
     case 'add_shape':
@@ -2165,6 +2595,8 @@ export function layoutOpLabel(op: LayoutOperation): string {
       ].filter(Boolean)
       return `Edit shape ${op.visualId}: ${parts.join(', ')}`
     }
+    case 'add_picture':
+      return `Insert picture ${op.name}`
     case 'add_image':
       return `Insert image ${op.path.split('/').pop() ?? op.path} at ${op.anchorCell}`
     case 'add_table':
@@ -2218,10 +2650,16 @@ export function layoutOpLabel(op: LayoutOperation): string {
       return `Add auto-filter on ${op.range}`
     case 'clear_filter':
       return 'Remove auto-filter'
+    case 'clear_filter_criteria':
+      return 'Clear all filter criteria'
+    case 'reapply_filter':
+      return 'Reapply filter criteria'
     case 'set_filter_criteria':
+      if (op.colors) return `Set color filter criteria on column ${op.column}`
+      if (op.customs) return `Set custom filter criteria on column ${op.column}`
       return op.values === null
         ? `Clear filter criteria on column ${op.column}`
-        : `Filter column ${op.column} to ${op.values.length} value${op.values.length === 1 ? '' : 's'}`
+        : `Filter column ${op.column} to ${op.values!.length} value${op.values!.length === 1 ? '' : 's'}`
     case 'add_conditional_format':
       return `Conditional format ${op.range}: ${cfRuleLabel(op.rule)}`
     case 'clear_conditional_formats':
@@ -2230,6 +2668,12 @@ export function layoutOpLabel(op: LayoutOperation): string {
       return op.validation === null
         ? `Clear data validation on ${op.range}`
         : `Data validation ${op.range}: ${dvRuleLabel(op.validation)}`
+    case 'add_defined_names':
+      return `Create ${op.names.length} defined names`
+    case 'manage_defined_name':
+      return op.replacement
+        ? `Update defined name ${op.name} to ${op.replacement.name}`
+        : `Remove defined name ${op.name} and its references`
     case 'add_defined_name':
       return `Define name ${op.name} = ${op.ref}`
     case 'delete_defined_name':
@@ -2262,6 +2706,12 @@ export function layoutOpLabel(op: LayoutOperation): string {
       if (op.colBreaks !== undefined) parts.push(`${op.colBreaks.length} column break(s)`)
       return `Page setup: ${parts.join(', ')}`
     }
+    case 'subtotal':
+      return `Subtotal ${op.range} by ${op.groupColumn} (${op.agg})`
+    case 'set_outline':
+      return `Outline ${op.axis} ${op.start}:${op.start + op.count - 1}, level ${op.level}`
+    case 'set_outline_settings':
+      return 'Outline summary placement'
     case 'set_freeze':
       return op.rows === 0 && op.columns === 0
         ? 'Unfreeze panes'
@@ -2303,6 +2753,8 @@ function cfRuleLabel(rule: CfRule): string {
 
 function dvRuleLabel(rule: DvRule): string {
   switch (rule.kind) {
+    case 'any':
+      return 'any value'
     case 'list':
       return `list (${rule.values.slice(0, 5).join(', ')}${rule.values.length > 5 ? ', …' : ''})`
     case 'listRef':
@@ -2315,6 +2767,8 @@ function dvRuleLabel(rule: DvRule): string {
       return 'checkbox'
     case 'formula':
       return `custom ${rule.formula}`
+    case 'criterion':
+      return `${rule.type} ${rule.operator} ${rule.formula1}${rule.formula2 === undefined ? '' : ` and ${rule.formula2}`}`
   }
 }
 

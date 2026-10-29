@@ -109,6 +109,7 @@ export const fr = {
   appLabelNumberFormat: "Format numérique de l'étiquette",
   appLabelFormatPlaceholder: 'p. ex. 0.0% / #,##0',
   appGridlines: 'Quadrillage',
+  appChartAxisRangeInvalid: 'Le maximum doit être supérieur au minimum.',
   appAxisMin: 'Minimum',
   appAxisMax: 'Maximum',
   appBarSection: 'Barres',
@@ -698,6 +699,14 @@ export const fr = {
   appNamesNeedFile:
     "Ouvrez d'abord un fichier XLSX — les noms définis sont enregistrés dans le fichier.",
   appNameGone: "Ce nom n'existe plus.",
+  appDefinedNameInvalid: 'Saisissez un nom non réservé et une référence valides.',
+  appDefinedNameDuplicate: 'Ce nom est déjà utilisé dans cette portée.',
+  appDefinedNameBindingConflict:
+    'Cette modification entre en conflit avec une définition masquée ou locale à une feuille.',
+  appAuditPendingValues:
+    'La vérification utilise les valeurs de formule enregistrées ; certains résultats attendent un recalcul.',
+  appDefinedNameLabelPending:
+    'Les résultats des formules des étiquettes ne sont pas vérifiés. Utilisez des étiquettes textuelles.',
   appNameApplyFailed: "Le nom n'a pas pu être appliqué.",
   appNamesUpdated: 'Noms définis mis à jour — enregistrez avec ⌘S.',
   appLinkInternal: "Le lien pointe à l'intérieur du classeur : {location}",
@@ -1610,4 +1619,12 @@ export const fr = {
   appVisualFlipV: 'Retourner verticalement',
   appVisualFlipH: 'Retourner horizontalement',
   appCtxPasteVisual: "Coller l'image ou la forme",
+  appDocumentChangedDuringAction:
+    'Le document a changé pendant la préparation de cette action. Réessayez.',
+  appClipboardUnsupported:
+    'Ce contenu ne peut pas encore être collé. Aucune cellule n’a été modifiée.',
+  appClipboardSelectionChanged: 'La sélection a changé avant le collage. Réessayez.',
+  appClipboardBusy: 'Attendez la fin de la modification en cours.',
+  appClipboardReadUnavailable:
+    'Impossible de lire le presse-papiers. Utilisez {shortcut} pour coller.',
 } satisfies Record<keyof typeof zh, string>

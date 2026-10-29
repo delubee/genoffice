@@ -62,6 +62,37 @@ export function pictureFileProblem(
   return null
 }
 
+/** Same picker/read/decode pipeline for desktop and embedded editors. */
+export function pickPictureFile(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/png,image/jpeg,image/gif'
+    input.onchange = () => resolve(input.files?.[0] ?? null)
+    input.oncancel = () => resolve(null)
+    input.click()
+  })
+}
+
+export async function readPictureFile(file: File) {
+  const problem = pictureFileProblem(file)
+  if (problem) throw new Error(problem)
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () =>
+      typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('bad-type'))
+    reader.onerror = () => reject(reader.error ?? new Error('bad-type'))
+    reader.readAsDataURL(file)
+  })
+  const size = await new Promise<{ width: number; height: number }>((resolve) => {
+    const image = new Image()
+    image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight })
+    image.onerror = () => resolve({ width: 480, height: 320 })
+    image.src = dataUrl
+  })
+  return { dataUrl, mediaType: pictureMediaType(file.type), ...size }
+}
+
 /// Frame size in grid cells for a picture of the given natural pixel size:
 /// ~80px per column, ~22px per row, scaled down to a <=480px-wide frame.
 export function fitPictureFrame(
@@ -84,6 +115,8 @@ export function pointInRect(
 }
 
 export interface PictureTransferHost {
+  pasteCells?(html: string, text: string): void
+  isPasteTarget?(target: EventTarget | null): boolean
   isCellEditing(): boolean
   cellAtPoint(clientX: number, clientY: number): PictureAnchor | null
   insert(file: File, anchor: PictureAnchor | null): void
@@ -95,9 +128,28 @@ export function installPictureTransfer(
 ): () => void {
   const onPaste = (event: ClipboardEvent): void => {
     if (event.defaultPrevented || !event.clipboardData) return
-    if (host.isCellEditing() || !isGridKeyTarget(event.target)) return
+    if (
+      host.isCellEditing() ||
+      !(host.isPasteTarget?.(event.target) ?? isGridKeyTarget(event.target))
+    )
+      return
     const file = pickTransferImage(event.clipboardData)
-    if (!file) return
+    if (!file) {
+      // The legacy native paste path otherwise prioritizes files over a table's
+      // markup. Delegate the exact HTML/text to its parser without the bitmap.
+      if (
+        host.pasteCells &&
+        (event.clipboardData.getData('text/html') || event.clipboardData.getData('text/plain'))
+      ) {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        host.pasteCells(
+          event.clipboardData.getData('text/html'),
+          event.clipboardData.getData('text/plain'),
+        )
+      }
+      return
+    }
     event.preventDefault()
     event.stopImmediatePropagation()
     host.insert(file, null)

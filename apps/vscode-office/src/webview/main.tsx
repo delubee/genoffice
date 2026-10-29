@@ -1,3 +1,6 @@
+import { workbookMediaResultSchema } from '@genoffice/xlsx-gateway/shared/workbook-protocol'
+import { z } from 'zod'
+import { workbookViewCommandSchema } from '@genoffice/xlsx-gateway/shared/workbook-view-command'
 import { useState, useSyncExternalStore } from 'react'
 import { workbookAppearance, type WorkbookAppearance } from '@genoffice/sheets-editor/appearance'
 import { createRoot } from 'react-dom/client'
@@ -29,6 +32,12 @@ const projection = new Promise<WorkbookRuntime>((resolve, reject) => {
 })
 void projection.catch(() => {})
 const host: EditorHost = {
+  outline: (sheetId, stateId) => bridge.request('source.outline', { sheetId, stateId }),
+  goalSeek: (request) => bridge.request('source.goalSeek', request),
+  media: async (visualId, stateId) =>
+    workbookMediaResultSchema.parse(await bridge.request('source.media', { visualId, stateId })),
+  audit: (request) => bridge.request('source.audit', request),
+  search: (request) => bridge.request('source.find', request),
   action: async (request) => {
     await bridge.request('office.action', request)
   },
@@ -67,8 +76,19 @@ bridge.handle('view.resync', async (raw) => {
   await (await projection).install(descriptor.stateId, descriptor.revision, state)
   return { projected: descriptor.stateId }
 })
-bridge.handle('view.flush', async () => ({ ready: await (await projection).flushEditor() }))
+const flushOptionsSchema = z
+  .object({ commitChartDraft: z.boolean().optional() })
+  .strict()
+  .default({})
+bridge.handle('view.flush', async (raw) => ({
+  ready: await (await projection).flushEditor(flushOptionsSchema.parse(raw)),
+}))
 bridge.handle('view.selection', async () => (await projection).selectionContext)
+bridge.handle('view.command', async (raw) => {
+  const { command } = workbookViewCommandSchema.parse(raw)
+  await (await projection).openViewCommand(command)
+  return { opened: command }
+})
 bridge.handle('view.presentation', async (raw) => {
   const request = raw as { stateId?: unknown; range?: unknown }
   if (

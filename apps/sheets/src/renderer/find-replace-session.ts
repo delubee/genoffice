@@ -1,3 +1,4 @@
+import type { Observable } from 'rxjs'
 /**
  * Excel-style Find & Replace: glue between the app's own dialog and Univer's
  * find-replace service.
@@ -15,7 +16,39 @@
 import type { IFindMatch, IFindReplaceService, IFindReplaceState } from '@univerjs/find-replace'
 import type { IRange, Nullable, Workbook } from '@univerjs/core'
 import { formatAddress, type RangeBounds } from '@genoffice/xlsx-gateway/domain/cell-address'
-import { scalarToText } from './lazy-find'
+import { scalarToText } from '@genoffice/xlsx-gateway/domain/search-text'
+
+/** Presentation contract shared by desktop and an authoritative external host. */
+export type FindReplacePanelService = Pick<
+  IFindReplaceService,
+  | 'state$'
+  | 'currentMatch$'
+  | 'replaceables$'
+  | 'revealed'
+  | 'replaceRevealed'
+  | 'getFindString'
+  | 'revealReplace'
+  | 'changeFindString'
+  | 'changeInputtingFindString'
+  | 'changeReplaceString'
+  | 'changeCaseSensitive'
+  | 'changeMatchesTheWholeCell'
+  | 'changeFindScope'
+  | 'changeFindDirection'
+  | 'changeFindBy'
+  | 'moveToNextMatch'
+  | 'moveToPreviousMatch'
+  | 'find'
+  | 'replace'
+  | 'replaceAll'
+> & {
+  focusSignal$?: Observable<void>
+  busy$?: Observable<boolean>
+  setComposing?(value: boolean): void
+  selectMatch?(sheetId: string, address: string): void
+  getMatches?(): IFindMatch[]
+  hideReplace?(): void
+}
 
 interface FindReplaceServiceInternals {
   _state?: { changeState(update: { replaceRevealed: boolean }): void }
@@ -30,8 +63,9 @@ interface FindReplaceServiceInternals {
  * synchronous subscriber never observes the panel in replace mode with the
  * flag already cleared, or the reverse.
  */
-export function hideReplace(service: IFindReplaceService): void {
+export function hideReplace(service: FindReplacePanelService): void {
   const internals = service as unknown as FindReplaceServiceInternals
+  if (service.hideReplace) return service.hideReplace()
   internals._toggleRevealReplace?.(false)
   internals._state?.changeState({ replaceRevealed: false })
 }
@@ -52,9 +86,9 @@ export function hasUncommittedQuery(
  * `matchesCount` counts. Empty when no session is live or the internal shape
  * moved.
  */
-export function getSessionMatches(service: IFindReplaceService): IFindMatch[] {
+export function getSessionMatches(service: FindReplacePanelService): IFindMatch[] {
   const internals = service as unknown as FindReplaceServiceInternals
-  const matches = internals._model?._matches
+  const matches = service.getMatches?.() ?? internals._model?._matches
   return Array.isArray(matches) ? matches : []
 }
 

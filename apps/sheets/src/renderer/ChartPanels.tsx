@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import type { ChartSeriesSelection } from '@genoffice/xlsx-gateway/domain/chart-series-selection'
 
-import { Dropdown } from '@genoffice/ui'
+import { Dropdown } from '@genoffice/ui/chrome'
 
 import {
   transposeChartSeries,
@@ -144,215 +145,237 @@ export function ChartFormatPane({
   element,
   onEdit,
   onClose,
+  pending = false,
+  error,
 }: {
   readonly chart: ChartVisualState
   readonly element: ChartElementRef | null
   readonly onEdit: (edit: ChartEditData) => void
+  readonly pending?: boolean | undefined
+  readonly error?: string | undefined
   readonly onClose: () => void
 }): React.JSX.Element {
   const { t } = useI18n()
   const { isPie, isDoughnut, isBar, hasAxes } = chartFamily(chart)
   const primary = chart.series[0]
   return (
-    <div className="chart-format-pane">
+    <div
+      className="chart-format-pane"
+      role="complementary"
+      aria-busy={pending}
+      aria-label={t('appFormatHeader', { target: elementLabel(t, element, chart) })}
+    >
       <header>
         <span>{t('appFormatHeader', { target: elementLabel(t, element, chart) })}</span>
-        <button data-tip={t('appClose')} aria-label={t('appClose')} onClick={onClose}>
+        <button
+          disabled={pending}
+          data-tip={t('appClose')}
+          aria-label={t('appClose')}
+          onClick={onClose}
+        >
           ✕
         </button>
       </header>
-      {(element?.kind === 'series' || element?.kind === 'point') && (
-        <div className="pane-section">
-          <strong>{element.kind === 'series' ? t('appSeries') : t('appDataPoint')}</strong>
-          <label>
-            {t('appFillColor')}
-            <ColorDropdown
-              label={t('appFillColor')}
-              value={
-                (element.kind === 'point'
-                  ? chart.series[element.seriesIndex]?.pointColors?.find(
-                      (entry) => entry.index === element.pointIndex,
-                    )?.color
-                  : undefined) ??
-                chart.series[element.seriesIndex]?.color ??
-                '#4472c4'
-              }
-              onPick={(color) => {
-                if (!color) return
-                if (element.kind === 'series') {
-                  onEdit({ seriesColors: { [String(element.seriesIndex)]: color } })
-                } else {
+      {error && (
+        <div className="chart-editor-error" role="alert">
+          {error}
+        </div>
+      )}
+      <fieldset disabled={pending}>
+        {(element?.kind === 'series' || element?.kind === 'point') && (
+          <div className="pane-section">
+            <strong>{element.kind === 'series' ? t('appSeries') : t('appDataPoint')}</strong>
+            <div className="chart-pane-field">
+              <span>{t('appFillColor')}</span>
+              <ColorDropdown
+                label={t('appFillColor')}
+                value={
+                  (element.kind === 'point'
+                    ? chart.series[element.seriesIndex]?.pointColors?.find(
+                        (entry) => entry.index === element.pointIndex,
+                      )?.color
+                    : undefined) ??
+                  chart.series[element.seriesIndex]?.color ??
+                  '#4472c4'
+                }
+                onPick={(color) => {
+                  if (!color) return
+                  if (element.kind === 'series') {
+                    onEdit({ seriesColors: { [String(element.seriesIndex)]: color } })
+                  } else {
+                    onEdit({
+                      pointColors: {
+                        [String(element.seriesIndex)]: { [String(element.pointIndex)]: color },
+                      },
+                    })
+                  }
+                }}
+              />
+            </div>
+            {isPie && element.kind === 'point' && element.seriesIndex === 0 && (
+              <BoundRange
+                label={t('appPointExplosion')}
+                min={0}
+                max={100}
+                step={5}
+                value={
+                  primary?.pointExplosions?.find((entry) => entry.index === element.pointIndex)
+                    ?.pct ??
+                  primary?.explosionPct ??
+                  0
+                }
+                onCommit={(next) =>
                   onEdit({
-                    pointColors: {
-                      [String(element.seriesIndex)]: { [String(element.pointIndex)]: color },
-                    },
+                    pointExplosions: { [String(element.pointIndex)]: next },
                   })
                 }
-              }}
+              />
+            )}
+          </div>
+        )}
+        <div className="pane-section">
+          <strong>{t('appTitle')}</strong>
+          <input
+            type="text"
+            aria-label={t('appTitle')}
+            key={chart.title}
+            defaultValue={chart.title}
+            maxLength={255}
+            onBlur={(event) => {
+              const next = event.target.value
+              if (next !== chart.title) onEdit({ title: next })
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') (event.target as HTMLInputElement).blur()
+            }}
+          />
+        </div>
+        <div className="pane-section">
+          <strong>{t('appLegendAndLabels')}</strong>
+          <div className="chart-pane-field">
+            <span>{t('appLegendPosition')}</span>
+            <Dropdown
+              ariaLabel={t('appLegendPosition')}
+              value={chart.legend ?? 'right'}
+              options={LEGEND_OPTIONS.map(([value, key]) => ({ value, label: t(key) }))}
+              onPick={(v) => onEdit({ legend: v as NonNullable<ChartEditData['legend']> })}
             />
-          </label>
-          {isPie && element.kind === 'point' && element.seriesIndex === 0 && (
+          </div>
+          <div className="chart-pane-field">
+            <span>{t('appDataLabels')}</span>
+            <Dropdown
+              ariaLabel={t('appDataLabels')}
+              value={chart.dataLabels ?? 'none'}
+              options={LABEL_OPTIONS.filter(
+                ([value]) => isPie || (value !== 'percent' && value !== 'category-percent'),
+              ).map(([value, key]) => ({ value, label: t(key) }))}
+              onPick={(v) => onEdit({ dataLabels: v as NonNullable<ChartEditData['dataLabels']> })}
+            />
+          </div>
+          {(isBar || isPie) && chart.dataLabels !== undefined && chart.dataLabels !== 'none' && (
+            <div className="chart-pane-field">
+              <span>{t('appLabelPosition')}</span>
+              {/* '' is the auto placeholder (the old <option> was disabled+hidden):
+                it labels the unset state and is not pickable */}
+              <Dropdown
+                ariaLabel={t('appLabelPosition')}
+                value={chart.dataLabelPosition ?? ''}
+                options={[
+                  { value: '', label: t('appAuto'), disabled: true },
+                  { value: 'outside-end', label: t('appOutsideEnd') },
+                  { value: 'inside-end', label: t('appInsideEnd') },
+                  { value: 'center', label: t('appCenter') },
+                ]}
+                onPick={(v) => {
+                  if (v) {
+                    onEdit({
+                      dataLabelPosition: v as NonNullable<ChartEditData['dataLabelPosition']>,
+                    })
+                  }
+                }}
+              />
+            </div>
+          )}
+          {chart.dataLabels !== undefined && chart.dataLabels !== 'none' && (
+            <label>
+              {t('appLabelNumberFormat')}
+              <input
+                type="text"
+                key={chart.dataLabelFormat ?? ''}
+                defaultValue={chart.dataLabelFormat ?? ''}
+                placeholder={t('appLabelFormatPlaceholder')}
+                maxLength={64}
+                onBlur={(event) => {
+                  const next = event.target.value.trim()
+                  if (next && next !== chart.dataLabelFormat) onEdit({ dataLabelFormat: next })
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') (event.target as HTMLInputElement).blur()
+                }}
+              />
+            </label>
+          )}
+        </div>
+        {hasAxes && (
+          <div className="pane-section">
+            <strong>{t('appValueAxis')}</strong>
+            <label>
+              {t('appGridlines')}
+              <input
+                type="checkbox"
+                checked={chart.gridlines !== false}
+                onChange={(event) => onEdit({ gridlines: event.target.checked })}
+              />
+            </label>
+            <BoundInput
+              label={t('appAxisMin')}
+              value={chart.valueAxis?.min}
+              onCommit={(min) => onEdit({ valueAxis: { min } })}
+            />
+            <BoundInput
+              label={t('appAxisMax')}
+              value={chart.valueAxis?.max}
+              onCommit={(max) => onEdit({ valueAxis: { max } })}
+            />
+          </div>
+        )}
+        {isBar && (
+          <div className="pane-section">
+            <strong>{t('appBarSection')}</strong>
             <BoundRange
-              label={t('appPointExplosion')}
+              label={t('appGapWidth')}
+              min={0}
+              max={500}
+              step={10}
+              value={chart.gapWidthPct ?? 150}
+              onCommit={(next) => onEdit({ gapWidthPct: next })}
+            />
+          </div>
+        )}
+        {isPie && (
+          <div className="pane-section">
+            <strong>{isDoughnut ? t('appDoughnutSection') : t('appChartPie')}</strong>
+            <BoundRange
+              label={t('appPieExplosion')}
               min={0}
               max={100}
               step={5}
-              value={
-                primary?.pointExplosions?.find((entry) => entry.index === element.pointIndex)
-                  ?.pct ??
-                primary?.explosionPct ??
-                0
-              }
-              onCommit={(next) =>
-                onEdit({
-                  pointExplosions: { [String(element.pointIndex)]: next },
-                })
-              }
+              value={primary?.explosionPct ?? 0}
+              onCommit={(next) => onEdit({ explosionPct: next })}
             />
-          )}
-        </div>
-      )}
-      <div className="pane-section">
-        <strong>{t('appTitle')}</strong>
-        <input
-          type="text"
-          key={chart.title}
-          defaultValue={chart.title}
-          maxLength={255}
-          onBlur={(event) => {
-            const next = event.target.value
-            if (next !== chart.title) onEdit({ title: next })
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') (event.target as HTMLInputElement).blur()
-          }}
-        />
-      </div>
-      <div className="pane-section">
-        <strong>{t('appLegendAndLabels')}</strong>
-        <label>
-          {t('appLegendPosition')}
-          <Dropdown
-            ariaLabel={t('appLegendPosition')}
-            value={chart.legend ?? 'right'}
-            options={LEGEND_OPTIONS.map(([value, key]) => ({ value, label: t(key) }))}
-            onPick={(v) => onEdit({ legend: v as NonNullable<ChartEditData['legend']> })}
-          />
-        </label>
-        <label>
-          {t('appDataLabels')}
-          <Dropdown
-            ariaLabel={t('appDataLabels')}
-            value={chart.dataLabels ?? 'none'}
-            options={LABEL_OPTIONS.filter(
-              ([value]) => isPie || (value !== 'percent' && value !== 'category-percent'),
-            ).map(([value, key]) => ({ value, label: t(key) }))}
-            onPick={(v) => onEdit({ dataLabels: v as NonNullable<ChartEditData['dataLabels']> })}
-          />
-        </label>
-        {(isBar || isPie) && chart.dataLabels !== undefined && chart.dataLabels !== 'none' && (
-          <label>
-            {t('appLabelPosition')}
-            {/* '' is the auto placeholder (the old <option> was disabled+hidden):
-                it labels the unset state and is not pickable */}
-            <Dropdown
-              ariaLabel={t('appLabelPosition')}
-              value={chart.dataLabelPosition ?? ''}
-              options={[
-                { value: '', label: t('appAuto'), disabled: true },
-                { value: 'outside-end', label: t('appOutsideEnd') },
-                { value: 'inside-end', label: t('appInsideEnd') },
-                { value: 'center', label: t('appCenter') },
-              ]}
-              onPick={(v) => {
-                if (v) {
-                  onEdit({
-                    dataLabelPosition: v as NonNullable<ChartEditData['dataLabelPosition']>,
-                  })
-                }
-              }}
-            />
-          </label>
+            {isDoughnut && (
+              <BoundRange
+                label={t('appHoleSize')}
+                min={10}
+                max={90}
+                step={5}
+                value={chart.holeSizePct ?? 50}
+                onCommit={(next) => onEdit({ holeSizePct: next })}
+              />
+            )}
+          </div>
         )}
-        {chart.dataLabels !== undefined && chart.dataLabels !== 'none' && (
-          <label>
-            {t('appLabelNumberFormat')}
-            <input
-              type="text"
-              key={chart.dataLabelFormat ?? ''}
-              defaultValue={chart.dataLabelFormat ?? ''}
-              placeholder={t('appLabelFormatPlaceholder')}
-              maxLength={64}
-              onBlur={(event) => {
-                const next = event.target.value.trim()
-                if (next && next !== chart.dataLabelFormat) onEdit({ dataLabelFormat: next })
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') (event.target as HTMLInputElement).blur()
-              }}
-            />
-          </label>
-        )}
-      </div>
-      {hasAxes && (
-        <div className="pane-section">
-          <strong>{t('appValueAxis')}</strong>
-          <label>
-            {t('appGridlines')}
-            <input
-              type="checkbox"
-              checked={chart.gridlines !== false}
-              onChange={(event) => onEdit({ gridlines: event.target.checked })}
-            />
-          </label>
-          <BoundInput
-            label={t('appAxisMin')}
-            value={chart.valueAxis?.min}
-            onCommit={(min) => onEdit({ valueAxis: { min } })}
-          />
-          <BoundInput
-            label={t('appAxisMax')}
-            value={chart.valueAxis?.max}
-            onCommit={(max) => onEdit({ valueAxis: { max } })}
-          />
-        </div>
-      )}
-      {isBar && (
-        <div className="pane-section">
-          <strong>{t('appBarSection')}</strong>
-          <BoundRange
-            label={t('appGapWidth')}
-            min={0}
-            max={500}
-            step={10}
-            value={chart.gapWidthPct ?? 150}
-            onCommit={(next) => onEdit({ gapWidthPct: next })}
-          />
-        </div>
-      )}
-      {isPie && (
-        <div className="pane-section">
-          <strong>{isDoughnut ? t('appDoughnutSection') : t('appChartPie')}</strong>
-          <BoundRange
-            label={t('appPieExplosion')}
-            min={0}
-            max={100}
-            step={5}
-            value={primary?.explosionPct ?? 0}
-            onCommit={(next) => onEdit({ explosionPct: next })}
-          />
-          {isDoughnut && (
-            <BoundRange
-              label={t('appHoleSize')}
-              min={10}
-              max={90}
-              step={5}
-              value={chart.holeSizePct ?? 50}
-              onCommit={(next) => onEdit({ holeSizePct: next })}
-            />
-          )}
-        </div>
-      )}
+      </fieldset>
     </div>
   )
 }
@@ -372,13 +395,15 @@ export function SelectDataDialog({
   supported,
   readVector,
   onApply,
+  onSelectionApply,
   onClose,
 }: {
   readonly chart: ChartVisualState
-  /// Single-plot chart families only; scatter/combos fail closed at save.
+  /// Supported single-plot chart families only; combos remain unavailable.
   readonly supported: boolean
   readonly readVector?: ((range: string) => Promise<ChartVectorRead>) | undefined
-  readonly onApply: (edit: ChartEditData) => void
+  readonly onApply: (edit: ChartEditData) => void | Promise<void>
+  readonly onSelectionApply?: (intent: ChartSeriesSelection) => Promise<void>
   readonly onClose: () => void
 }): React.JSX.Element {
   const { t } = useI18n()
@@ -392,6 +417,54 @@ export function SelectDataDialog({
   )
   const [error, setError] = useState<string | null>(null)
   const [isBusy, setIsBusy] = useState(false)
+
+  const busy = useRef(false)
+  const close = () => {
+    if (!busy.current) onClose()
+  }
+  async function commit(transpose = false): Promise<void> {
+    if (busy.current) return
+    busy.current = true
+    setIsBusy(true)
+    setError(null)
+    try {
+      if (onSelectionApply) {
+        if (transpose)
+          await onSelectionApply({
+            mode: 'transpose',
+            defaultNames: Array.from({ length: 24 }, (_, i) => t('appSeriesN', { n: i + 1 })),
+          })
+        else {
+          if (!rows.length) throw new Error(t('appKeepOneSeries'))
+          const selection = rows.map((row, at) => {
+            const name =
+              row.name.trim() ||
+              (row.source === null ? undefined : chart.series[row.source]?.name) ||
+              t('appSeriesN', { n: at + 1 })
+            if (row.source === null && !row.valuesRange.trim())
+              throw new Error(t('appSeriesNeedsValues', { name }))
+            return {
+              name: name.slice(0, 255),
+              ...(row.source === null ? {} : { sourceIndex: row.source }),
+              ...(row.valuesRange.trim() ? { valuesRef: row.valuesRange.trim() } : {}),
+              ...(row.categoriesRange.trim() ? { categoriesRef: row.categoriesRange.trim() } : {}),
+            }
+          })
+          await onSelectionApply({ mode: 'rows', rows: selection })
+        }
+      } else if (transpose) {
+        const seriesSet = transposeChartSeries(chart.series, (n) => t('appSeriesN', { n }))
+        if (!seriesSet) throw new Error(t('appNoCategoriesToSwitch'))
+        await onApply({ seriesSet })
+      } else await onApply({ seriesSet: await buildSeriesSet() })
+      onClose()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : t('appCannotReadDataRange'))
+    } finally {
+      busy.current = false
+      setIsBusy(false)
+    }
+  }
 
   const patchRow = (index: number, patch: Partial<SeriesRow>): void =>
     setRows((previous) => previous.map((row, at) => (at === index ? { ...row, ...patch } : row)))
@@ -450,19 +523,9 @@ export function SelectDataDialog({
     return entries
   }
 
-  function switchRowColumn(): void {
-    const seriesSet = transposeChartSeries(chart.series, (n) => t('appSeriesN', { n }))
-    if (!seriesSet) {
-      setError(t('appNoCategoriesToSwitch'))
-      return
-    }
-    onApply({ seriesSet })
-    onClose()
-  }
-
-  const modal = useModalDialog(onClose)
+  const modal = useModalDialog(close)
   return (
-    <div className="dialog-backdrop" onClick={onClose}>
+    <div className="dialog-backdrop" onClick={close}>
       <div
         className="format-cells-dialog select-data-dialog"
         role="dialog"
@@ -471,7 +534,7 @@ export function SelectDataDialog({
         onClick={(event) => event.stopPropagation()}
       >
         <header>{t('appSelectDataSource')}</header>
-        <div className="dialog-body">
+        <div className="dialog-body" aria-busy={isBusy}>
           {!supported && <p>{t('appComboNoSelectData')}</p>}
           {supported && (
             <>
@@ -485,11 +548,13 @@ export function SelectDataDialog({
                 {rows.map((row, index) => (
                   <div className="select-data-row" key={index}>
                     <input
+                      disabled={isBusy}
                       value={row.name}
                       placeholder={t('appSeriesN', { n: index + 1 })}
                       onChange={(event) => patchRow(index, { name: event.target.value })}
                     />
                     <input
+                      disabled={isBusy}
                       value={row.valuesRange}
                       placeholder={
                         row.source !== null
@@ -499,6 +564,7 @@ export function SelectDataDialog({
                       onChange={(event) => patchRow(index, { valuesRange: event.target.value })}
                     />
                     <input
+                      disabled={isBusy}
                       value={row.categoriesRange}
                       placeholder={
                         row.source !== null
@@ -511,7 +577,7 @@ export function SelectDataDialog({
                       <button
                         data-tip={t('appMoveUp')}
                         aria-label={t('appMoveUp')}
-                        disabled={index === 0}
+                        disabled={isBusy || index === 0}
                         onClick={() => moveRow(index, -1)}
                       >
                         ↑
@@ -519,7 +585,7 @@ export function SelectDataDialog({
                       <button
                         data-tip={t('appMoveDown')}
                         aria-label={t('appMoveDown')}
-                        disabled={index === rows.length - 1}
+                        disabled={isBusy || index === rows.length - 1}
                         onClick={() => moveRow(index, 1)}
                       >
                         ↓
@@ -527,6 +593,7 @@ export function SelectDataDialog({
                       <button
                         data-tip={t('appRemoveSeries')}
                         aria-label={t('appRemoveSeries')}
+                        disabled={isBusy}
                         onClick={() =>
                           setRows((previous) => previous.filter((_, at) => at !== index))
                         }
@@ -539,7 +606,7 @@ export function SelectDataDialog({
               </div>
               <div className="select-data-actions">
                 <button
-                  disabled={rows.length >= 24}
+                  disabled={isBusy || rows.length >= 24}
                   onClick={() =>
                     setRows((previous) => [
                       ...previous,
@@ -549,7 +616,10 @@ export function SelectDataDialog({
                 >
                   {t('appAddSeries')}
                 </button>
-                <button disabled={chart.series.length === 0} onClick={switchRowColumn}>
+                <button
+                  disabled={isBusy || chart.series.length === 0}
+                  onClick={() => void commit(true)}
+                >
                   {t('appSwitchRowColumn')}
                 </button>
               </div>
@@ -558,23 +628,13 @@ export function SelectDataDialog({
           {error && <div className="chart-editor-error">{error}</div>}
         </div>
         <footer className="dialog-actions">
-          <button onClick={onClose}>{t('appCancel')}</button>
+          <button disabled={isBusy} onClick={close}>
+            {t('appCancel')}
+          </button>
           <button
             className="primary"
             disabled={!supported || isBusy || rows.length === 0}
-            onClick={() => {
-              setIsBusy(true)
-              setError(null)
-              buildSeriesSet()
-                .then((seriesSet) => {
-                  onApply({ seriesSet })
-                  onClose()
-                })
-                .catch((reason: unknown) => {
-                  setError(reason instanceof Error ? reason.message : t('appCannotReadDataRange'))
-                })
-                .finally(() => setIsBusy(false))
-            }}
+            onClick={() => void commit()}
           >
             {isBusy ? t('appReading') : t('appOk')}
           </button>

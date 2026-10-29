@@ -1,3 +1,4 @@
+import type { WorkbookViewCommand } from '@genoffice/xlsx-gateway/shared/workbook-view-command'
 import * as vscode from 'vscode'
 import { nativeOfficeActions } from './office-actions'
 import { captureWorkbookBinding } from './commands/bind-selection'
@@ -72,6 +73,32 @@ export class WorkbookEditorProvider
   }
   getDocument(uri: vscode.Uri) {
     return this.documents.get(uri.toString())
+  }
+  private activeWorkbookView() {
+    const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input
+    if (!(input instanceof vscode.TabInputCustom) || input.viewType !== EDITOR_ID) return null
+    const document = this.getDocument(input.uri)
+    const panel = document && this.panels.get(document)
+    return document && panel?.active && !document.isClosed ? { document, panel } : null
+  }
+  async viewCommand(command: WorkbookViewCommand) {
+    const target = this.activeWorkbookView()
+    if (!target) return false
+    const sessionId = target.document.sessionId
+    await target.document.whenViewReady()
+    const current = this.activeWorkbookView()
+    if (
+      current?.document !== target.document ||
+      current.panel !== target.panel ||
+      target.document.sessionId !== sessionId
+    )
+      throw new WorkbookError(
+        'view_closed',
+        'The active workbook changed before opening the dialog.',
+      )
+    target.panel.reveal(target.panel.viewColumn, false)
+    await target.document.bridge!.request('view.command', { command })
+    return true
   }
   openDocuments() {
     return [...this.documents.values()]

@@ -26,7 +26,7 @@ export interface FunctionTarget {
 
 export interface FunctionArgumentsHost {
   readTarget(): Promise<FunctionTarget | null>
-  write(target: FunctionTarget, formula: string): string | null
+  write(target: FunctionTarget, formula: string): string | null | Promise<string | null>
   evaluate(target: FunctionTarget, expressions: readonly string[]): Promise<PreviewValue[]>
   observeRangePick(target: FunctionTarget, onPick: (ref: string) => void): () => void
   cancel(target: FunctionTarget): void
@@ -50,6 +50,7 @@ let evaluationQueue: Promise<void> = Promise.resolve()
 export function createFunctionArgumentsHost(
   getRuntime: () => UniverRuntime | null,
   notReady: () => string,
+  gridElement?: HTMLElement,
 ): FunctionArgumentsHost {
   return {
     async readTarget() {
@@ -127,7 +128,12 @@ export function createFunctionArgumentsHost(
       // grid after the dialog opened counts as a pick.
       let armed = false
       const arm = (event: PointerEvent): void => {
-        if (event.target instanceof Element && event.target.closest('#univer-container')) {
+        if (
+          event.target instanceof Element &&
+          (gridElement
+            ? gridElement.contains(event.target)
+            : event.target.closest('#univer-container'))
+        ) {
           armed = true
         }
       }
@@ -180,10 +186,13 @@ export function registerFxButtonOpener(open: () => void): () => void {
 
 /// The formula bar's fx button: Univer opens the cell editor on pointer down
 /// and emits on click; nothing in Univer listens, so the click is ours.
-export function installFxButtonHook(runtime: UniverRuntime): { dispose(): void } {
+export function installFxButtonHook(
+  runtime: UniverRuntime,
+  onOpen?: () => void,
+): { dispose(): void } {
   const subscription = runtime.univer
     .__getInjector()
     .get(IFormulaEditorManagerService)
-    .fxBtnClick$.subscribe(() => fxOpener?.())
+    .fxBtnClick$.subscribe(() => (onOpen ?? fxOpener)?.())
   return { dispose: () => subscription.unsubscribe() }
 }

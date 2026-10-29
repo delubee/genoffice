@@ -396,3 +396,88 @@ export function shiftFormulaRefs(
 
   return { formula: rewritten.join(''), changed, hasRefError }
 }
+
+export interface FormulaMoveSpec {
+  sourceSheetName: string
+  targetSheetName: string
+  source: { startRow: number; endRow: number; startColumn: number; endColumn: number }
+  target: { startRow: number; startColumn: number }
+}
+
+/** Cut semantics: references wholly inside the moved block follow it, including
+ * absolute references. Partial ranges keep their range, as in the desktop
+ * formula controller's MOVE_RANGE path. A formula moved across sheets retains
+ * its original external dependencies by qualifying formerly bare references. */
+export function moveFormulaRefs(
+  formula: string,
+  spec: FormulaMoveSpec,
+  formulaSheetName: string,
+  nextFormulaSheetName = formulaSheetName,
+): string {
+  const qualify = (name: string) => `'${name.replaceAll("'", "''")}'!`
+  const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
+  // A colon in the left boundary protects 3D sheet references and range tails;
+  // a closing bracket protects unquoted external-workbook qualifiers.
+  const refs = new RegExp(
+    REF_RE.source
+      .replace('A-Za-z0-9_.$!', 'A-Za-z0-9_.$!\\]:')
+      .replace('A-Za-z0-9(', 'A-Za-z0-9(!:'),
+    'gi',
+  )
+  return formula
+    .split(REWRITE_SKIP_RE)
+    .map((segment, index) => {
+      if (index % 2) return segment
+      let result = segment.replace(
+        refs,
+        (match, quoted, bare, ac, col, ar, row, bc, endCol, br, endRow) => {
+          const name =
+            quoted !== undefined ? decodeQuotedSheetName(quoted) : (bare ?? formulaSheetName)
+          if (name.includes('[') || name.includes(':')) return match
+          const first: RefPart = {
+            colAbs: ac,
+            col: columnIndex(col),
+            rowAbs: ar,
+            row: Number(row) - 1,
+          }
+          const last: RefPart =
+            endCol === undefined
+              ? first
+              : { colAbs: bc, col: columnIndex(endCol), rowAbs: br, row: Number(endRow) - 1 }
+          const contained =
+            same(name, spec.sourceSheetName) &&
+            Math.min(first.row, last.row) >= spec.source.startRow &&
+            Math.max(first.row, last.row) <= spec.source.endRow &&
+            Math.min(first.col, last.col) >= spec.source.startColumn &&
+            Math.max(first.col, last.col) <= spec.source.endColumn
+          const explicit = quoted !== undefined || bare !== undefined
+          if (contained) {
+            const shift = (part: RefPart) =>
+              formatRef({
+                ...part,
+                row: part.row + spec.target.startRow - spec.source.startRow,
+                col: part.col + spec.target.startColumn - spec.source.startColumn,
+              })
+            const prefix =
+              explicit || !same(spec.targetSheetName, nextFormulaSheetName)
+                ? qualify(spec.targetSheetName)
+                : ''
+            return `${prefix}${shift(first)}${endCol === undefined ? '' : ':' + shift(last)}`
+          }
+          return !explicit && !same(formulaSheetName, nextFormulaSheetName)
+            ? qualify(formulaSheetName) + match
+            : match
+        },
+      )
+      if (!same(formulaSheetName, nextFormulaSheetName)) {
+        // A bounded cell cut cannot contain an entire row/column span. These stay
+        // on their original sheet when the formula itself moves across sheets.
+        for (const pattern of [COLUMN_SPAN_RE, ROW_SPAN_RE])
+          result = result.replace(pattern, (match, quoted, bare) =>
+            quoted === undefined && bare === undefined ? qualify(formulaSheetName) + match : match,
+          )
+      }
+      return result
+    })
+    .join('')
+}

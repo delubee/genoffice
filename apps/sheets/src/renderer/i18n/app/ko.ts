@@ -103,6 +103,7 @@ export const ko = {
   appLabelNumberFormat: '레이블 표시 형식',
   appLabelFormatPlaceholder: '예: 0.0% / #,##0',
   appGridlines: '눈금선',
+  appChartAxisRangeInvalid: '최댓값은 최솟값보다 커야 합니다.',
   appAxisMin: '최소값',
   appAxisMax: '최대값',
   appBarSection: '막대',
@@ -647,6 +648,13 @@ export const ko = {
   appScopeWorkbook: '통합 문서',
   appNamesNeedFile: '먼저 XLSX 파일을 여십시오. 정의된 이름은 파일에 저장됩니다.',
   appNameGone: '해당 이름이 더 이상 없습니다.',
+  appDefinedNameInvalid: '유효한 비예약 이름과 참조를 입력하세요.',
+  appDefinedNameDuplicate: '이 범위에서 이미 사용 중인 이름입니다.',
+  appDefinedNameBindingConflict: '숨겨진 정의 또는 시트 범위의 정의와 충돌합니다.',
+  appAuditPendingValues:
+    '오류 검사는 저장된 수식 값을 사용합니다. 일부 결과는 다시 계산해야 합니다.',
+  appDefinedNameLabelPending:
+    '레이블 수식 결과가 검증되지 않았습니다. 텍스트 레이블로 이름을 만드세요.',
   appNameApplyFailed: '이름을 적용할 수 없습니다.',
   appNamesUpdated: '이름을 업데이트했습니다 — ⌘S로 저장합니다.',
   appLinkInternal: '링크가 통합 문서 내부를 가리킵니다: {location}',
@@ -1562,4 +1570,10 @@ export const ko = {
   appVisualFlipV: '상하 대칭',
   appVisualFlipH: '좌우 대칭',
   appCtxPasteVisual: '그림/도형 붙여넣기',
+  appDocumentChangedDuringAction: '이 작업을 준비하는 동안 문서가 변경되었습니다. 다시 시도하세요.',
+  appClipboardUnsupported:
+    '이 클립보드 내용은 아직 붙여넣을 수 없습니다. 셀은 변경되지 않았습니다.',
+  appClipboardSelectionChanged: '붙여넣기 전에 선택 영역이 변경되었습니다. 다시 시도하세요.',
+  appClipboardBusy: '현재 편집이 끝날 때까지 기다리세요.',
+  appClipboardReadUnavailable: '클립보드를 읽을 수 없습니다. {shortcut}로 붙여넣으세요.',
 } satisfies Record<keyof typeof zh, string>

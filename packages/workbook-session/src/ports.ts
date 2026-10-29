@@ -8,6 +8,13 @@ import type {
 import type { ImportBatch } from './exchange/schemas'
 
 export interface WorkbookSource {
+  readRowOutline?(sessionId: string, sheetId: string): Promise<unknown>
+  /** Host-private calculation resources; never forward to the renderer. */
+  readCalculationContext?(sessionId: string): Promise<unknown>
+  findBaseCells?(
+    input: import('@genoffice/xlsx-gateway/shared/workbook-protocol').WorkbookFindCellsRequest,
+  ): Promise<unknown>
+  readMedia?(sessionId: string, visualId: string): Promise<unknown>
   openSnapshot(path: string): Promise<{ sessionId: string; metadata: unknown }>
   readBaseRange(sessionId: string, sheetId: string, range: string): Promise<unknown>
   readFeatures(sessionId: string, sheetId: string): Promise<unknown>

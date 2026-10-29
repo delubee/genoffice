@@ -1,3 +1,4 @@
+import { chartNumericValue } from './chart-series-range'
 import { parseRange, rangeAddresses } from './cell-address'
 import type { WorkbookSnapshot } from './workbook.types'
 
@@ -25,7 +26,7 @@ export function refreshChartReferences(
 ) {
   for (const owner of book.sheets)
     for (const visual of owner.visuals ?? [])
-      for (const series of visual.chart.series) {
+      for (const series of visual.kind === 'chart' ? visual.chart.series : []) {
         for (const key of ['valuesRef', 'categoriesRef', 'nameRef'] as const) {
           if (!series[key]) continue
           const source = readReference(book, series[key]!)
@@ -41,9 +42,9 @@ export function refreshChartReferences(
           if (!completeSheetIds.includes(source.sheetId) && !covered)
             throw new Error('incomplete_chart_material')
           if (key === 'valuesRef') {
-            series.values = source.values.map((value) => (typeof value === 'number' ? value : 0))
+            series.values = source.values.map((value) => chartNumericValue(value) ?? 0)
             const blanks = source.values.flatMap((value, index) =>
-              typeof value !== 'number' ? [index] : [],
+              chartNumericValue(value) === null ? [index] : [],
             )
             if (blanks.length) series.blanks = blanks
             else delete series.blanks

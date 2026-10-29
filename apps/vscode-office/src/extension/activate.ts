@@ -20,6 +20,11 @@ export function activate(context: vscode.ExtensionContext) {
     registerWorkbookTools(provider),
     registerBindSelection(provider),
     registerWorkbookSkillCommands(context),
+    vscode.commands.registerCommand('genoffice.workbook.find', () => provider.viewCommand('find')),
+    vscode.commands.registerCommand('genoffice.workbook.replace', () =>
+      provider.viewCommand('replace'),
+    ),
+    vscode.commands.registerCommand('genoffice.workbook.goto', () => provider.viewCommand('goto')),
     vscode.commands.registerCommand('genoffice.recoverWorkbook', (uri?: vscode.Uri) =>
       provider.recoverWorkbook(uri),
     ),

@@ -186,6 +186,28 @@ export async function runWorkbookDsl(
   ctx?: PathContext,
   opts: { sourcePath?: string } = {},
 ): Promise<DslOutcome> {
+  if (
+    rawOps.some((op) => op && typeof op === 'object' && (op as { op?: unknown }).op === 'subtotal')
+  )
+    throw new CliError(EXIT.usage, 'Subtotal requires an authoritative workbook session.')
+  if (
+    rawOps.some(
+      (op) =>
+        op &&
+        typeof op === 'object' &&
+        (['manage_defined_name', 'add_defined_names'].includes(
+          String((op as { op?: unknown }).op),
+        ) ||
+          (['add_defined_name', 'delete_defined_name'].includes(
+            String((op as { op?: unknown }).op),
+          ) &&
+            'scopeSheetId' in op)),
+    )
+  )
+    throw new CliError(
+      EXIT.usage,
+      'Scoped and reference-aware defined-name operations require an authoritative workbook session.',
+    )
   const imported = await readBasicWorkbook(source)
   const meta = await readWorkbookMeta(source)
   // readBasicWorkbook stops at cell values; the adapter's merge-overlap check needs the file's merges
@@ -419,8 +441,20 @@ export async function runWorkbookDsl(
       edits.set(
         k,
         existing
-          ? { ...existing, style: mergeStyleEdits(existing.style ?? {}, style) }
-          : { sheetName, row, column, writeValue: false, cell: { value: null }, style },
+          ? {
+              ...existing,
+              ...(change.reset ? { styleReset: true } : {}),
+              style: change.reset ? style : mergeStyleEdits(existing.style ?? {}, style),
+            }
+          : {
+              sheetName,
+              row,
+              column,
+              writeValue: false,
+              cell: { value: null },
+              style,
+              ...(change.reset ? { styleReset: true } : {}),
+            },
       )
     }
   }
@@ -467,7 +501,9 @@ export async function runWorkbookDsl(
           kind: 'set-col-size',
           start,
           end: start + op.count - 1,
-          size: Math.max(Math.round((op.widthPx / PX_PER_CHAR) * 256) / 256, 1 / 256),
+          size:
+            op.widthCharacters ??
+            Math.max(Math.round((op.widthPx / PX_PER_CHAR) * 256) / 256, 1 / 256),
         })
         break
       }

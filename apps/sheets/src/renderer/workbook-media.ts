@@ -1,3 +1,8 @@
+import type {
+  WorkbookMediaRequest,
+  WorkbookMediaResult,
+} from '@genoffice/xlsx-gateway/shared/workbook-protocol'
+export type WorkbookMediaReader = (request: WorkbookMediaRequest) => Promise<WorkbookMediaResult>
 /**
  * Fetches a workbook image as a data URL. Lives apart from the visual layer
  * so a picture inside a note can be shown the same way an in-cell picture is,
@@ -31,6 +36,7 @@ export async function workbookMediaDataUrl(media: {
 export function useWorkbookMediaUrl(
   sessionId: string | undefined,
   visualId: string,
+  readMedia?: WorkbookMediaReader,
 ): { url: string | null; unavailable: boolean } {
   const [url, setUrl] = useState<string | null>(null)
   const [unavailable, setUnavailable] = useState(false)
@@ -38,8 +44,14 @@ export function useWorkbookMediaUrl(
   useEffect(() => {
     if (sessionId === undefined) return
     let isCurrent = true
-    void window.desktopApi
-      .readWorkbookMedia({ sessionId, visualId })
+    const api = (window as Window & { desktopApi?: { readWorkbookMedia: WorkbookMediaReader } })
+      .desktopApi
+    const reader = readMedia ?? (api ? api.readWorkbookMedia.bind(api) : undefined)
+    if (!reader) {
+      setUnavailable(true)
+      return
+    }
+    void reader({ sessionId, visualId })
       .then(async (media) => {
         const next = await workbookMediaDataUrl(media)
         if (!isCurrent) return
@@ -55,7 +67,7 @@ export function useWorkbookMediaUrl(
     return () => {
       isCurrent = false
     }
-  }, [sessionId, visualId])
+  }, [sessionId, visualId, readMedia])
 
   return { url, unavailable }
 }

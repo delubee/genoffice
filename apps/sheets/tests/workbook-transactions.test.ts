@@ -342,7 +342,8 @@ describe('InMemoryWorkbookAdapter', () => {
       ],
     })
     adapter.apply(cleared)
-    expect(adapter.getSnapshot().sheets[0]?.styles?.A1).toEqual({ bold: true })
+    // Explicit null overrides a fill inherited from the source package.
+    expect(adapter.getSnapshot().sheets[0]?.styles?.A1).toEqual({ bold: true, fillColor: null })
 
     adapter.undo()
     expect(adapter.getSnapshot().sheets[0]?.styles?.A1).toEqual({
@@ -607,7 +608,7 @@ describe('InMemoryWorkbookAdapter', () => {
       }),
     )
     // the value-label default is bar/column only — pie keeps its legend
-    expect(adapter.getSnapshot().sheets[0]?.visuals?.[0]?.chart.dataLabels).toBeUndefined()
+    expect(adapter.getSnapshot().sheets[0]?.visuals?.[0]?.chart?.dataLabels).toBeUndefined()
     const visualId = adapter.getSnapshot().sheets[0]?.visuals?.[0]?.id ?? ''
     adapter.apply(
       adapter.plan({
@@ -658,11 +659,12 @@ describe('InMemoryWorkbookAdapter', () => {
     adapter.apply(plan)
     const visual = adapter.getSnapshot().sheets[0]?.visuals?.[0]
     expect(visual?.kind).toBe('chart')
+    if (visual?.kind !== 'chart') throw new Error('Expected a chart')
     expect(visual?.chart.title).toBe('Regional Revenue')
     expect(visual?.chart.chartTypes).toEqual(['barChart'])
     expect(visual?.chart.barDirection).toBe('col')
-    // new bar/column charts label each bar by default
-    expect(visual?.chart.dataLabels).toBe('value')
+    // Match the desktop Insert gallery's default label visibility.
+    expect(visual?.chart.dataLabels).toBeUndefined()
     expect(visual?.chart.series[0]).toMatchObject({
       name: 'Revenue',
       categories: ['North', 'South'],

@@ -40,7 +40,7 @@ export {
   partitionFontFamilies,
   systemFamiliesBesidesCandidates,
 } from './font-list'
-export { SHAPE_GALLERY_GROUPS, ShapePreview } from './shape-gallery'
+export { SHAPE_GALLERY_GROUPS, ShapePreview, shapePreviewPath, shapeClipCss } from './shape-gallery'
 export {
   WORDART_PRESETS,
   wordArtSolidColor,

@@ -1,3 +1,7 @@
+import { buildChartSeriesSelection } from './chart-series-selection'
+import { resolveChartRange } from './chart-series-range'
+import { assertChartFormat } from './chart-format'
+import { chartSeriesRangeEdits } from './chart-series-range'
 import {
   copyTargetBounds,
   expandToPrimitiveOps,
@@ -87,7 +91,10 @@ export class InMemoryWorkbookAdapter implements WorkbookAdapter {
 
   constructor(
     snapshot: WorkbookSnapshot,
-    private readonly options: { sortLocale?: string } = {},
+    private readonly options: {
+      sortLocale?: string
+      sortRowVisible?: (row: number, sheetId: string) => boolean
+    } = {},
   ) {
     this.snapshot = structuredClone(snapshot)
   }
@@ -124,6 +131,10 @@ export class InMemoryWorkbookAdapter implements WorkbookAdapter {
 
     for (const operation of expandToPrimitiveOps(batch.operations, readCell, this.options)) {
       if (operation.op === 'fill_range') {
+        if (operation.copyFormat)
+          throw new WorkbookConflictError(
+            'Formatting fills require an authoritative workbook session.',
+          )
         // Demo workbooks clone every cell per revision, so fills stay at the
         // per-cell preview scale; imported files get the range-level executor
         // with the 200k cap instead.
@@ -254,6 +265,7 @@ export class InMemoryWorkbookAdapter implements WorkbookAdapter {
           sheetId: operation.sheetId,
           range: operation.range,
           format: operation.format,
+          ...(operation.reset ? { reset: true } : {}),
           label: formatOpLabel(operation),
         })
         continue
@@ -345,6 +357,7 @@ export class InMemoryWorkbookAdapter implements WorkbookAdapter {
         sheetId: change.sheetId,
         range: change.range,
         format: change.format,
+        ...(change.reset ? { reset: true } : {}),
       })
     }
 
@@ -611,15 +624,268 @@ function rangesIntersect(a: string, b: string): boolean {
 }
 
 function applyLayoutOp(snapshot: WorkbookSnapshot, op: LayoutOperation): void {
+  if (op.op === 'subtotal')
+    throw new Error('unsupported_operation: subtotal requires a canonical workbook session')
+  if (op.op === 'relocate_range')
+    throw new Error('unsupported_operation: range relocation requires a canonical session')
+  if (op.op === 'paste_cells') {
+    if (op.writeValues !== undefined || op.format !== undefined || op.skipCells !== undefined)
+      throw new Error('unsupported_operation: selective paste requires a canonical session')
+    const sheet = findSheet(snapshot, op.sheetId),
+      origin = parseAddress(op.start),
+      cells = { ...sheet.cells },
+      styles = { ...sheet.styles }
+    for (const [r, row] of op.cells.entries())
+      for (const [c, cell] of row.entries()) {
+        const address = formatAddress(origin.row + r, origin.column + c)
+        cells[address] = {
+          value: cell.formula ? null : cell.rawValue,
+          ...(cell.formula ? { formula: cell.formula } : {}),
+          ...(cell.kind === 'error' ? { error: true } : {}),
+        }
+        const {
+          horizontalAlignment,
+          verticalAlignment,
+          textRotation,
+          fontColor,
+          fillColor,
+          ...style
+        } = cell.style ?? {}
+        styles[address] = {
+          ...style,
+          ...(fontColor === undefined
+            ? {}
+            : {
+                fontColor:
+                  fontColor === null ? null : resolveStyleColor(normalizeStyleColor(fontColor)),
+              }),
+          ...(fillColor === undefined
+            ? {}
+            : {
+                fillColor:
+                  fillColor === null ? null : resolveStyleColor(normalizeStyleColor(fillColor)),
+              }),
+          ...(cell.numberFormat ? { numberFormat: cell.numberFormat } : {}),
+          ...(horizontalAlignment ? { horizontalAlign: horizontalAlignment } : {}),
+          ...(verticalAlignment ? { verticalAlign: verticalAlignment } : {}),
+          ...(textRotation === undefined
+            ? {}
+            : {
+                textRotation:
+                  textRotation === 255
+                    ? 'vertical'
+                    : textRotation > 90
+                      ? 90 - textRotation
+                      : textRotation,
+              }),
+        }
+      }
+    const area = {
+      startRow: origin.row,
+      startColumn: origin.column,
+      endRow: origin.row + op.cells.length - 1,
+      endColumn: origin.column + op.cells[0]!.length - 1,
+    }
+    const intersects = (m: ReturnType<typeof parseRange>) =>
+      m.startRow <= area.endRow &&
+      m.endRow >= area.startRow &&
+      m.startColumn <= area.endColumn &&
+      m.endColumn >= area.startColumn
+    for (const range of sheet.merges ?? []) {
+      const m = parseRange(range)
+      if (
+        intersects(m) &&
+        (op.merges === undefined ||
+          m.startRow < area.startRow ||
+          m.endRow > area.endRow ||
+          m.startColumn < area.startColumn ||
+          m.endColumn > area.endColumn)
+      )
+        throw new WorkbookConflictError('merge_partial_overlap')
+    }
+    replaceSheet(snapshot, {
+      ...sheet,
+      cells,
+      styles,
+      ...(op.merges === undefined
+        ? {}
+        : {
+            merges: [
+              ...(sheet.merges ?? []).filter((m) => !intersects(parseRange(m))),
+              ...op.merges,
+            ],
+          }),
+    })
+    return
+  }
+  if (op.op === 'add_picture') {
+    const sheet = findSheet(snapshot, op.sheetId)
+    replaceSheet(snapshot, {
+      ...sheet,
+      visuals: [
+        ...(sheet.visuals ?? []),
+        {
+          id: `added-image-${op.sheetId}-${(sheet.visuals?.length ?? 0) + 1}`,
+          sheetId: sheet.id,
+          kind: 'image',
+          anchor: structuredClone(op.anchor),
+          mediaType: op.mediaType,
+          mediaDataUrl: `data:${op.mediaType};base64,${op.base64}`,
+          name: op.name,
+        },
+      ],
+    })
+    return
+  }
+  if (op.op === 'add_shape') {
+    const sheet = findSheet(snapshot, op.sheetId),
+      cell = parseAddress(op.anchorCell)
+    const anchor = op.anchor ?? {
+      fromRow: cell.row,
+      fromColumn: cell.column,
+      fromRowOffset: 0,
+      fromColumnOffset: 0,
+      toRow: Math.min(1048575, cell.row + (op.shapeType === 'textbox' ? 4 : 6)),
+      toColumn: Math.min(16383, cell.column + (op.shapeType === 'textbox' ? 4 : 3)),
+      toRowOffset: 0,
+      toColumnOffset: 0,
+    }
+    if (
+      (anchor.toRow <= anchor.fromRow && anchor.toRowOffset <= anchor.fromRowOffset) ||
+      (anchor.toColumn <= anchor.fromColumn && anchor.toColumnOffset <= anchor.fromColumnOffset)
+    )
+      throw new WorkbookConflictError('invalid_shape_anchor')
+    replaceSheet(snapshot, {
+      ...sheet,
+      visuals: [
+        ...(sheet.visuals ?? []),
+        {
+          id: (() => {
+            let n = (sheet.visuals?.length ?? 0) + 1
+            while (sheet.visuals?.some((v) => v.id === `added-shape-${op.sheetId}-${n}`)) n++
+            return `added-shape-${op.sheetId}-${n}`
+          })(),
+          sheetId: sheet.id,
+          kind: 'shape',
+          shapeType: op.shapeType === 'textbox' ? 'rect' : op.shapeType,
+          anchor: structuredClone(anchor),
+          fillColor: op.fillColor ?? (op.shapeType === 'textbox' ? '#FFFFFF' : '#DDEBF7'),
+          ...(op.text === undefined
+            ? op.shapeType === 'textbox'
+              ? { text: 'Text' }
+              : {}
+            : { text: op.text }),
+          ...(op.shapeType === 'textbox' ? { isTextBox: true } : {}),
+          editAs: 'twoCell',
+        },
+      ],
+    })
+    return
+  }
+  if (op.op === 'edit_shape') {
+    const sheet = snapshot.sheets.find((s) =>
+      s.visuals?.some((v) => v.id === op.visualId && v.kind === 'shape'),
+    )
+    const visual = sheet?.visuals?.find((v) => v.id === op.visualId)
+    if (!sheet || !visual || visual.kind !== 'shape')
+      throw new WorkbookConflictError('unknown_shape')
+    const anchor = op.anchorCell
+      ? (() => {
+          const point = parseAddress(op.anchorCell)
+          const rows = point.row - visual.anchor.fromRow,
+            cols = point.column - visual.anchor.fromColumn
+          return {
+            ...visual.anchor,
+            fromRow: point.row,
+            toRow: visual.anchor.toRow + rows,
+            fromColumn: point.column,
+            toColumn: visual.anchor.toColumn + cols,
+          }
+        })()
+      : visual.anchor
+    if (anchor.toRow > 1048575 || anchor.toColumn > 16383)
+      throw new WorkbookConflictError('invalid_shape_anchor')
+    replaceSheet(snapshot, {
+      ...sheet,
+      visuals: sheet.visuals!.map((v) =>
+        v.id === visual.id
+          ? {
+              ...v,
+              anchor,
+              ...(op.text === undefined ? {} : { text: op.text }),
+              ...(op.fillColor === undefined ? {} : { fillColor: op.fillColor }),
+            }
+          : v,
+      ),
+    })
+    return
+  }
+  if (op.op === 'edit_visual') {
+    const sheet = snapshot.sheets.find((sheet) => sheet.visuals?.some((v) => v.id === op.visualId))
+    if (!sheet?.visuals) throw new WorkbookConflictError(`Unknown visual: ${op.visualId}`)
+    const visual = sheet.visuals.find((v) => v.id === op.visualId)!
+    if (
+      visual.kind === 'chart' &&
+      ['fillColor', 'lineColor', 'rotation', 'flipH', 'flipV', 'frameSize'].some((key) =>
+        Object.hasOwn(op, key),
+      )
+    )
+      throw new WorkbookConflictError('unsupported_visual_properties')
+    if (visual.kind === 'image' && (op.fillColor !== undefined || op.lineColor !== undefined))
+      throw new WorkbookConflictError('unsupported_visual_properties')
+    let visuals = sheet.visuals.map((v) =>
+      v.id === op.visualId
+        ? {
+            ...v,
+            ...(op.altText === undefined ? {} : { altText: op.altText }),
+            ...(op.editAs === undefined ? {} : { editAs: op.editAs }),
+            ...(v.kind !== 'chart'
+              ? {
+                  ...(op.fillColor === undefined ? {} : { fillColor: op.fillColor }),
+                  ...(op.lineColor === undefined ? {} : { lineColor: op.lineColor }),
+                  ...(op.rotation === undefined ? {} : { rotation: op.rotation }),
+                  ...(op.flipH === undefined ? {} : { flipH: op.flipH }),
+                  ...(op.flipV === undefined ? {} : { flipV: op.flipV }),
+                  ...(op.frameSize
+                    ? { frameWidth: op.frameSize.width, frameHeight: op.frameSize.height }
+                    : {}),
+                }
+              : {}),
+          }
+        : v,
+    )
+    if (op.zIndex !== undefined) {
+      if (op.zIndex >= visuals.length) throw new WorkbookConflictError('invalid_visual_z_index')
+      const updated = visuals.find((v) => v.id === visual.id)!
+      visuals = visuals.filter((v) => v.id !== visual.id)
+      visuals.splice(op.zIndex, 0, updated)
+    }
+    replaceSheet(snapshot, { ...sheet, visuals })
+    return
+  }
+  if (op.op === 'set_visual_anchor') {
+    const sheet = findSheet(snapshot, op.sheetId)
+    if (!sheet.visuals?.some((visual) => visual.id === op.visualId))
+      throw new WorkbookConflictError(`Unknown visual: ${op.visualId}`)
+    replaceSheet(snapshot, {
+      ...sheet,
+      visuals: sheet.visuals.map((visual) =>
+        visual.id === op.visualId ? { ...visual, anchor: structuredClone(op.anchor) } : visual,
+      ),
+    })
+    return
+  }
   if (op.op === 'edit_chart') {
     // Demo charts have no chart part; the visual id doubles as chartPath.
     let sheet: WorksheetState | undefined
-    let visual: SheetVisual | undefined
+    let visual: import('./chart-visual').SheetChartVisual | undefined
     for (const candidate of snapshot.sheets) {
-      const found = candidate.visuals?.find((entry) => entry.id === op.chartPath)
+      const found = candidate.visuals?.find(
+        (entry) => entry.id === op.chartPath && entry.kind === 'chart',
+      )
       if (found) {
         sheet = candidate
-        visual = found
+        visual = found as import('./chart-visual').SheetChartVisual
         break
       }
     }
@@ -646,49 +912,48 @@ function applyLayoutOp(snapshot: WorkbookSnapshot, op: LayoutOperation): void {
         throw new WorkbookConflictError('Only bar, line, and area charts support grouping.')
       }
     }
-    const series = (op.seriesData ?? []).map((entry) => {
-      if (entry.index >= chartVisual.chart.series.length) {
-        throw new WorkbookConflictError(
-          `Chart ${op.chartPath} has no series #${entry.index} (it has ${chartVisual.chart.series.length}).`,
-        )
-      }
-      const sourceSheet =
-        entry.sheetId === undefined
-          ? findSheet(snapshot, chartVisual.sheetId)
-          : findSheet(snapshot, entry.sheetId)
-      const vector = (range: string): ChartGridValue[] => gridFromRange(sourceSheet, range).flat()
-      return {
-        index: entry.index,
-        ...(entry.name === undefined ? {} : { name: entry.name }),
-        ...(entry.valuesRange === undefined
-          ? {}
-          : {
-              values: vector(entry.valuesRange).map((value) => {
-                const numeric =
-                  typeof value === 'number' ? value : Number(String(value ?? '').trim())
-                return Number.isFinite(numeric) ? numeric : 0
-              }),
-            }),
-        ...(entry.categoriesRange === undefined
-          ? {}
-          : { categories: vector(entry.categoriesRange).map((value) => String(value ?? '')) }),
-      }
-    })
+    const series = chartSeriesRangeEdits(
+      snapshot,
+      chartVisual.sheetId,
+      chartVisual.chart.series.length,
+      op.seriesData ?? [],
+    )
+    const seriesSet = op.seriesSelection
+      ? buildChartSeriesSelection(chartVisual.chart, op.seriesSelection, (reference) => {
+          const resolved = resolveChartRange(reference, snapshot.sheets, chartVisual.sheetId)
+          return {
+            ref: resolved.ref,
+            vector: gridFromRange(findSheet(snapshot, resolved.sheetId), resolved.range).flat(),
+          }
+        })
+      : undefined
     const edit: ChartStateEdit = {
+      ...(seriesSet ? { seriesSet } : {}),
       ...(op.title === undefined ? {} : { title: op.title }),
       ...(op.chartType === undefined ? {} : { chartType: op.chartType }),
       ...(op.seriesColors === undefined ? {} : { seriesColors: op.seriesColors }),
+      ...(op.pointColors === undefined ? {} : { pointColors: op.pointColors }),
+      ...(op.dataLabelPosition === undefined ? {} : { dataLabelPosition: op.dataLabelPosition }),
+      ...(op.dataLabelFormat === undefined ? {} : { dataLabelFormat: op.dataLabelFormat }),
+      ...(op.gridlines === undefined ? {} : { gridlines: op.gridlines }),
+      ...(op.valueAxis === undefined ? {} : { valueAxis: op.valueAxis }),
+      ...(op.gapWidthPct === undefined ? {} : { gapWidthPct: op.gapWidthPct }),
+      ...(op.holeSizePct === undefined ? {} : { holeSizePct: op.holeSizePct }),
+      ...(op.explosionPct === undefined ? {} : { explosionPct: op.explosionPct }),
+      ...(op.pointExplosions === undefined ? {} : { pointExplosions: op.pointExplosions }),
+
       ...(op.legend === undefined ? {} : { legend: op.legend }),
       ...(op.dataLabels === undefined ? {} : { dataLabels: op.dataLabels }),
       ...(op.grouping === undefined ? {} : { grouping: op.grouping }),
       ...(op.axisTitles === undefined ? {} : { axisTitles: op.axisTitles }),
       ...(series.length > 0 ? { series } : {}),
     }
+    assertChartFormat(chartVisual.chart, edit)
     const chart = applyChartStateEdit(chartVisual.chart, edit)
     replaceSheet(snapshot, {
       ...sheet,
       visuals: (sheet.visuals ?? []).map((entry) =>
-        entry.id === chartVisual.id ? { ...entry, chart } : entry,
+        entry.id === chartVisual.id && entry.kind === 'chart' ? { ...entry, chart } : entry,
       ),
     })
     return
@@ -783,7 +1048,7 @@ function applyFormatRange(snapshot: WorkbookSnapshot, op: FormatRangeOperation):
   const sheet = findSheet(snapshot, op.sheetId)
   const styles: Record<string, CellFormatState> = { ...sheet.styles }
   for (const address of rangeAddresses(parseRange(op.range))) {
-    const merged = mergeFormat(styles[address], op.format)
+    const merged = mergeFormat(op.reset ? undefined : styles[address], op.format)
     if (merged) styles[address] = merged
     else delete styles[address]
   }
@@ -801,7 +1066,18 @@ function mergeFormat(
   for (const [key, value] of Object.entries(patch)) {
     if (value === undefined) continue
     if (value === null) {
-      if (['fontColor', 'fillColor', 'fill', 'vertAlign'].includes(key)) {
+      if (
+        [
+          'fontColor',
+          'fillColor',
+          'fill',
+          'vertAlign',
+          'borderTop',
+          'borderBottom',
+          'borderLeft',
+          'borderRight',
+        ].includes(key)
+      ) {
         merged[key] = null
         if (key === 'fill') merged.fillColor = null
         if (key === 'fillColor') delete merged.fill

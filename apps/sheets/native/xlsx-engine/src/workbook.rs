@@ -659,6 +659,7 @@ pub(crate) fn read_defined_names(
 ) -> Result<
     (
         Vec<DefinedName>,
+        Vec<ReservedDefinedName>,
         HashMap<usize, SheetPrintNames>,
         HashSet<usize>,
     ),
@@ -667,6 +668,7 @@ pub(crate) fn read_defined_names(
     let xml = read_zip_string(archive, "xl/workbook.xml")?;
     let mut reader = Reader::from_str(&xml);
     let mut names = Vec::new();
+    let mut reserved = Vec::new();
     let mut print_names: HashMap<usize, SheetPrintNames> = HashMap::new();
     // Sheets with ANY localSheetId-scoped definedName, including hidden and
     // _xlnm.* built-ins the editor never models — the save's duplicate guard
@@ -714,7 +716,14 @@ pub(crate) fn read_defined_names(
                     if let Some(sheet_index) = defined.sheet_index {
                         scoped_sheets.insert(sheet_index);
                     }
-                    if defined.formula.is_empty() {
+                    if defined.formula.trim().is_empty() {
+                        if !defined.name.is_empty() {
+                            reserved.push(ReservedDefinedName {
+                                name: defined.name,
+                                sheet_index: defined.sheet_index,
+                                sheet_id: None,
+                            });
+                        }
                         continue;
                     }
                     if defined.name.starts_with("_xlnm") {
@@ -734,7 +743,15 @@ pub(crate) fn read_defined_names(
                         }
                     // Hidden names stay file-only (the save preserves them
                     // verbatim; the editor never models them).
-                    } else if !defined.hidden {
+                    } else if defined.hidden {
+                        if !defined.name.is_empty() {
+                            reserved.push(ReservedDefinedName {
+                                name: defined.name,
+                                sheet_index: defined.sheet_index,
+                                sheet_id: None,
+                            });
+                        }
+                    } else {
                         names.push(DefinedName {
                             name: defined.name,
                             formula: strip_future_function_markers(&defined.formula),
@@ -743,9 +760,24 @@ pub(crate) fn read_defined_names(
                     }
                 }
             }
+            Event::Empty(element) if element.local_name().as_ref() == b"definedName" => {
+                let name = attribute_value(&reader, &element, b"name")?.unwrap_or_default();
+                let sheet_index = attribute_value(&reader, &element, b"localSheetId")?
+                    .and_then(|value| value.parse::<usize>().ok());
+                if let Some(index) = sheet_index {
+                    scoped_sheets.insert(index);
+                }
+                if !name.is_empty() {
+                    reserved.push(ReservedDefinedName {
+                        name,
+                        sheet_index,
+                        sheet_id: None,
+                    });
+                }
+            }
             Event::Eof => break,
             _ => {}
         }
     }
-    Ok((names, print_names, scoped_sheets))
+    Ok((names, reserved, print_names, scoped_sheets))
 }

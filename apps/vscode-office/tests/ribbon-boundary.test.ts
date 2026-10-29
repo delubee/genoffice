@@ -6,9 +6,26 @@ import { browserBoundary } from '../../../packages/sheets-editor/browser-boundar
 
 it.each([
   ['Sheets', '../../sheets/src/renderer/SheetsRibbon.tsx', 'SheetsRibbon'],
+  ['Header/Footer', '../../sheets/src/renderer/HeaderFooterDialog.tsx', 'HeaderFooterDialog'],
+  ['Visual frame', '../../sheets/src/renderer/WorkbookVisuals.tsx', 'installWorkbookVisuals'],
+  ['Chart', '../../sheets/src/renderer/SheetChart.tsx', 'SheetChart'],
+  ['Shape drawing', '../../sheets/src/renderer/shape-draw.ts', 'startSheetShapeDraw'],
+  ['Picture picker', '../../sheets/src/renderer/picture-paste.ts', 'pickPictureFile'],
+  ['Cell format conversion', '../../sheets/src/renderer/edit-journal.ts', 'toNeutralStyle'],
+  ['Visual dialogs', '../../sheets/src/renderer/VisualDialogs.tsx', 'VisualDialog'],
+  ['Chart text dialog', '../../sheets/src/renderer/ChartTextDialog.tsx', 'ChartTextDialog'],
+  ['Chart format pane', '../../sheets/src/renderer/ChartPanels.tsx', 'ChartFormatPane'],
+  [
+    'Recommended Charts',
+    '../../sheets/src/renderer/RecommendedChartsDialog.tsx',
+    'RecommendedChartsDialog',
+  ],
+  ['Symbol', '../../sheets/src/renderer/SymbolDialog.tsx', 'SymbolDialog'],
+  ['Link', '../../sheets/src/renderer/LinkDialog.tsx', 'LinkDialog'],
+  ['Find/Replace', '../../sheets/src/renderer/FindReplacePanel.tsx', 'FindReplacePanel'],
   ['Docs', '../../docs/src/renderer/components/Ribbon.tsx', 'Ribbon'],
 ])(
-  'bundles the desktop %s ribbon for an isolated browser without AI or grid services',
+  'bundles the desktop %s presentation for an isolated browser without AI or grid services',
   async (_, entry, exported) => {
     const boundary = browserBoundary()
     const result = await build({

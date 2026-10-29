@@ -132,3 +132,40 @@ describe('applyDefinedNamesState', () => {
     expect(xml).toContain('<definedName name="Total" localSheetId="0">Data!$B$1</definedName>')
   })
 })
+
+it('rejects case-insensitive collisions with hidden names while allowing independent scopes', () => {
+  const xml =
+    '<workbook><sheets/><definedNames><definedName name="Private" hidden="1">1</definedName></definedNames></workbook>'
+  expect(() =>
+    applyDefinedNamesState(xml, { names: [{ name: 'private', formula: '2' }], preserveNames: [] }),
+  ).toThrow(DefinedNameError)
+  expect(
+    applyDefinedNamesState(xml, {
+      names: [{ name: 'Private', formula: '2', sheetIndex: 0 }],
+      preserveNames: [],
+    }),
+  ).toContain('localSheetId="0"')
+  expect(() =>
+    applyDefinedNamesState(xml, {
+      names: [
+        { name: 'One', formula: '1' },
+        { name: 'one', formula: '2' },
+      ],
+      preserveNames: [],
+    }),
+  ).toThrow(DefinedNameError)
+})
+
+it('preserves empty file-only definitions and guards their scope without shadowing valid definitions elsewhere', () => {
+  const empty = '<definedName name="Private" localSheetId="1"/>'
+  const xml = `<workbook><sheets/><definedNames>${empty}</definedNames></workbook>`
+  expect(
+    applyDefinedNamesState(xml, { names: [{ name: 'Private', formula: '1' }], preserveNames: [] }),
+  ).toContain(empty)
+  expect(() =>
+    applyDefinedNamesState(xml, {
+      names: [{ name: 'Private', formula: '1', sheetIndex: 1 }],
+      preserveNames: [],
+    }),
+  ).toThrow(DefinedNameError)
+})

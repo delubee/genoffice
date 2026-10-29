@@ -22,6 +22,7 @@ const CANCELLABLE_READS = new Set([
   'read_merge_ranges',
   'read_range',
   'read_formula_cells',
+  'read_calculation_context',
   'read_row_outline',
   'read_media',
   'find_cells',
@@ -99,6 +100,10 @@ export class XlsxSidecarClient {
     readonly sheetId: string
   }): Promise<unknown> {
     return this.request({ command: 'read_formula_cells', ...input })
+  }
+
+  async readCalculationContext(sessionId: string): Promise<unknown> {
+    return this.request({ command: 'read_calculation_context', sessionId })
   }
 
   async findCells(

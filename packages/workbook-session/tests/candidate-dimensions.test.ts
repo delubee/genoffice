@@ -31,11 +31,19 @@ it('persists row heights and column widths without materializing cell edits and 
   }
   await apply([
     { op: 'set_row_height', sheetId: id, row: 2, count: 1, heightPoints: 30 },
-    { op: 'set_col_width', sheetId: id, column: 'B', count: 1, widthPx: 140 },
+    {
+      op: 'set_col_width',
+      sheetId: id,
+      column: 'B',
+      count: 1,
+      widthPx: 140,
+      widthCharacters: 17.5,
+    },
   ])
   expect(state.sheets[0]!.features).toMatchObject({
     rowHeights: { '2': 30 },
     colWidths: { B: 140 },
+    columnWidthsCharacters: { B: 17.5 },
   })
   expect(state.sheets[0]!.cells).toEqual({})
   await apply([
@@ -45,5 +53,30 @@ it('persists row heights and column widths without materializing cell edits and 
   expect(state.sheets[0]!.features).toMatchObject({
     rowHeights: { '3': 30 },
     colWidths: { C: 140 },
+    columnWidthsCharacters: { C: 17.5 },
   })
+})
+
+it('matches desktop dialog units, chunks a large axis selection and accepts zero and maximum sizes', async () => {
+  const { ribbonIntents } = await import('@genoffice/sheets-editor/ribbon-intents')
+  const { toSelectionFormat } = await import('../../../apps/sheets/src/renderer/selection-format')
+  const target = {
+    sheetId: 'sheet',
+    address: 'B2:C3',
+    maximumDigitWidth: 8,
+    format: toSelectionFormat({}, 'General'),
+    doubleUnderline: false,
+  }
+  expect(ribbonIntents('row-height:25.3', target)).toMatchObject([
+    { op: 'set_row_height', row: 2, count: 2, heightPoints: 25.5 },
+  ])
+  expect(ribbonIntents('col-width:10', target)).toMatchObject([
+    { op: 'set_col_width', column: 'B', count: 2, widthPx: 80, widthCharacters: 10 },
+  ])
+  expect(ribbonIntents('row-height:409.5', target)[0]).toMatchObject({ heightPoints: 409.5 })
+  expect(ribbonIntents('row-height:0', target)[0]).toMatchObject({ heightPoints: 0 })
+  expect(ribbonIntents('col-width:0', target)[0]).toMatchObject({ widthPx: 0, widthCharacters: 0 })
+  expect(ribbonIntents('row-height:30', { ...target, address: 'A1:A1001' })).toHaveLength(3)
+  expect(() => ribbonIntents('row-height:410', target)).toThrow()
+  expect(() => ribbonIntents('col-width:256', target)).toThrow()
 })

@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 
 import { useI18n, type StringKey } from './i18n/locale'
 
-import type { HeaderFooterParts } from './edit-journal'
+import type { HeaderFooterParts } from './ribbon-model'
 import { useModalDialog } from './modal-dialog'
 
 /// Excel's Insert → Header & Footer as a dialog (the app has no Page Layout
@@ -70,7 +70,7 @@ export function HeaderFooterDialog({
   readonly initialHeader: HeaderFooterParts | null
   readonly initialFooter: HeaderFooterParts | null
   /// Returns an error message, or null on success.
-  readonly onApply: (result: HeaderFooterResult) => string | null
+  readonly onApply: (result: HeaderFooterResult) => string | null | Promise<string | null>
   readonly onClose: () => void
 }): React.JSX.Element {
   const { t } = useI18n()
@@ -83,6 +83,11 @@ export function HeaderFooterDialog({
     'footer-right': initialFooter?.right ?? '',
   })
   const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
+  const pendingRef = useRef(false)
+  const close = () => {
+    if (!pendingRef.current) onClose()
+  }
   const focusedKey = useRef<SectionKey>('header-center')
   const inputs = useRef(new Map<SectionKey, HTMLInputElement>())
 
@@ -100,9 +105,34 @@ export function HeaderFooterDialog({
     })
   }
 
-  const modal = useModalDialog(onClose)
+  const apply = (): void => {
+    if (pendingRef.current) return
+    const finish = (failure: string | null) => {
+      setError(failure)
+      if (failure === null) onClose()
+    }
+    try {
+      const result = onApply({
+        header: toParts(values['header-left'], values['header-center'], values['header-right']),
+        footer: toParts(values['footer-left'], values['footer-center'], values['footer-right']),
+      })
+      if (result instanceof Promise) {
+        pendingRef.current = true
+        setPending(true)
+        void result
+          .then(finish, (error) => setError(String(error)))
+          .finally(() => {
+            pendingRef.current = false
+            setPending(false)
+          })
+      } else finish(result)
+    } catch (error) {
+      setError(String(error))
+    }
+  }
+  const modal = useModalDialog(close)
   return (
-    <div className="dialog-backdrop" onClick={onClose}>
+    <div className="dialog-backdrop" onClick={close}>
       <div
         className="format-cells-dialog"
         role="dialog"
@@ -116,6 +146,7 @@ export function HeaderFooterDialog({
             <label key={key}>
               {t(SECTION_LABELS[key])}
               <input
+                disabled={pending}
                 value={values[key]}
                 ref={(element) => {
                   if (element) inputs.current.set(key, element)
@@ -135,6 +166,7 @@ export function HeaderFooterDialog({
             {FIELD_CODES.map((field) => (
               <button
                 key={field.code}
+                disabled={pending}
                 className="secondary"
                 data-tip={t('dlgHfInsertCode', { code: field.code })}
                 onMouseDown={(event) => event.preventDefault()}
@@ -152,28 +184,10 @@ export function HeaderFooterDialog({
           </p>
         )}
         <div className="dialog-actions">
-          <button className="secondary" onClick={onClose}>
+          <button className="secondary" disabled={pending} onClick={close}>
             {t('dlgCancel')}
           </button>
-          <button
-            className="primary-action"
-            onClick={() => {
-              const failure = onApply({
-                header: toParts(
-                  values['header-left'],
-                  values['header-center'],
-                  values['header-right'],
-                ),
-                footer: toParts(
-                  values['footer-left'],
-                  values['footer-center'],
-                  values['footer-right'],
-                ),
-              })
-              setError(failure)
-              if (failure === null) onClose()
-            }}
-          >
+          <button className="primary-action" disabled={pending} onClick={apply}>
             {t('dlgOk')}
           </button>
         </div>

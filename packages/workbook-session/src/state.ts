@@ -39,7 +39,14 @@ export function initialState(rawMetadata: unknown): WorkbookState {
     stateId: randomUUID(),
     dateSystem: metadata.date1904 ? '1904' : '1900',
     structuralLog: [],
-    features: { originalMetadata: JSON.parse(JSON.stringify(workbookMetadata)) },
+    features: {
+      originalMetadata: JSON.parse(
+        JSON.stringify({
+          ...workbookMetadata,
+          sourceSheetIds: metadata.sheets.map((sheet) => sheet.id),
+        }),
+      ),
+    },
     sheets: metadata.sheets.map((sheet) => ({
       id: randomUUID(),
       originalSheetId: sheet.id,

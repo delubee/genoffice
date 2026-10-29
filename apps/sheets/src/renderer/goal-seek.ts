@@ -9,16 +9,8 @@ import { calculateNow, isManualCalculation } from './calc-options'
 import { t } from './i18n/locale'
 import type { UniverRuntime } from './univer-state'
 
-export interface GoalSeekResult {
-  readonly found: boolean
-  /// f(x) actually reached (shown next to the target).
-  readonly reached: number
-  readonly solution: number
-  readonly iterations: number
-}
-
-const MAX_ITERATIONS = 100
-const MAX_CHANGE = 0.001
+import { solveGoalSeekSamples, type GoalSeekResult } from '@genoffice/xlsx-gateway/domain/goal-seek'
+export type { GoalSeekResult } from '@genoffice/xlsx-gateway/domain/goal-seek'
 
 /// Runs `mutate` and resolves after the recalc it triggers. The listener is
 /// attached before the write so the end event cannot be missed; the timeout
@@ -74,39 +66,14 @@ export async function solveGoalSeek(
   }
 
   try {
-    let x0 = original
-    let f0 = await evaluate(x0)
-    if (Number.isNaN(f0)) throw new Error(t('appGoalSeekTargetNotNumber'))
-    if (Math.abs(f0 - input.toValue) <= MAX_CHANGE) {
-      return { found: true, reached: f0, solution: x0, iterations: 1 }
-    }
-    // A relative nudge for the second sample; 1 covers the x0 = 0 case.
-    let x1 = x0 + Math.max(Math.abs(x0) * 0.01, 1)
-    let f1 = await evaluate(x1)
-    let iterations = 2
-    while (iterations < MAX_ITERATIONS) {
-      if (Math.abs(f1 - input.toValue) <= MAX_CHANGE) {
-        return { found: true, reached: f1, solution: x1, iterations }
-      }
-      const slope = f1 - f0
-      if (slope === 0 || !Number.isFinite(slope)) break
-      const next = x1 - ((f1 - input.toValue) * (x1 - x0)) / slope
-      if (!Number.isFinite(next)) break
-      x0 = x1
-      f0 = f1
-      x1 = next
-      f1 = await evaluate(x1)
-      iterations += 1
-    }
-    if (Math.abs(f1 - input.toValue) <= MAX_CHANGE) {
-      return { found: true, reached: f1, solution: x1, iterations }
-    }
-    // No convergence: put the original contents back (journaled, undoable).
-    await restore()
-    return { found: false, reached: f1, solution: x1, iterations }
+    const result = await solveGoalSeekSamples(evaluate, original, input.toValue)
+    if (!result.found) await restore()
+    return result
   } catch (error) {
     // Any abort after the first write must not leave a guess in the grid.
     await restore()
+    if (error instanceof Error && error.message === 'goal_seek_target_not_number')
+      throw new Error(t('appGoalSeekTargetNotNumber'), { cause: error })
     throw error
   }
 }

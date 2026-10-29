@@ -1,3 +1,9 @@
+import { chartSelectionReferences } from '@genoffice/xlsx-gateway/domain/chart-series-selection'
+import {
+  applyChartStateEdit,
+  type ChartStateEdit,
+} from '@genoffice/xlsx-gateway/domain/chart-visual'
+import { resolveChartRange } from '@genoffice/xlsx-gateway/domain/chart-series-range'
 import { randomUUID } from 'node:crypto'
 import {
   copyTargetBounds,
@@ -16,6 +22,7 @@ import { workbookStateSchema } from './schemas'
 import type { SheetVisual } from '@genoffice/xlsx-gateway/domain/chart-visual'
 
 const structural = new Set([
+  'subtotal',
   'insert_rows',
   'delete_rows',
   'insert_cols',
@@ -32,7 +39,16 @@ export async function prepareCandidateMaterial(input: {
   signal?: AbortSignal
 }) {
   const state = workbookStateSchema.parse(input.state),
-    full = input.operations.some((op) => structural.has(op.op))
+    full = input.operations.some((op) => structural.has(op.op) || op.op === 'relocate_range')
+  const pageSettingsOnly = input.operations.every((op) =>
+    [
+      'set_page_setup',
+      'add_defined_name',
+      'delete_defined_name',
+      'manage_defined_name',
+      'add_defined_names',
+    ].includes(op.op),
+  )
   const ranges = new Map<string, Set<string>>()
   const addRange = (sheetId: string, range: string) => {
     const selected = ranges.get(sheetId) ?? new Set()
@@ -55,11 +71,12 @@ export async function prepareCandidateMaterial(input: {
     if ('sheetId' in op) {
       if ('address' in op) addRange(op.sheetId, op.address)
       if ('range' in op && typeof op.range === 'string') addRange(op.sheetId, op.range)
-      if (op.op === 'set_range' && op.start) {
+      if ((op.op === 'set_range' || op.op === 'paste_cells') && op.start) {
+        const values = op.op === 'paste_cells' ? op.cells : op.values
         const start = parseRange(op.start)
         addRange(
           op.sheetId,
-          `${op.start}:${formatAddress(start.startRow + op.values.length - 1, start.startColumn + op.values[0]!.length - 1)}`,
+          `${op.start}:${formatAddress(start.startRow + values.length - 1, start.startColumn + values[0]!.length - 1)}`,
         )
       }
       if (op.op === 'add_chart') addRange(op.sheetId, op.dataRange)
@@ -76,10 +93,11 @@ export async function prepareCandidateMaterial(input: {
         )
       }
     }
+  // Print metadata does not consume or recalculate chart data.
   // Hydrate exact chart references, not unrelated source worksheets.
-  for (const sheet of state.sheets) {
+  for (const sheet of pageSettingsOnly ? [] : state.sheets) {
     for (const visual of (sheet.features?.charts ?? []) as unknown as SheetVisual[])
-      for (const series of visual.chart.series)
+      for (const series of visual.kind === 'chart' ? visual.chart.series : [])
         for (const key of ['valuesRef', 'categoriesRef', 'nameRef'] as const) {
           const reference = series[key]
           if (!reference) continue
@@ -95,21 +113,61 @@ export async function prepareCandidateMaterial(input: {
         }
   }
   for (const op of input.operations)
-    if (op.op === 'edit_chart' && op.seriesData) {
-      const owner = state.sheets.find((sheet) =>
-        ((sheet.features?.charts ?? []) as unknown as SheetVisual[]).some(
-          (visual) => visual.id === op.chartPath,
-        ),
+    if (op.op === 'edit_chart' && (op.seriesData || op.seriesSelection)) {
+      const native = (
+        state.features?.originalMetadata as { visuals?: SheetVisual[] } | undefined
+      )?.visuals?.find((visual) => visual.chartPath === op.chartPath)
+      const owner = state.sheets.find(
+        (sheet) =>
+          ((sheet.features?.charts ?? []) as unknown as SheetVisual[]).some(
+            (visual) => visual.id === op.chartPath,
+          ) ||
+          (!!native && sheet.originalSheetId === native.sheetId),
       )
-      if (!owner)
-        throw new WorkbookError('unsupported_operation', 'Original workbook charts are read-only.')
-      for (const series of op.seriesData) {
-        if (series.valuesRange) addRange(series.sheetId ?? owner.id, series.valuesRange)
-        if (series.categoriesRange) addRange(series.sheetId ?? owner.id, series.categoriesRange)
+      if (!owner) throw new WorkbookError('unsupported_operation', 'unknown_chart')
+      if (op.seriesSelection) {
+        const own = ((owner.features?.charts ?? []) as unknown as SheetVisual[]).find(
+          (v) => v.id === op.chartPath,
+        )
+        const visual = own ?? native
+        if (!visual || visual.kind !== 'chart')
+          throw new WorkbookError('unsupported_operation', 'unknown_chart')
+        const overlays = (owner.features?.chartEdits ?? {}) as Record<string, ChartStateEdit>
+        const chart = applyChartStateEdit(visual.chart, own ? undefined : overlays[op.chartPath])
+        for (const reference of chartSelectionReferences(chart, op.seriesSelection)) {
+          const resolved = resolveChartRange(reference, state.sheets, owner.id)
+          addRange(resolved.sheetId, resolved.range)
+        }
+      }
+      for (const series of op.seriesData ?? []) {
+        for (const range of [series.valuesRange, series.categoriesRange]) {
+          if (!range) continue
+          const resolved = resolveChartRange(range, state.sheets, series.sheetId ?? owner.id)
+          addRange(resolved.sheetId, resolved.range)
+        }
       }
     }
+  // Journaled original-series references remain live after subsequent cell edits.
+  for (const sheet of pageSettingsOnly ? [] : state.sheets) {
+    const edits = (sheet.features?.chartEdits ?? {}) as Record<
+      string,
+      {
+        series?: { valuesRef?: string; categoriesRef?: string }[]
+        seriesSet?: { valuesRef?: string; categoriesRef?: string }[]
+      }
+    >
+    for (const edit of Object.values(edits))
+      for (const series of [...(edit.series ?? []), ...(edit.seriesSet ?? [])])
+        for (const reference of [series.valuesRef, series.categoriesRef]) {
+          if (!reference) continue
+          const resolved = resolveChartRange(reference, state.sheets, sheet.id)
+          addRange(resolved.sheetId, resolved.range)
+        }
+  }
+  const hiddenRows: Record<string, number[]> = {}
   const completeSheetIds: string[] = [],
-    writableSheetIds: string[] = []
+    writableSheetIds: string[] = [],
+    viewWritableSheetIds: string[] = []
   for (const sheet of state.sheets) {
     assertNotCancelled(input.signal)
     const features = sheet.originalSheetId
@@ -126,7 +184,12 @@ export async function prepareCandidateMaterial(input: {
         (op) =>
           'sheetId' in op &&
           op.sheetId === sheet.id &&
-          ['set_filter_criteria', 'clear_filter'].includes(op.op),
+          [
+            'set_filter_criteria',
+            'clear_filter',
+            'clear_filter_criteria',
+            'reapply_filter',
+          ].includes(op.op),
       )
     ) {
       const edits = sheet.features?.filterEdits as
@@ -152,6 +215,20 @@ export async function prepareCandidateMaterial(input: {
           `${formatAddress(range.startRow, range.startColumn)}:${formatAddress(range.endRow, range.endColumn)}`,
         )
     }
+    const needsRowVisibility = input.operations.some(
+      (op) =>
+        'sheetId' in op &&
+        op.sheetId === sheet.id &&
+        [
+          'sort_range',
+          'set_filter',
+          'set_filter_criteria',
+          'clear_filter',
+          'clear_filter_criteria',
+          'reapply_filter',
+        ].includes(op.op),
+    )
+    if (needsRowVisibility) hiddenRows[sheet.id] = []
     for (const range of selected) {
       if (rangeCellCount(parseRange(range)) > LIMITS.rangeCells)
         throw new WorkbookError('range_limit', 'Candidate material exceeds the range budget.')
@@ -163,7 +240,10 @@ export async function prepareCandidateMaterial(input: {
         range,
         signal: input.signal,
         limit: LIMITS.rangeCells,
+        includeMerges: needsRowVisibility,
       })
+      if (needsRowVisibility && 'rows' in read)
+        for (const row of read.rows) if (row.hidden) hiddenRows[sheet.id]!.push(row.row)
       for (const { address, displayValue: _display, ...cell } of read.cells)
         if (
           cell.rawValue !== null ||
@@ -175,6 +255,7 @@ export async function prepareCandidateMaterial(input: {
     }
     if (!sheet.originalSheetId) {
       writableSheetIds.push(sheet.id)
+      if (!sheet.readOnly) viewWritableSheetIds.push(sheet.id)
       completeSheetIds.push(sheet.id)
       continue
     }
@@ -182,6 +263,7 @@ export async function prepareCandidateMaterial(input: {
     sheet.protected =
       protection !== null && protection !== undefined && protection.protected !== false
     if (!sheet.readOnly && !sheet.protected) writableSheetIds.push(sheet.id)
+    if (!sheet.readOnly) viewWritableSheetIds.push(sheet.id)
     const { styles: _styles, sheet: _metadata, ...featureState } = features!
     sheet.features = { ...sheet.features, ...JSON.parse(JSON.stringify(featureState)) }
     if (
@@ -196,8 +278,10 @@ export async function prepareCandidateMaterial(input: {
   return {
     state: workbookStateSchema.parse(state),
     completeSheetIds,
+    hiddenRows,
     referenceRanges: Object.fromEntries([...ranges].map(([id, selected]) => [id, [...selected]])),
     writableSheetIds,
+    viewWritableSheetIds,
     allocation: {
       stateId: randomUUID(),
       sheetIds: Object.fromEntries(

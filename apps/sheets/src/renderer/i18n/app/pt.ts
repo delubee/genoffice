@@ -108,6 +108,7 @@ export const pt = {
   appLabelNumberFormat: 'Formato numérico do rótulo',
   appLabelFormatPlaceholder: 'ex.: 0.0% / #,##0',
   appGridlines: 'Linhas de grade',
+  appChartAxisRangeInvalid: 'O máximo deve ser maior que o mínimo.',
   appAxisMin: 'Mínimo',
   appAxisMax: 'Máximo',
   appBarSection: 'Colunas',
@@ -675,6 +676,14 @@ export const pt = {
   appScopeWorkbook: 'Pasta de Trabalho',
   appNamesNeedFile: 'Abra primeiro um arquivo XLSX — os nomes definidos são salvos no arquivo.',
   appNameGone: 'Esse nome não existe mais.',
+  appDefinedNameInvalid: 'Introduza um nome não reservado e uma referência válidos.',
+  appDefinedNameDuplicate: 'Esse nome já é utilizado neste âmbito.',
+  appDefinedNameBindingConflict:
+    'Esta alteração entra em conflito com uma definição oculta ou local da folha.',
+  appAuditPendingValues:
+    'A verificação usa valores de fórmulas salvos; alguns resultados aguardam recálculo.',
+  appDefinedNameLabelPending:
+    'Os resultados das fórmulas dos rótulos não estão verificados. Utilize rótulos de texto.',
   appNameApplyFailed: 'Não foi possível aplicar o nome.',
   appNamesUpdated: 'Nomes definidos atualizados — salve com ⌘S.',
   appLinkInternal: 'O link aponta para dentro da pasta de trabalho: {location}',
@@ -1584,4 +1593,11 @@ export const pt = {
   appVisualFlipV: 'Inverter verticalmente',
   appVisualFlipH: 'Inverter horizontalmente',
   appCtxPasteVisual: 'Colar imagem ou forma',
+  appDocumentChangedDuringAction:
+    'O documento mudou durante a preparação desta ação. Tente novamente.',
+  appClipboardUnsupported: 'Este conteúdo ainda não pode ser colado. Nenhuma célula foi alterada.',
+  appClipboardSelectionChanged: 'A seleção mudou antes de colar. Tente novamente.',
+  appClipboardBusy: 'Aguarde a conclusão da edição atual.',
+  appClipboardReadUnavailable:
+    'Não foi possível ler a área de transferência. Use {shortcut} para colar.',
 } satisfies Record<keyof typeof zh, string>

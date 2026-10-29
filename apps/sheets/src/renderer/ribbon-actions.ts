@@ -1,3 +1,4 @@
+import { autoFunctionCells } from './auto-function-command'
 /**
  * The ribbon command dispatcher. Extracted from App.tsx; the App component
  * passes a RibbonCommandContext built fresh per call so refs and state never
@@ -29,18 +30,9 @@ import {
   applyFlashFillTemplate,
   inferFlashFillTemplate,
 } from '@genoffice/xlsx-gateway/domain/flash-fill'
-import type {
-  WorkbookChartEdit,
-  WorkbookStyleEdit,
-  WorkbookVisualObject,
-} from '../shared/desktop-api'
-import {
-  CELL_STYLE_PRESETS,
-  CHART_LABEL_COMMANDS,
-  CHART_LEGEND_COMMANDS,
-  CHART_PALETTES,
-  CHART_TYPE_COMMANDS,
-} from './app-constants'
+import type { WorkbookStyleEdit, WorkbookVisualObject } from '../shared/desktop-api'
+import { CELL_STYLE_PRESETS } from './app-constants'
+import { chartRibbonEdit } from './chart-ribbon-edit'
 import {
   handleApplyFormula,
   handleCreateNamesFromSelection,
@@ -246,85 +238,15 @@ export function handleRibbonCommand(ctx: RibbonCommandContext, command: string):
       ? (ctx.selectedVisual.chartPath ?? ctx.selectedVisual.id)
       : undefined
     if (!editKey) return
-    if (command.startsWith('chart-type-')) {
-      const chartType = CHART_TYPE_COMMANDS.find((type) => command === `chart-type-${type}`)
-      if (chartType) ctx.chartEditRef.current(editKey, { chartType })
-    } else if (command.startsWith('chart-legend:')) {
-      const legend = CHART_LEGEND_COMMANDS.find((pos) => command === `chart-legend:${pos}`)
-      if (legend) ctx.chartEditRef.current(editKey, { legend })
-    } else if (command.startsWith('chart-labels:')) {
-      const labels = CHART_LABEL_COMMANDS.find((mode) => command === `chart-labels:${mode}`)
-      // scatter/radar cannot save plot-level labels — fail here, not at ⌘S.
-      if (labels && ctx.selectedChart?.canLabel) {
-        ctx.chartEditRef.current(editKey, { dataLabels: labels })
-      }
-    } else if (command.startsWith('chart-grouping:')) {
-      const grouping = (['clustered', 'stacked', 'percentStacked'] as const).find(
-        (mode) => command === `chart-grouping:${mode}`,
-      )
-      if (grouping) ctx.chartEditRef.current(editKey, { grouping })
-    } else if (command.startsWith('chart-colors:')) {
-      const palette = CHART_PALETTES[command.slice('chart-colors:'.length)]
-      if (!palette) return
-      if (ctx.selectedChart?.isPie) {
-        // Pie recolor varies by point, not by series.
-        const count = Math.min(ctx.selectedChart.categoryCount, 64)
-        if (count === 0) return
-        ctx.chartEditRef.current(editKey, {
-          pointColors: {
-            '0': Object.fromEntries(
-              Array.from({ length: count }, (_, index) => [
-                String(index),
-                palette[index % palette.length] ?? '#4472c4',
-              ]),
-            ),
-          },
-        })
-        return
-      }
-      const count = Math.min(ctx.selectedChart?.seriesCount ?? 0, 24)
-      if (count === 0) return
-      ctx.chartEditRef.current(editKey, {
-        seriesColors: Object.fromEntries(
-          Array.from({ length: count }, (_, index) => [
-            String(index),
-            palette[index % palette.length] ?? '#4472c4',
-          ]),
-        ),
-      })
-    } else if (command.startsWith('chart-layout:')) {
-      // Quick Layout presets: legend placement + data labels together,
-      // labels picked per chart family (pie vs. axis charts).
-      const labelsOn = ctx.selectedChart?.isPie ? ('category-percent' as const) : ('value' as const)
-      const preset = {
-        'chart-layout:1': { legend: 'right', dataLabels: labelsOn },
-        'chart-layout:2': { legend: 'top', dataLabels: labelsOn },
-        'chart-layout:3': { legend: 'bottom', dataLabels: 'none' },
-        'chart-layout:4': { legend: 'none', dataLabels: labelsOn },
-      }[command] as Pick<WorkbookChartEdit, 'legend' | 'dataLabels'> | undefined
-      if (preset) {
-        // Label-less families take the preset's legend only.
-        const applied = ctx.selectedChart?.canLabel
-          ? preset
-          : { ...(preset.legend === undefined ? {} : { legend: preset.legend }) }
-        ctx.chartEditRef.current(editKey, applied)
-      }
-    } else if (command.startsWith('chart-title:')) {
-      ctx.chartEditRef.current(editKey, {
-        title: command.slice('chart-title:'.length).slice(0, 255),
-      })
-    } else if (command.startsWith('chart-axis-cat:')) {
-      const text = command.slice('chart-axis-cat:'.length).slice(0, 255)
-      ctx.chartEditRef.current(editKey, { axisTitles: { category: text || null } })
-    } else if (command.startsWith('chart-axis-val:')) {
-      const text = command.slice('chart-axis-val:'.length).slice(0, 255)
-      ctx.chartEditRef.current(editKey, { axisTitles: { value: text || null } })
-    } else if (command === 'chart-switch-row-col') {
+    if (command === 'chart-switch-row-col') {
       const seriesSet = transposeChartSeries(ctx.selectedChart?.series ?? [], (n) =>
         t('appSeriesN', { n }),
       )
       if (seriesSet) ctx.chartEditRef.current(editKey, { seriesSet })
       else ctx.setMessage(t('appNoCategoriesToSwitch'))
+    } else {
+      const edit = chartRibbonEdit(command, ctx.selectedChart)
+      if (edit) ctx.chartEditRef.current(editKey, edit)
     }
     return
   }
@@ -1733,7 +1655,6 @@ export function handleRibbonCommand(ctx: RibbonCommandContext, command: string):
           return
         }
         const startRow = range.getRow()
-        const startColumn = range.getColumn()
         const lastRow = startRow + range.getHeight() - 1
         // Same protection as manual edits: never write into a row whose
         // original content has not streamed in yet (see BeforeSheetEditStart).
@@ -1750,12 +1671,8 @@ export function handleRibbonCommand(ctx: RibbonCommandContext, command: string):
             return
           }
         }
-        for (let column = startColumn; column < startColumn + range.getWidth(); column += 1) {
-          const letter = columnLabel(column)
-          worksheet
-            .getRange(lastRow + 1, column)
-            .setFormula(`=${argument}(${letter}${startRow + 1}:${letter}${lastRow + 1})`)
-        }
+        for (const cell of autoFunctionCells(argument, range.getA1Notation()))
+          worksheet.getRange(cell.address).setFormula(cell.formula)
         ctx.setMessage(t('appAutofnInserted', { fn: argument }))
         return
       }

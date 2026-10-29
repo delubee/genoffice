@@ -445,12 +445,14 @@ export function getActiveSheetInfo(
     ...frozenFields,
     merges: sheet.merges ?? [],
     charts: snapshot.sheets.flatMap((entry) =>
-      (entry.visuals ?? []).map((visual) => ({
-        path: visual.id,
-        title: visual.chart.title,
-        types: visual.chart.chartTypes.join('+'),
-        sheetId: visual.sheetId,
-      })),
+      (entry.visuals ?? [])
+        .filter((visual) => visual.kind === 'chart')
+        .map((visual) => ({
+          path: visual.id,
+          title: visual.chart.title,
+          types: visual.chart.chartTypes.join('+'),
+          sheetId: visual.sheetId,
+        })),
     ),
   }
 }

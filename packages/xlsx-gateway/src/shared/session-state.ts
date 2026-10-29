@@ -1,12 +1,12 @@
 import { z } from 'zod'
 import { workbookOperationSchema } from '../domain/workbook-dsl'
-import { workbookStyleEditSchema } from './edit-schemas'
+import { cellRecordSchema } from './cell-record'
+export { cellRecordSchema } from './cell-record'
 import { parseAddress } from '../domain/cell-address'
 import { MAX_GRID_COLUMNS, MAX_GRID_ROWS } from './grid-bounds'
 
 const id = z.string().min(1).max(256)
 const revision = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER)
-const scalar = z.union([z.string(), z.number().finite(), z.boolean(), z.null()])
 const calculation = z.enum(['ready', 'pending', 'error'])
 
 export const addressSchema = z
@@ -20,31 +20,6 @@ export const addressSchema = z
       return false
     }
   }, 'Address exceeds the Excel grid')
-
-export const cellRecordSchema = z
-  .strictObject({
-    kind: z.enum(['blank', 'string', 'number', 'boolean', 'date', 'error']),
-    rawValue: scalar,
-    formula: z.string().startsWith('=').optional(),
-    calculationState: calculation.optional(),
-    cachedValue: scalar.optional(),
-    numberFormat: z.string().optional(),
-    dateSystem: z.enum(['1900', '1904']).optional(),
-    style: workbookStyleEditSchema.optional(),
-  })
-  .superRefine((cell, ctx) => {
-    const valid =
-      cell.kind === 'blank'
-        ? cell.rawValue === null
-        : cell.kind === 'number' || cell.kind === 'date'
-          ? typeof cell.rawValue === 'number'
-          : cell.kind === 'boolean'
-            ? typeof cell.rawValue === 'boolean'
-            : typeof cell.rawValue === 'string'
-    if (!valid) ctx.addIssue({ code: 'custom', message: 'Cell kind does not match its raw value' })
-    if (cell.kind === 'date' && !cell.dateSystem)
-      ctx.addIssue({ code: 'custom', message: 'Dates require an explicit date system' })
-  })
 
 export const sheetRecordSchema = z.strictObject({
   id,
@@ -129,6 +104,7 @@ export const protocolMessageSchema = z.strictObject({
     'view.ready',
     'view.flush',
     'view.selection',
+    'view.command',
     'view.presentation',
     'appearance.change',
     'appearance.changed',
@@ -139,6 +115,11 @@ export const protocolMessageSchema = z.strictObject({
     'view.resync',
     'history.request',
     'source.read',
+    'source.media',
+    'source.find',
+    'source.audit',
+    'source.goalSeek',
+    'source.outline',
     'view.dispose',
     'docx.operations',
     'office.action',

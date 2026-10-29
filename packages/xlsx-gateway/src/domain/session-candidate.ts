@@ -1,15 +1,54 @@
+import { buildSubtotalPlan } from './subtotal-plan'
+import { sortRowVisibility } from './session-sort'
+import {
+  visibilityEditSchema,
+  visibilityEditsSchema,
+  axisHiddenOverride,
+} from './session-visibility'
+import { isWorksheetViewOperation } from './session-permissions'
+import { rewriteNameReferences, type NameReferenceChange } from './defined-name-references'
+import {
+  editSessionDefinedName,
+  sessionDefinedNames,
+  manageSessionDefinedName,
+  assertNameBindingsComplete,
+} from './session-defined-names'
+import type { WorkbookVisualObject } from '../shared/workbook-protocol'
+import { projectVisualOrder } from './visual-order'
+import { buildChartSeriesSelection, chartSelectionReferences } from './chart-series-selection'
+import { assertChartFormat } from './chart-format'
+import { chartSeriesRangeEdits, resolveChartRange } from './chart-series-range'
+import { workbookChartEditSchema, workbookVisualEditSchema } from '../shared/edit-schemas'
 import { isDateFormat } from 'numfmt'
 import { InMemoryWorkbookAdapter } from './in-memory-workbook'
-import { formatAddress, parseAddress, parseRange, columnIndex } from './cell-address'
+import {
+  formatAddress,
+  parseAddress,
+  parseRange,
+  columnIndex,
+  rangeAddresses,
+} from './cell-address'
 import { computeSortedRowOrder } from './sort-range'
 import { updateSessionFilter } from './session-filter'
 import { shiftIndex, shiftSpecForOp } from './formula-shift'
-import type { SheetVisual } from './chart-visual'
+import {
+  applyChartStateEdit,
+  pruneChartSettingsForType,
+  chartKindFromVisual,
+  type ChartStateEdit,
+  type SheetVisual,
+} from './chart-visual'
 import type { CellFormatState, WorkbookSnapshot, WorksheetState } from './workbook.types'
 import { isStructuralOp, parseWorkbookCommandBatch } from './workbook-dsl'
 import { normalizeStyleColor } from './style-color'
 import { renameSheetInFormula } from '../gateway/xlsx-sheets'
 import { shiftFormulaText } from '../gateway/xlsx-structure'
+import {
+  dvRuleToWireRule,
+  subtractDvRules,
+  type DvCellArea,
+  type DvWireRule,
+} from '../gateway/xlsx-dv'
 import {
   transactionInputSchema,
   workbookStateSchema,
@@ -18,9 +57,13 @@ import {
 import type { z } from 'zod'
 import { refreshChartReferences } from './session-chart-references'
 import { stateChangeset, type CandidateState } from '../shared/session-changeset'
+import { pasteCellFields } from './paste-cell-fields'
+import { moveSessionRange } from './session-range-move'
+import { moveFormulaRefs } from './formula-shift'
 import { copySessionRange } from './session-range-copy'
+import { measureNormalFontMdw, type NormalFontDescriptor } from './normal-font-metrics'
 import { SESSION_OPERATION_NAMES, hasMixedSessionOperations } from '../shared/session-operations'
-import { assertMergeOperation, updateSessionMerges } from './session-merges'
+import { assertMergeOperation, updateSessionMerges, sessionMerges } from './session-merges'
 
 type TypedCell = z.infer<typeof cellRecordSchema>
 export interface CandidateMaterial {
@@ -30,8 +73,12 @@ export interface CandidateMaterial {
   completeSheetIds: readonly string[]
   /** Exact current ranges hydrated for chart dependencies, separate from full sheets. */
   referenceRanges?: Record<string, string[]>
+  /** Complete host-resolved visibility over requested sort/filter spans. */
+  hiddenRows?: Record<string, readonly number[]>
   /** Host-validated protection/readonly state, independent of renderer focus. */
   writableSheetIds: readonly string[]
+  /** Indexed source permits view-only changes, including protected sheets; never content writes. */
+  viewWritableSheetIds?: readonly string[]
   allocation: { stateId: string; sheetIds: Record<string, string> }
 }
 
@@ -119,7 +166,10 @@ function typedStyle(
           : format.textRotation
   if (border)
     for (const edge of ['top', 'bottom', 'left', 'right'] as const)
-      if (border.type === 'all' || border.type === 'none' || border.type === edge)
+      if (
+        (border.type === 'all' || border.type === 'none' || border.type === edge) &&
+        !Object.hasOwn(simple, 'border' + edge[0]!.toUpperCase() + edge.slice(1))
+      )
         result[('border' + edge[0]!.toUpperCase() + edge.slice(1)) as 'borderTop'] =
           border.type === 'none'
             ? null
@@ -150,7 +200,9 @@ function snapshot(state: CandidateState): WorkbookSnapshot {
       ),
       rowHeights: structuredClone((sheet.features?.rowHeights ?? {}) as Record<string, number>),
       colWidths: structuredClone((sheet.features?.colWidths ?? {}) as Record<string, number>),
-      visuals: structuredClone((sheet.features?.charts ?? []) as unknown as SheetVisual[]),
+      visuals: structuredClone(
+        (sheet.features?.visuals ?? sheet.features?.charts ?? []) as unknown as SheetVisual[],
+      ),
     })),
   }
 }
@@ -164,7 +216,7 @@ export async function computeCandidateState(
     fault?(point: string): void
     afterStep?(snapshot: WorkbookSnapshot): void | Promise<void>
   } = {},
-) {
+): Promise<ReturnType<typeof stateChangeset>> {
   const signal = options.signal
   const before = workbookStateSchema.parse(inputState),
     intent = transactionInputSchema.parse(rawIntent)
@@ -181,19 +233,109 @@ export async function computeCandidateState(
   })
   for (const op of intent.operations)
     if (!whitelist.has(op.op)) throw new Error(`unsupported_operation: ${op.op}`)
-  for (const op of intent.operations)
-    if (
-      (op.op === 'add_chart' || op.op === 'edit_chart') &&
-      op.chartType &&
-      !['column', 'bar', 'line', 'pie'].includes(op.chartType)
-    )
-      throw new Error('unsupported_chart_type')
   const current = workbookStateSchema.parse(material.state)
   if (
     current.stateId !== before.stateId ||
     current.sheets.map((sheet) => sheet.id).join() !== before.sheets.map((sheet) => sheet.id).join()
   )
     throw new Error('stale_candidate_material')
+  const subtotal = intent.operations.find((op) => op.op === 'subtotal')
+  if (subtotal) {
+    if (intent.operations.length !== 1)
+      throw new Error('Subtotal must be a standalone transaction.')
+    const sheet = current.sheets.find((sheet) => sheet.id === subtotal.sheetId)
+    if (!sheet) throw new Error('unknown_sheet')
+    const bounds = parseRange(subtotal.range)
+    if ((bounds.endRow - bounds.startRow + 1) * (bounds.endColumn - bounds.startColumn + 1) > 2000)
+      throw new Error('Subtotal supports at most 2000 source cells.')
+    const groupCol = columnIndex(subtotal.groupColumn),
+      valueCol = columnIndex(subtotal.valueColumn)
+    const labels: unknown[] = []
+    for (let row = bounds.startRow + 1; row <= bounds.endRow; row++) {
+      const cell = sheet.cells[formatAddress(row, groupCol)]
+      if (cell?.kind === 'error') throw new Error('Subtotal cannot group cells containing errors.')
+      if (
+        cell?.formula &&
+        (cell.calculationState !== 'ready' || !Object.hasOwn(cell, 'cachedValue'))
+      )
+        throw new Error('Wait for Subtotal group formulas to finish calculating, then retry.')
+      labels.push(cell?.formula ? cell.cachedValue : cell?.rawValue)
+    }
+    for (const item of current.sheets) {
+      const metadata = item.features?.originalMetadata as
+        { outlineLevelRow?: number; outlineLevelCol?: number } | undefined
+      if (metadata?.outlineLevelRow || metadata?.outlineLevelCol)
+        throw new Error('unsupported_structural_feature: source_outline')
+    }
+    const plan = buildSubtotalPlan(bounds, labels, { groupCol, valueCol, agg: subtotal.agg })
+    if (sheet.rows + plan.insertBefore.length > 1_048_576)
+      throw new Error('Subtotal exceeds the worksheet row limit.')
+    const structuralOps = plan.insertBefore.map((row) => ({
+      op: 'insert_rows' as const,
+      sheetId: sheet.id,
+      row: row + 1,
+      count: 1,
+    }))
+    // Private stages are never installed or journaled as separate commits.
+    // Hydrated source cells are retained across the coordinate/content boundary.
+    let stage = await computeCandidateState(
+      current,
+      { ...intent, operations: structuralOps },
+      material,
+      options,
+    )
+    const writes: import('./workbook-dsl').WorkbookOperation[] = []
+    for (const total of [...plan.totals, plan.grand]) {
+      const label = formatAddress(total.row, groupCol),
+        value = formatAddress(total.row, valueCol)
+      writes.push(
+        { op: 'set_cell', sheetId: sheet.id, address: label, value: total.label },
+        { op: 'set_formula', sheetId: sheet.id, address: value, formula: total.formula },
+        { op: 'format_range', sheetId: sheet.id, range: label, format: { bold: true } },
+        { op: 'format_range', sheetId: sheet.id, range: value, format: { bold: true } },
+      )
+    }
+    writes.push({
+      op: 'set_outline_settings',
+      sheetId: sheet.id,
+      summaryBelow: true,
+      summaryRight:
+        (sheet.features?.originalMetadata as { outlineSummaryRight?: boolean } | undefined)
+          ?.outlineSummaryRight !== false,
+    })
+    writes.push({
+      op: 'set_outline',
+      sheetId: sheet.id,
+      axis: 'rows',
+      start: bounds.startRow + 2,
+      count: plan.grand.row - bounds.startRow - 1,
+      level: 1,
+      collapsed: false,
+    })
+    for (const group of plan.totals)
+      writes.push({
+        op: 'set_outline',
+        sheetId: sheet.id,
+        axis: 'rows',
+        start: group.detailStart + 1,
+        count: group.detailEnd - group.detailStart + 1,
+        level: 2,
+        collapsed: false,
+      })
+    const affected = [...stage.affectedTargets]
+    for (let index = 0; index < writes.length; index += 500) {
+      const state = stage.nextState
+      stage = await computeCandidateState(
+        state,
+        { ...intent, operations: writes.slice(index, index + 500) },
+        { ...material, state },
+        options,
+      )
+      affected.push(...stage.affectedTargets)
+    }
+    return stateChangeset(before, stage.nextState, affected)
+  }
+  let workbookFeatures = structuredClone(current.features ?? {})
   const workbookMetadata = current.features?.originalMetadata as Record<string, unknown> | undefined
   if (
     intent.operations.some((op) => changingCoordinates.has(op.op) || op.op === 'add_sheet') &&
@@ -203,16 +345,29 @@ export async function computeCandidateState(
   if (intent.operations.some((op) => changingCoordinates.has(op.op))) {
     if (current.sheets.some((sheet) => !material.completeSheetIds.includes(sheet.id)))
       throw new Error('incomplete_structural_material')
-    if (Array.isArray(workbookMetadata?.definedNames) && workbookMetadata.definedNames.length)
+    if (
+      sessionDefinedNames(current).names.length ||
+      sessionDefinedNames(current).preserveNames.length ||
+      (Array.isArray(current.features?.definedNameReferences) &&
+        current.features.definedNameReferences.length > 0) ||
+      (Array.isArray(workbookMetadata?.reservedDefinedNames) &&
+        workbookMetadata.reservedDefinedNames.length > 0)
+    )
       throw new Error('unsupported_structural_feature: definedNames')
     let formulaCount = 0
     for (const sheet of current.sheets) {
       formulaCount += Object.values(sheet.cells).filter((cell) => cell.formula).length
       const metadata = sheet.features?.originalMetadata as Record<string, unknown> | undefined
+      if ((sheet.features?.visibilityEdits as unknown[] | undefined)?.length)
+        throw new Error('unsupported_structural_feature: session_visibility')
+      if ((sheet.features?.outlineEdits as unknown[] | undefined)?.length)
+        throw new Error('unsupported_structural_feature: session_outline')
       if (sheet.features?.mergeEdits)
         throw new Error('unsupported_structural_feature: session_merges')
       if (Object.keys((sheet.features?.noteEdits ?? {}) as object).length)
         throw new Error('unsupported_structural_feature: session_notes')
+      if (sheet.features?.hyperlinkEdits)
+        throw new Error('unsupported_structural_feature: session_hyperlinks')
       if (sheet.features?.filterEdits)
         throw new Error('unsupported_structural_feature: session_filter')
       if (sheet.features?.autoFilter) throw new Error('unsupported_structural_feature: autoFilter')
@@ -260,37 +415,129 @@ export async function computeCandidateState(
   const featureEdits = new Map<string, Record<string, unknown>>()
   const log = structuredClone(before.structuralLog)
   const sheetMap = structuredClone(before.sheetMap)
+  const nativeVisuals =
+    (
+      before.features?.originalMetadata as
+        | {
+            visuals?: WorkbookVisualObject[]
+          }
+        | undefined
+    )?.visuals ?? []
   const affected: string[] = []
   let expandedWrites = 0
   for (const [index, op] of intent.operations.entries()) {
     cancelled(signal)
+    if (op.op === 'add_defined_names') {
+      assertNameBindingsComplete({ features: workbookFeatures })
+      for (const entry of op.names) {
+        cancelled(signal)
+        workbookFeatures = {
+          ...workbookFeatures,
+          definedNamesEdits: JSON.parse(
+            JSON.stringify(
+              editSessionDefinedName(
+                { ...current, features: workbookFeatures },
+                { op: 'add_defined_name', ...entry },
+              ),
+            ),
+          ),
+        }
+      }
+      affected.push(...op.names.map((name) => name.name))
+      await options.afterStep?.(book)
+      options.fault?.(`afterOperation:${index + 1}`)
+      continue
+    }
+    if (op.op === 'manage_defined_name') {
+      const managed = manageSessionDefinedName({ ...current, features: workbookFeatures }, op)
+      const previous = (workbookFeatures.definedNameReferences ??
+        []) as unknown as NameReferenceChange[]
+      if (managed.change) {
+        const plan = {
+          changes: [managed.change],
+          sheets: current.sheets.map(({ id, name }) => ({ id, name })),
+        }
+        book = {
+          ...book,
+          sheets: book.sheets.map((sheet) => {
+            cancelled(signal)
+            return {
+              ...sheet,
+              cells: Object.fromEntries(
+                Object.entries(sheet.cells).map(([address, cell]) => {
+                  const formula = cell.formula
+                    ? rewriteNameReferences(cell.formula, sheet.id, plan)
+                    : undefined
+                  return [
+                    address,
+                    formula && formula !== cell.formula ? { ...cell, formula, value: null } : cell,
+                  ]
+                }),
+              ),
+            }
+          }),
+        }
+      }
+      workbookFeatures = {
+        ...workbookFeatures,
+        definedNamesEdits: JSON.parse(JSON.stringify(managed.names)),
+        definedNameReferences: JSON.parse(
+          JSON.stringify([...previous, ...(managed.change ? [managed.change] : [])]),
+        ),
+      }
+      affected.push(op.name)
+      await options.afterStep?.(book)
+      options.fault?.(`afterOperation:${index + 1}`)
+      continue
+    }
+    if (op.op === 'add_defined_name' || op.op === 'delete_defined_name') {
+      workbookFeatures = {
+        ...workbookFeatures,
+        definedNamesEdits: JSON.parse(
+          JSON.stringify(editSessionDefinedName({ ...current, features: workbookFeatures }, op)),
+        ),
+      }
+      affected.push(op.name)
+      await options.afterStep?.(book)
+      options.fault?.(`afterOperation:${index + 1}`)
+      continue
+    }
+    cancelled(signal)
     const target =
       'sheetId' in op
         ? book.sheets.find((sheet) => sheet.id === op.sheetId)
-        : book.sheets.find((sheet) =>
-            sheet.visuals?.some((visual) =>
-              'chartPath' in op
-                ? visual.id === op.chartPath
-                : 'visualId' in op
-                  ? visual.id === op.visualId
-                  : false,
-            ),
+        : book.sheets.find(
+            (sheet) =>
+              sheet.visuals?.some((visual) =>
+                'chartPath' in op
+                  ? visual.id === op.chartPath
+                  : 'visualId' in op
+                    ? visual.id === op.visualId
+                    : false,
+              ) ||
+              (('visualId' in op || 'chartPath' in op) &&
+                nativeVisuals.some(
+                  (visual) =>
+                    ('visualId' in op
+                      ? visual.id === op.visualId
+                      : visual.chartPath === op.chartPath) &&
+                    visual.sheetId ===
+                      current.sheets.find((item) => item.id === sheet.id)?.originalSheetId,
+                )),
           )
     const permissions = current.sheets.find((sheet) => sheet.id === target?.id)
-    if (op.op === 'sort_range') {
-      const filter = (
-        permissions?.features?.filterEdits as { filter?: { columns?: unknown[] } } | undefined
-      )?.filter
-      if (
-        filter?.columns?.length ||
-        (!permissions?.features?.filterEdits &&
-          (permissions?.features?.autoFilterColumns as unknown[] | undefined)?.length)
-      )
-        throw new Error('active_filter_sort: clear the filter criteria before sorting')
-    }
-    if (target && !material.writableSheetIds.includes(target.id))
+    const viewWrite =
+      !!target &&
+      isWorksheetViewOperation(op) &&
+      material.viewWritableSheetIds?.includes(target.id) === true
+    if (target && !material.writableSheetIds.includes(target.id) && !viewWrite)
       throw new Error('unverified_writable_target')
-    if (permissions?.readOnly || permissions?.protected) throw new Error('protected_target')
+    if (
+      workbookMetadata?.readOnly ||
+      permissions?.readOnly ||
+      (permissions?.protected && !viewWrite)
+    )
+      throw new Error('protected_target')
     assertMergeOperation(
       {
         ...current,
@@ -333,16 +580,303 @@ export async function computeCandidateState(
                 op.name,
               )
     }
+    const checkedChartRange = (range: string, sheetId: string) => {
+      const resolved = resolveChartRange(range, book.sheets, sheetId)
+      const covered =
+        material.completeSheetIds.includes(resolved.sheetId) ||
+        (material.referenceRanges?.[resolved.sheetId] ?? []).some((area) => {
+          const bounds = parseRange(area)
+          return (
+            bounds.startRow <= resolved.bounds.startRow &&
+            bounds.endRow >= resolved.bounds.endRow &&
+            bounds.startColumn <= resolved.bounds.startColumn &&
+            bounds.endColumn >= resolved.bounds.endColumn
+          )
+        })
+      if (!covered) throw new Error('incomplete_chart_material')
+      const typed = current.sheets.find((sheet) => sheet.id === resolved.sheetId)!
+      const source = book.sheets.find((sheet) => sheet.id === resolved.sheetId)!
+      for (const address of rangeAddresses(resolved.bounds)) {
+        const cell = typed.cells[address]
+        if (
+          source.cells[address]?.formula &&
+          (cell?.formula !== source.cells[address]?.formula ||
+            (cell.calculationState !== 'ready' && cell.calculationState !== 'error'))
+        )
+          throw new Error('chart_formula_pending')
+      }
+      return resolved
+    }
+    if (op.op === 'edit_chart' && target) {
+      if (op.seriesData && op.seriesSelection) throw new Error('chart_series_edit_conflict')
+      for (const entry of op.seriesData ?? [])
+        for (const range of [entry.valuesRange, entry.categoriesRange])
+          if (range) checkedChartRange(range, entry.sheetId ?? target.id)
+      if (op.seriesSelection) {
+        const native = nativeVisuals.find((v) => v.chartPath === op.chartPath)
+        const own = target.visuals?.find((v) => v.id === op.chartPath)
+        const overlays = (featureEdits.get(target.id)?.chartEdits ??
+          permissions?.features?.chartEdits ??
+          {}) as Record<string, ChartStateEdit>
+        const chart =
+          own?.chart ??
+          (native?.chart ? applyChartStateEdit(native.chart, overlays[op.chartPath]) : undefined)
+        if (!chart) throw new Error('unknown_chart')
+        for (const reference of chartSelectionReferences(chart, op.seriesSelection))
+          checkedChartRange(reference, target.id)
+      }
+    }
     let next: WorkbookSnapshot
-    if (
+    if (op.op === 'edit_chart' && op.chartPath.startsWith('xl/')) {
+      const matches = nativeVisuals.filter((visual) => visual.chartPath === op.chartPath)
+      if (matches.length !== 1 || !matches[0]?.chart || !target) throw new Error('unknown_chart')
+      const native = matches[0]
+      const features = featureEdits.get(target.id) ?? structuredClone(permissions?.features ?? {})
+      if (
+        (features.visualEdits as Record<string, { remove?: true }> | undefined)?.[native.id]?.remove
+      )
+        throw new Error('visual_removed')
+      const { op: _op, seriesData, seriesSelection, ...patch } = op
+      const chart = native.chart!
+      const edits = (features.chartEdits ?? {}) as Record<string, Record<string, unknown>>
+      let previous = edits[op.chartPath] ?? {}
+      const currentChart = applyChartStateEdit(chart, previous as ChartStateEdit)
+      const seriesSet = seriesSelection
+        ? buildChartSeriesSelection(currentChart, seriesSelection, (reference) => {
+            const resolved = checkedChartRange(reference, target.id)
+            const source = book.sheets.find((sheet) => sheet.id === resolved.sheetId)!
+            return {
+              ref: resolved.ref,
+              vector: rangeAddresses(resolved.bounds).map(
+                (address) => source.cells[address]?.value ?? null,
+              ),
+            }
+          })
+        : undefined
+      if (seriesSet) {
+        previous = { ...previous }
+        for (const key of [
+          'series',
+          'seriesSet',
+          'seriesColors',
+          'pointColors',
+          'pointExplosions',
+          'explosionPct',
+        ])
+          delete previous[key]
+      }
+      const kind = chartKindFromVisual(chart)
+      if (
+        op.chartType !== undefined &&
+        (!kind || !['column', 'bar', 'line', 'area', 'pie', 'doughnut'].includes(kind))
+      )
+        throw new Error('unsupported_chart_conversion')
+      const series = chartSeriesRangeEdits(
+        book,
+        target.id,
+        currentChart.series.length,
+        seriesData ?? [],
+        (sheetId, address) => {
+          const cell = current.sheets.find((sheet) => sheet.id === sheetId)?.cells[address]
+          if (
+            cell?.formula &&
+            cell.calculationState !== 'ready' &&
+            cell.calculationState !== 'error'
+          )
+            throw new Error('chart_formula_pending')
+        },
+      )
+      let merged = {
+        ...previous,
+        ...patch,
+        ...(seriesSet ? { seriesSet } : {}),
+        ...(series.length
+          ? {
+              series: (() => {
+                const previousSeries = (previous.series ?? []) as NonNullable<
+                  ReturnType<typeof chartSeriesRangeEdits>
+                >
+                const merged = new Map(previousSeries.map((entry) => [entry.index, entry]))
+                for (const entry of series)
+                  merged.set(entry.index, { ...merged.get(entry.index), ...entry })
+                return [...merged.values()]
+              })(),
+            }
+          : {}),
+        ...(op.seriesColors
+          ? { seriesColors: { ...(previous.seriesColors as object), ...op.seriesColors } }
+          : {}),
+        ...(op.pointColors
+          ? {
+              pointColors: Object.fromEntries(
+                Array.from(
+                  new Set([
+                    ...Object.keys((previous.pointColors ?? {}) as object),
+                    ...Object.keys(op.pointColors),
+                  ]),
+                  (index) => [
+                    index,
+                    {
+                      ...((previous.pointColors as Record<string, object> | undefined)?.[index] ??
+                        {}),
+                      ...op.pointColors?.[index],
+                    },
+                  ],
+                ),
+              ),
+            }
+          : {}),
+        ...(op.valueAxis
+          ? { valueAxis: { ...(previous.valueAxis as object), ...op.valueAxis } }
+          : {}),
+        ...(op.pointExplosions
+          ? { pointExplosions: { ...(previous.pointExplosions as object), ...op.pointExplosions } }
+          : {}),
+        ...(op.axisTitles
+          ? { axisTitles: { ...(previous.axisTitles as object), ...op.axisTitles } }
+          : {}),
+      }
+      assertChartFormat(currentChart, {
+        ...patch,
+        ...(seriesSet ? { seriesSet } : {}),
+        ...(seriesSet ? { seriesSet } : {}),
+        ...(series.length ? { series } : {}),
+      })
+      if (op.chartType !== undefined) merged = pruneChartSettingsForType(merged, op.chartType)
+      const edit = workbookChartEditSchema.parse(merged)
+      const effective = applyChartStateEdit(chart, edit)
+      if (op.axisTitles && effective.chartTypes.some((type) => /pie|doughnut/i.test(type)))
+        throw new Error('unsupported_chart_axes')
+      if (
+        op.grouping &&
+        !effective.chartTypes.some((type) => /^(barChart|lineChart|areaChart)$/.test(type))
+      )
+        throw new Error('unsupported_chart_grouping')
+      features.chartEdits = { ...edits, [op.chartPath]: edit }
+      featureEdits.set(target.id, features)
+      next = structuredClone(book)
+    } else if (
+      op.op === 'set_visual_anchor' ||
+      op.op === 'delete_visual' ||
+      op.op === 'edit_visual' ||
+      op.op === 'edit_shape'
+    ) {
+      const own = target?.visuals?.find((visual) => visual.id === op.visualId)
+      const native = nativeVisuals.find(
+        (visual) => visual.id === op.visualId && visual.sheetId === permissions?.originalSheetId,
+      )
+      if (!own && native) {
+        if (op.op === 'edit_shape') throw new Error('unknown_shape')
+        if (!native.drawingPath || native.drawingIndex === undefined)
+          throw new Error('unsupported_visual_anchor')
+        const features =
+          featureEdits.get(target!.id) ?? structuredClone(permissions?.features ?? {})
+        const edits = (features.visualEdits ?? {}) as Record<
+          string,
+          { anchor?: unknown; remove?: true }
+        >
+        if (edits[native.id]?.remove) throw new Error('visual_removed')
+        if (op.op === 'edit_visual') {
+          if ((op.fillColor !== undefined || op.lineColor !== undefined) && native.kind !== 'shape')
+            throw new Error('unsupported_visual_paint')
+          if (
+            (op.rotation !== undefined ||
+              op.flipH !== undefined ||
+              op.flipV !== undefined ||
+              op.frameSize !== undefined) &&
+            native.kind !== 'shape' &&
+            native.kind !== 'image'
+          )
+            throw new Error('unsupported_visual_transform')
+          if (op.frameSize !== undefined && !edits[native.id]?.anchor)
+            throw new Error('visual_frame_requires_anchor')
+
+          if (nativeVisuals.filter((v) => v.id === op.visualId).length !== 1)
+            throw new Error('ambiguous_visual')
+          if (op.editAs !== undefined && native.editAs === undefined)
+            throw new Error('unsupported_visual_placement')
+          if (op.zIndex !== undefined) {
+            const part = nativeVisuals.filter(
+              (v) =>
+                v.drawingPath === native.drawingPath &&
+                v.drawingIndex !== undefined &&
+                !edits[v.id]?.remove,
+            )
+            if (op.zIndex >= part.length) throw new Error('invalid_visual_z_index')
+          }
+        }
+        const patch =
+          op.op === 'delete_visual'
+            ? { remove: true as const }
+            : op.op === 'edit_visual'
+              ? (({ op: _op, visualId: _id, ...properties }) => properties)(op)
+              : { anchor: structuredClone(op.anchor) }
+        workbookVisualEditSchema.parse({
+          ...edits[native.id],
+          ...patch,
+          drawingPath: native.drawingPath,
+          drawingIndex: native.drawingIndex,
+        })
+        const mergedEdits = {
+          ...edits,
+          [native.id]:
+            op.op === 'delete_visual'
+              ? { remove: true as const }
+              : { ...edits[native.id], ...patch },
+        }
+        if (op.op === 'edit_visual' && op.zIndex !== undefined) {
+          const part = projectVisualOrder(
+            nativeVisuals.filter(
+              (v) =>
+                v.sheetId === native.sheetId &&
+                v.drawingPath === native.drawingPath &&
+                v.drawingIndex !== undefined &&
+                !edits[v.id]?.remove,
+            ),
+            (v) => (edits[v.id] as { zIndex?: number } | undefined)?.zIndex,
+          )
+          const at = part.findIndex((v) => v.id === native.id)
+          const reordered = [...part]
+          reordered.splice(at, 1)
+          reordered.splice(op.zIndex, 0, native)
+          reordered.forEach((visual, zIndex) => {
+            mergedEdits[visual.id] = { ...mergedEdits[visual.id], zIndex }
+          })
+        }
+        features.visualEdits = mergedEdits
+        featureEdits.set(target!.id, features)
+        next = structuredClone(book)
+      } else {
+        if (!own) throw new Error('unknown_visual')
+        const adapter = new InMemoryWorkbookAdapter(book)
+        adapter.apply(
+          adapter.plan({
+            dslVersion: 1,
+            transactionId: `${intent.transactionId}-${index}`,
+            baseRevision: book.revision,
+            summary: intent.summary,
+            operations: [op],
+          }),
+        )
+        next = adapter.getSnapshot()
+      }
+    } else if (
       op.op === 'merge_cells' ||
       op.op === 'unmerge_cells' ||
       op.op === 'set_page_setup' ||
       op.op === 'set_freeze' ||
       op.op === 'set_note' ||
+      op.op === 'set_hyperlink' ||
       op.op === 'set_filter' ||
       op.op === 'clear_filter' ||
-      op.op === 'set_filter_criteria'
+      op.op === 'clear_filter_criteria' ||
+      op.op === 'reapply_filter' ||
+      op.op === 'set_filter_criteria' ||
+      op.op === 'set_data_validation' ||
+      op.op === 'set_rows_hidden' ||
+      op.op === 'set_cols_hidden' ||
+      op.op === 'set_outline' ||
+      op.op === 'set_outline_settings'
     ) {
       const features =
         featureEdits.get(op.sheetId) ??
@@ -368,10 +902,113 @@ export async function computeCandidateState(
       } else if (
         op.op === 'set_filter' ||
         op.op === 'clear_filter' ||
+        op.op === 'clear_filter_criteria' ||
+        op.op === 'reapply_filter' ||
         op.op === 'set_filter_criteria'
-      )
-        features.filterEdits = updateSessionFilter(features, op, book, current.dateSystem)
-      else if (op.op === 'set_page_setup') {
+      ) {
+        const nextFilter = updateSessionFilter(
+          features,
+          op,
+          book,
+          current.dateSystem,
+          (current.features?.originalMetadata as { themeColors?: string[] } | undefined)
+            ?.themeColors ?? undefined,
+        )
+        // A source row hidden without live filter criteria is manually hidden.
+        // Record that provenance before canonical filter visibility replaces the
+        // file cache; the same journal survives projection, sorting and saving.
+        if (!features.filterEdits) {
+          const visibility = visibilityEditsSchema.parse(features.visibilityEdits ?? [])
+          const originalFilter = features.autoFilter as
+            { startRow: number; endRow: number } | undefined
+          const hasCriteria =
+            Array.isArray(features.autoFilterColumns) && features.autoFilterColumns.length > 0
+          for (const row of material.hiddenRows?.[op.sheetId] ?? []) {
+            if (
+              row <= nextFilter.visibilityRange.startRow ||
+              row > nextFilter.visibilityRange.endRow ||
+              axisHiddenOverride(visibility, 'rows', row) !== undefined ||
+              (hasCriteria &&
+                originalFilter &&
+                row > originalFilter.startRow &&
+                row <= originalFilter.endRow)
+            )
+              continue
+            visibility.push({ axis: 'rows', start: row, count: 1, hidden: true })
+          }
+          if (visibility.length) features.visibilityEdits = visibility
+        }
+        if ((op.op === 'set_filter_criteria' || op.op === 'reapply_filter') && nextFilter.filter) {
+          const typed = current.sheets.find((sheet) => sheet.id === op.sheetId)!
+          const source = book.sheets.find((sheet) => sheet.id === op.sheetId)!
+          const contentOps = new Set([
+            'set_cell',
+            'set_formula',
+            'clear_cell',
+            'set_range',
+            'clear_range',
+            'paste_cells',
+            'sort_range',
+            'find_replace',
+            'fill_range',
+            'copy_range',
+            'relocate_range',
+            'add_defined_name',
+            'add_defined_names',
+            'manage_defined_name',
+            'delete_defined_name',
+            'set_rows_hidden',
+            'set_cols_hidden',
+          ])
+          const changedEarlier = intent.operations
+            .slice(0, index)
+            .some((earlier) => contentOps.has(earlier.op))
+          for (const column of nextFilter.filter.columns.filter((column) => !column.colors))
+            for (
+              let row = nextFilter.filter.range.startRow + 1;
+              row <= nextFilter.filter.range.endRow;
+              row++
+            ) {
+              const address = formatAddress(row, nextFilter.filter.range.startColumn + column.colId)
+              const cell = typed.cells[address]
+              if (
+                source.cells[address]?.formula &&
+                (changedEarlier ||
+                  cell?.formula !== source.cells[address]!.formula ||
+                  (cell.calculationState !== 'ready' && cell.calculationState !== 'error') ||
+                  !Object.hasOwn(cell, 'cachedValue'))
+              )
+                throw new Error(
+                  'filter_formula_pending: recalculate current source values before filtering',
+                )
+            }
+        }
+        features.filterEdits = nextFilter
+      } else if (op.op === 'set_data_validation') {
+        const area = parseRange(op.range),
+          edits = (features.dataValidationEdits ?? { rules: [], remove: [] }) as {
+            rules: DvWireRule[]
+            remove: DvCellArea[]
+          }
+        edits.rules = subtractDvRules(edits.rules, [area])
+        if (!edits.remove.some((range) => JSON.stringify(range) === JSON.stringify(area)))
+          edits.remove.push(area)
+        if (op.validation !== null)
+          edits.rules.push({ ranges: [area], rule: dvRuleToWireRule(op.validation) })
+        features.dataValidationEdits = edits
+      } else if (op.op === 'set_rows_hidden' || op.op === 'set_cols_hidden') {
+        const edit = visibilityEditSchema.parse({
+          axis: op.op === 'set_rows_hidden' ? 'rows' : 'cols',
+          start: op.op === 'set_rows_hidden' ? op.row - 1 : columnIndex(op.column),
+          count: op.count,
+          hidden: op.hidden,
+        })
+        features.visibilityEdits = [...((features.visibilityEdits ?? []) as unknown[]), edit]
+      } else if (op.op === 'set_outline' || op.op === 'set_outline_settings') {
+        features.outlineEdits = JSON.parse(
+          JSON.stringify([...((features.outlineEdits ?? []) as unknown[]), op]),
+        )
+      } else if (op.op === 'set_page_setup') {
         const { op: _op, sheetId: _id, ...patch } = op
         const page = { ...((features.pageSetupEdits ?? {}) as Record<string, unknown>), ...patch }
         if (op.scale !== undefined) {
@@ -382,6 +1019,11 @@ export async function computeCandidateState(
         features.pageSetupEdits = page
       } else if (op.op === 'set_freeze')
         features.freezeEdits = { frozenRows: op.rows, frozenColumns: op.columns }
+      else if (op.op === 'set_hyperlink')
+        features.hyperlinkEdits = {
+          ...((features.hyperlinkEdits ?? {}) as Record<string, string | null>),
+          [op.address]: op.target,
+        }
       else {
         const metadata = features.originalMetadata as
           { comments?: { image?: unknown }[] } | undefined
@@ -394,6 +1036,143 @@ export async function computeCandidateState(
       }
       featureEdits.set(op.sheetId, features)
       next = structuredClone(book)
+    } else if (op.op === 'relocate_range') {
+      if (current.sheets.some((sheet) => !material.completeSheetIds.includes(sheet.id)))
+        throw new Error('incomplete_move_material')
+      const features = new Map(
+        current.sheets.map((sheet) => [
+          sheet.id,
+          structuredClone(featureEdits.get(sheet.id) ?? sheet.features ?? {}),
+        ]),
+      )
+      const moved = moveSessionRange(
+        book,
+        op,
+        typedTemplates,
+        features,
+        material.writableSheetIds,
+        signal,
+      )
+      const defined = sessionDefinedNames({ ...current, features: workbookFeatures })
+      if (defined.preserveNames.length) throw new Error('unsupported_move_feature: definedNames')
+      for (const entry of defined.names) {
+        const owner =
+          current.sheets.find((sheet) => sheet.id === entry.scopeSheetId) ?? current.sheets[0]!
+        if (
+          moveFormulaRefs(entry.formula, moved.spec, owner.name) !== entry.formula ||
+          (entry.scopeSheetId !== undefined && op.sourceSheetId !== op.sheetId)
+        )
+          throw new Error('unsupported_move_feature: definedNames')
+      }
+      for (const visual of nativeVisuals)
+        if (visual.kind === 'chart' && visual.chart)
+          for (const series of visual.chart.series)
+            for (const key of ['valuesRef', 'categoriesRef', 'nameRef'] as const)
+              if (series[key] && moveFormulaRefs(series[key]!, moved.spec, '') !== series[key])
+                throw new Error('unsupported_move_feature: native_chart_reference')
+      for (const [id, data] of features) featureEdits.set(id, data)
+      expandedWrites += moved.writes
+      if (expandedWrites > 2000)
+        throw new Error('expanded_write_limit: ordinary batches allow 2000 cells')
+      affected.push(...moved.affected)
+      next = moved.book
+      const size = dimensions.get(op.sheetId)!
+      size.rows = Math.max(size.rows, moved.target.endRow + 1)
+      size.columns = Math.max(size.columns, moved.target.endColumn + 1)
+    } else if (op.op === 'paste_cells') {
+      const origin = parseAddress(op.start),
+        sheet = book.sheets.find((s) => s.id === op.sheetId)!
+      const cells = { ...sheet.cells },
+        styles = { ...sheet.styles },
+        templates = typedTemplates.get(sheet.id) ?? {}
+      for (const [r, row] of op.cells.entries())
+        for (const [c, input] of row.entries()) {
+          const address = formatAddress(origin.row + r, origin.column + c)
+          if (op.skipCells?.includes(address)) continue
+          const prior = templates[address] ?? { kind: 'blank' as const, rawValue: null }
+          const actual = sheet.cells[address] ?? { value: null }
+          const oldStyle = typedStyle(sheet.styles?.[address], prior.style)
+          const currentCell: TypedCell = {
+            ...prior,
+            rawValue: actual.value,
+            kind:
+              prior.rawValue === actual.value
+                ? prior.kind
+                : actual.value === null
+                  ? 'blank'
+                  : typeof actual.value === 'number'
+                    ? 'number'
+                    : typeof actual.value === 'boolean'
+                      ? 'boolean'
+                      : 'string',
+            ...(oldStyle ? { style: oldStyle } : {}),
+          }
+          if (actual.formula) currentCell.formula = actual.formula
+          else delete currentCell.formula
+          if (oldStyle?.numberFormat) currentCell.numberFormat = oldStyle.numberFormat
+          const value = pasteCellFields(currentCell, input, op)
+          if (
+            op.writeValues !== false &&
+            input.kind === 'date' &&
+            input.dateSystem !== (before.dateSystem ?? '1900')
+          )
+            throw new Error('date_system_mismatch')
+          if (op.writeValues !== false) {
+            if (value.formula) {
+              value.kind = 'blank'
+              value.rawValue = null
+              value.calculationState = 'pending'
+              delete value.cachedValue
+            }
+            cells[address] = {
+              value: value.rawValue,
+              ...(value.formula ? { formula: value.formula } : {}),
+              ...(value.kind === 'error' ? { error: true } : {}),
+            }
+          }
+          styles[address] = formatState(value)
+          templates[address] = value
+        }
+      if (op.merges !== undefined) {
+        const area = {
+          startRow: origin.row,
+          startColumn: origin.column,
+          endRow: origin.row + op.cells.length - 1,
+          endColumn: origin.column + op.cells[0]!.length - 1,
+        }
+        const features = {
+          ...(featureEdits.get(sheet.id) ??
+            current.sheets.find((s) => s.id === sheet.id)!.features ??
+            {}),
+        }
+        features.mergeEdits = sessionMerges(features).filter(
+          (m) =>
+            !(
+              m.startRow <= area.endRow &&
+              m.endRow >= area.startRow &&
+              m.startColumn <= area.endColumn &&
+              m.endColumn >= area.startColumn
+            ),
+        )
+        for (const range of op.merges)
+          features.mergeEdits = updateSessionMerges(
+            features,
+            { op: 'merge_cells', sheetId: sheet.id, range },
+            templates,
+          )
+        featureEdits.set(sheet.id, features)
+      }
+      typedTemplates.set(sheet.id, templates)
+      expandedWrites += op.cells.length * op.cells[0]!.length
+      if (expandedWrites > 2000)
+        throw new Error('expanded_write_limit: ordinary batches allow 2000 cells')
+      next = {
+        ...book,
+        sheets: book.sheets.map((s) => (s.id === sheet.id ? { ...s, cells, styles } : s)),
+      }
+      const size = dimensions.get(sheet.id)!
+      size.rows = Math.max(size.rows, origin.row + op.cells.length)
+      size.columns = Math.max(size.columns, origin.column + op.cells[0]!.length)
     } else if (op.op === 'copy_range' || op.op === 'fill_range') {
       const copied = copySessionRange(book, op, typedTemplates, signal)
       next = copied.snapshot
@@ -401,7 +1180,17 @@ export async function computeCandidateState(
       size.rows = Math.max(size.rows, copied.target.endRow + 1)
       size.columns = Math.max(size.columns, copied.target.endColumn + 1)
     } else {
-      const adapter = new InMemoryWorkbookAdapter(book, { sortLocale: SESSION_SORT_LOCALE })
+      const sortVisible =
+        op.op === 'sort_range'
+          ? sortRowVisibility(
+              featureEdits.get(op.sheetId) ?? permissions?.features ?? {},
+              material.hiddenRows?.[op.sheetId],
+            )
+          : undefined
+      const adapter = new InMemoryWorkbookAdapter(book, {
+        sortLocale: SESSION_SORT_LOCALE,
+        ...(sortVisible ? { sortRowVisible: sortVisible } : {}),
+      })
       const plan = adapter.plan({
         dslVersion: 1,
         summary: intent.summary,
@@ -435,16 +1224,31 @@ export async function computeCandidateState(
         }
       adapter.apply(plan)
       next = adapter.getSnapshot()
+      if (op.op === 'format_range' && op.reset) {
+        const range = parseRange(op.range),
+          templates = typedTemplates.get(op.sheetId)!
+        for (let row = range.startRow; row <= range.endRow; row++)
+          for (let column = range.startColumn; column <= range.endColumn; column++) {
+            const address = formatAddress(row, column)
+            const template = templates[address] ?? { kind: 'blank' as const, rawValue: null }
+            templates[address] = { ...template, style: {}, styleReset: true }
+            delete templates[address]!.numberFormat
+          }
+      }
       if (op.op === 'sort_range') {
         const range = parseRange(op.range),
           first = range.startRow + (op.hasHeader ? 1 : 0)
         const sourceSheet = book.sheets.find((sheet) => sheet.id === op.sheetId)!
         const targetSheet = next.sheets.find((sheet) => sheet.id === op.sheetId)!
-        const matrix = Array.from({ length: range.endRow - first + 1 }, (_, r) =>
+        const rowIndices = Array.from(
+          { length: range.endRow - first + 1 },
+          (_, r) => first + r,
+        ).filter((row) => sortVisible!(row))
+        const matrix = rowIndices.map((sourceRow) =>
           Array.from(
             { length: range.endColumn - range.startColumn + 1 },
             (_, c) =>
-              sourceSheet.cells[formatAddress(first + r, range.startColumn + c)]?.value ?? null,
+              sourceSheet.cells[formatAddress(sourceRow, range.startColumn + c)]?.value ?? null,
           ),
         )
         const order = computeSortedRowOrder(
@@ -452,14 +1256,18 @@ export async function computeCandidateState(
           columnIndex(op.byColumn) - range.startColumn,
           op.order === 'asc',
           SESSION_SORT_LOCALE,
+          op.levels?.map((level) => ({
+            keyOffset: columnIndex(level.byColumn) - range.startColumn,
+            ascending: level.order === 'asc',
+          })),
         )
         const templates = typedTemplates.get(op.sheetId)!,
           old = structuredClone(templates)
         const styles = { ...targetSheet.styles }
         for (const [row, source] of order.entries())
           for (let column = range.startColumn; column <= range.endColumn; column++) {
-            const from = formatAddress(first + source, column),
-              to = formatAddress(first + row, column)
+            const from = formatAddress(rowIndices[source]!, column),
+              to = formatAddress(rowIndices[row]!, column)
             if (old[from]) templates[to] = structuredClone(old[from]!)
             else delete templates[to]
             if (sourceSheet.styles?.[from]) styles[to] = structuredClone(sourceSheet.styles[from]!)
@@ -500,6 +1308,26 @@ export async function computeCandidateState(
       dimensions.set(logicalId, { rows: fresh.gridRows ?? 1000, columns: fresh.gridColumns ?? 20 })
       affected.push(logicalId)
     }
+    if (op.op === 'add_shape' || op.op === 'add_picture') {
+      next = {
+        ...next,
+        sheets: next.sheets.map((sheet) =>
+          sheet.id === op.sheetId
+            ? {
+                ...sheet,
+                visuals: sheet.visuals?.map((visual, at) =>
+                  at === sheet.visuals!.length - 1
+                    ? {
+                        ...visual,
+                        id: `added-${op.op === 'add_picture' ? 'image' : 'shape'}-${material.allocation.stateId}-${index}`,
+                      }
+                    : visual,
+                ),
+              }
+            : sheet,
+        ),
+      }
+    }
     if (op.op === 'set_row_height')
       dimensions.get(op.sheetId)!.rows = Math.max(
         dimensions.get(op.sheetId)!.rows,
@@ -522,6 +1350,21 @@ export async function computeCandidateState(
     }
     if (isStructuralOp(op)) {
       const spec = shiftSpecForOp(op)
+      if (spec?.axis === 'column' && 'sheetId' in op) {
+        const features =
+          featureEdits.get(op.sheetId) ??
+          structuredClone(current.sheets.find((sheet) => sheet.id === op.sheetId)!.features ?? {})
+        const widths = features.columnWidthsCharacters as Record<string, number> | undefined
+        if (widths) {
+          const shifted: Record<string, number> = {}
+          for (const [column, value] of Object.entries(widths)) {
+            const nextColumn = shiftIndex(columnIndex(column), spec)
+            if (nextColumn !== null) shifted[formatAddress(0, nextColumn).replace(/1$/, '')] = value
+          }
+          features.columnWidthsCharacters = shifted
+          featureEdits.set(op.sheetId, features)
+        }
+      }
       if (spec && 'sheetId' in op) {
         const templates = typedTemplates.get(op.sheetId) ?? {},
           moved: Record<string, TypedCell> = {}
@@ -568,7 +1411,7 @@ export async function computeCandidateState(
                 if (value === null) throw new Error('chart_anchor_deleted')
                 visual.anchor[key] = value
               }
-            for (const series of visual.chart.series)
+            for (const series of visual.kind === 'chart' ? visual.chart.series : [])
               for (const key of ['valuesRef', 'categoriesRef', 'nameRef'] as const)
                 if (series[key])
                   series[key] = shiftFormulaText(
@@ -592,7 +1435,7 @@ export async function computeCandidateState(
       log.push(op)
       for (const sheet of next.sheets)
         for (const visual of sheet.visuals ?? [])
-          for (const series of visual.chart.series)
+          for (const series of visual.kind === 'chart' ? visual.chart.series : [])
             for (const key of ['valuesRef', 'categoriesRef', 'nameRef'] as const)
               if (series[key])
                 series[key] = renameSheetInFormula(series[key]!, target!.name, op.name)
@@ -605,26 +1448,158 @@ export async function computeCandidateState(
         gridColumns: Math.max(1, dimensions.get(sheet.id)?.columns ?? sheet.gridColumns ?? 20),
       })),
     }
-    refreshChartReferences(
-      next,
-      [
-        ...material.completeSheetIds,
-        ...next.sheets
-          .filter((sheet) => !current.sheets.some((previous) => previous.id === sheet.id))
-          .map((sheet) => sheet.id),
-      ],
-      material.referenceRanges,
-    )
+    if (op.op === 'set_col_width') {
+      const features =
+        featureEdits.get(op.sheetId) ??
+        structuredClone(current.sheets.find((sheet) => sheet.id === op.sheetId)!.features ?? {})
+      const widths = { ...((features.columnWidthsCharacters ?? {}) as Record<string, number>) }
+      for (let index = 0; index < op.count; index++) {
+        const column = formatAddress(0, columnIndex(op.column) + index).replace(/1$/, '')
+        widths[column] =
+          op.widthCharacters ??
+          Math.max(
+            0,
+            Math.round(
+              (op.widthPx /
+                measureNormalFontMdw(
+                  (current.features?.originalMetadata ?? {}) as NormalFontDescriptor,
+                )) *
+                256,
+            ) / 256,
+          )
+      }
+      if (
+        Object.values(widths).some((width) => width > 255 || width < 0 || !Number.isFinite(width))
+      )
+        throw new Error('column_width_out_of_range: Excel supports 0 to 255 characters')
+      features.columnWidthsCharacters = widths
+      featureEdits.set(op.sheetId, features)
+    }
+    if (op.op !== 'set_page_setup')
+      refreshChartReferences(
+        next,
+        [
+          ...material.completeSheetIds,
+          ...next.sheets
+            .filter((sheet) => !current.sheets.some((previous) => previous.id === sheet.id))
+            .map((sheet) => sheet.id),
+        ],
+        material.referenceRanges,
+      )
     await options.afterStep?.(next)
     book = next
     affected.push('sheetId' in op ? op.sheetId : op.op)
     options.fault?.(`afterOperation:${index + 1}`)
+  }
+  // Keep journaled original-chart caches aligned with their current references.
+  for (const owner of intent.operations.every((op) =>
+    [
+      'set_page_setup',
+      'add_defined_name',
+      'delete_defined_name',
+      'manage_defined_name',
+      'add_defined_names',
+    ].includes(op.op),
+  )
+    ? []
+    : book.sheets) {
+    const features =
+      featureEdits.get(owner.id) ??
+      structuredClone(current.sheets.find((sheet) => sheet.id === owner.id)?.features ?? {})
+    const edits = (features.chartEdits ?? {}) as Record<
+      string,
+      ChartStateEdit & { chartPath?: string }
+    >
+    let refreshed = false
+    for (const [path, edit] of Object.entries(edits)) {
+      if (!edit.series?.length && !edit.seriesSet?.length) continue
+      const native = nativeVisuals.find(
+        (visual) =>
+          visual.chartPath === path &&
+          visual.sheetId === current.sheets.find((sheet) => sheet.id === owner.id)?.originalSheetId,
+      )
+      if (
+        !native?.chart ||
+        (features.visualEdits as Record<string, { remove?: true }> | undefined)?.[native.id]?.remove
+      )
+        continue
+      const entries = edit.seriesSet
+        ? applyChartStateEdit(native.chart, edit).series.map((entry, index) => ({
+            ...entry,
+            index,
+          }))
+        : (edit.series ?? [])
+      const updates = entries.map((entry) => {
+        if (!entry.valuesRef && !entry.categoriesRef) return entry
+        for (const ref of [entry.valuesRef, entry.categoriesRef]) {
+          if (!ref) continue
+          const resolved = resolveChartRange(ref, book.sheets, owner.id)
+          const covered =
+            material.completeSheetIds.includes(resolved.sheetId) ||
+            (material.referenceRanges?.[resolved.sheetId] ?? []).some((area) => {
+              const bounds = parseRange(area)
+              return (
+                bounds.startRow <= resolved.bounds.startRow &&
+                bounds.endRow >= resolved.bounds.endRow &&
+                bounds.startColumn <= resolved.bounds.startColumn &&
+                bounds.endColumn >= resolved.bounds.endColumn
+              )
+            })
+          if (!covered) throw new Error('incomplete_chart_material')
+        }
+        const data = chartSeriesRangeEdits(
+          book,
+          owner.id,
+          edit.seriesSet?.length ?? native.chart!.series.length,
+          [
+            {
+              index: entry.index,
+              ...(entry.valuesRef ? { valuesRange: entry.valuesRef } : {}),
+              ...(entry.categoriesRef ? { categoriesRange: entry.categoriesRef } : {}),
+            },
+          ],
+          (sheetId, address) => {
+            const cell = current.sheets.find((sheet) => sheet.id === sheetId)?.cells[address]
+            if (
+              book.sheets.find((sheet) => sheet.id === sheetId)?.cells[address]?.formula &&
+              cell?.calculationState !== 'ready' &&
+              cell?.calculationState !== 'error'
+            )
+              throw new Error('chart_formula_pending')
+          },
+        )[0]!
+        return { ...entry, ...data }
+      })
+      edits[path] = workbookChartEditSchema.parse({
+        ...edit,
+        chartPath: path,
+        ...(edit.seriesSet
+          ? {
+              series: undefined,
+              seriesSet: updates.map((series) => ({
+                name: series.name,
+                values: series.values,
+                categories: series.categories,
+                valuesRef: series.valuesRef,
+                categoriesRef: series.categoriesRef,
+                color: 'color' in series ? series.color : undefined,
+              })),
+            }
+          : { series: updates }),
+      })
+      refreshed = true
+    }
+    if (refreshed) {
+      features.chartEdits = edits
+      featureEdits.set(owner.id, features)
+    }
   }
   const after: CandidateState = {
     ...before,
     stateId: material.allocation.stateId,
     structuralLog: log,
     sheetMap,
+    ...(Object.keys(workbookFeatures).length ? { features: workbookFeatures } : {}),
     sheets: book.sheets.map((sheet: WorksheetState) => {
       const original = current.sheets.find((item) => item.id === sheet.id)
       const cells: Record<string, TypedCell> = {}
@@ -662,7 +1637,9 @@ export async function computeCandidateState(
         cells[address] = {
           kind,
           rawValue: cell.value,
-          ...(kind === 'date' ? { dateSystem: before.dateSystem } : {}),
+          ...(kind === 'date'
+            ? { dateSystem: before.dateSystem ?? template?.dateSystem ?? '1900' }
+            : {}),
           ...(cell.formula
             ? {
                 formula: cell.formula,
@@ -671,6 +1648,7 @@ export async function computeCandidateState(
               }
             : {}),
           ...(style ? { style } : {}),
+          ...(template?.styleReset ? { styleReset: true } : {}),
           ...(style?.numberFormat ? { numberFormat: style.numberFormat } : {}),
         }
       }
@@ -690,7 +1668,8 @@ export async function computeCandidateState(
           JSON.stringify({
             ...original?.features,
             ...featureEdits.get(sheet.id),
-            charts: sheet.visuals ?? [],
+            visuals: sheet.visuals ?? [],
+            charts: (sheet.visuals ?? []).filter((v) => v.kind === 'chart'),
             rowHeights: sheet.rowHeights ?? {},
             colWidths: sheet.colWidths ?? {},
           }),

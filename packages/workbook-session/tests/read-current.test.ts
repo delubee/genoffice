@@ -176,3 +176,75 @@ it('returns finite JSON for hidden rows without explicit heights', async () => {
   expect(() => assertSerializable(view)).not.toThrow()
   expect(view).toHaveProperty('rows', [{ row: 0, hidden: true }])
 })
+
+it('returns only current in-range hyperlinks with overrides, removals and source coordinate shifts', async () => {
+  const current = structuredClone(state)
+  current.sheets[0]!.features = {
+    ...current.sheets[0]!.features,
+    hyperlinkEdits: {
+      A2: null,
+      B2: 'https://example.org/edited',
+    },
+  }
+  const linkedSource = {
+    ...source,
+    async readFeatures() {
+      return {
+        indexingComplete: true,
+        merges: [],
+        styles: [],
+        hyperlinks: [
+          { row: 0, column: 0, target: 'https://example.org/original' },
+          { row: 1, column: 0, target: '#Data!A1' },
+          { row: 1, column: 1, target: 'https://example.org/old' },
+          { row: 7, column: 2, target: 'https://example.org/outside' },
+        ],
+      }
+    },
+  }
+  const before = structuredClone(current)
+  const view = await readCurrentRange({
+    state: current,
+    sessionId: 'source',
+    source: linkedSource,
+    logicalSheetId: sheetId,
+    range: 'A1:B2',
+    includeMerges: true,
+  })
+  expect(view).toHaveProperty('hyperlinks', [
+    { address: 'A1', target: 'https://example.org/original' },
+    { address: 'B2', target: 'https://example.org/edited' },
+  ])
+  expect(current).toEqual(before)
+  current.structuralLog = [{ op: 'insert_rows', sheetId, row: 1, count: 1 }]
+  current.sheets[0]!.features!.hyperlinkEdits = {}
+  const shifted = await readCurrentRange({
+    state: current,
+    sessionId: 'source',
+    source: linkedSource,
+    logicalSheetId: sheetId,
+    range: 'A2:B2',
+    includeMerges: true,
+  })
+  expect(shifted).toHaveProperty('hyperlinks', [
+    { address: 'A2', target: 'https://example.org/original' },
+  ])
+})
+
+it('marks original formula caches pending after a name-only edit', async () => {
+  const current = structuredClone(state)
+  current.features!.definedNamesEdits = { names: [], preserveNames: [] }
+  const view = await readCurrentRange({
+    state: current,
+    sessionId: 'source',
+    logicalSheetId: sheetId,
+    range: 'A1:A1',
+    source: {
+      ...source,
+      async readBaseRange() {
+        return { cells: [{ row: 0, column: 0, value: 10, formula: '=Total' }] }
+      },
+    },
+  })
+  expect(view.cells[0]).toMatchObject({ formula: '=Total', calculationState: 'pending' })
+})

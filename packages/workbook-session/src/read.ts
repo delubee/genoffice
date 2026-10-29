@@ -1,3 +1,17 @@
+import {
+  projectDataValidationRules,
+  type DataValidationEdits,
+} from '@genoffice/xlsx-gateway/domain/data-validation-projection'
+import { workbookFilterStateSchema } from '@genoffice/xlsx-gateway/shared/workbook-protocol'
+import {
+  visibilityEditsSchema,
+  axisHiddenOverride,
+} from '@genoffice/xlsx-gateway/domain/session-visibility'
+import {
+  rewriteNameReferences,
+  type NameReferenceChange,
+} from '@genoffice/xlsx-gateway/domain/defined-name-references'
+import { shiftedSessionFormula } from '@genoffice/xlsx-gateway/domain/session-formula'
 import { z } from 'zod'
 import * as numfmt from 'numfmt'
 import {
@@ -7,8 +21,6 @@ import {
   rangeCellCount,
 } from '@genoffice/xlsx-gateway/domain/cell-address'
 import { MAX_GRID_COLUMNS, MAX_GRID_ROWS } from '@genoffice/xlsx-gateway/shared/grid-bounds'
-import { renameSheetInFormula } from '@genoffice/xlsx-gateway/gateway/xlsx-sheets'
-import { shiftFormulaText } from '@genoffice/xlsx-gateway/gateway/xlsx-structure'
 import { workbookStyleEditSchema } from '@genoffice/xlsx-gateway/shared/edit-schemas'
 import {
   LIMITS,
@@ -21,7 +33,10 @@ import type { WorkbookSource } from './ports'
 import { logicalSheet } from './sheet-map'
 import { indexedFeatures } from './source-features'
 import { workbookMergeRangesResultSchema } from '@genoffice/xlsx-gateway/shared/workbook-protocol'
-import { originalAxisIndex } from '@genoffice/xlsx-gateway/domain/session-coordinates'
+import {
+  originalAxisIndex,
+  currentAxisIndex,
+} from '@genoffice/xlsx-gateway/domain/session-coordinates'
 
 const sourceCells = z.object({
   rows: z
@@ -72,43 +87,6 @@ export function baseCoordinate(
     else column = coordinate
   }
   return { row, column }
-}
-
-function shiftedFormula(state: Readonly<WorkbookState>, sheetId: string, formula: string) {
-  const names = new Map(
-    state.sheets.map((sheet) => [
-      sheet.id,
-      (sheet.features?.originalMetadata as { name?: string } | undefined)?.name ?? sheet.name,
-    ]),
-  )
-  for (const op of state.structuralLog) {
-    if (!('sheetId' in op)) continue
-    const target = state.sheets.find((sheet) => sheet.id === op.sheetId)
-    if (!target) continue
-    if (op.op === 'rename_sheet') {
-      formula = renameSheetInFormula(formula, names.get(op.sheetId)!, op.name)
-      names.set(op.sheetId, op.name)
-      continue
-    }
-    const rows = op.op === 'insert_rows' || op.op === 'delete_rows'
-    const columns = op.op === 'insert_cols' || op.op === 'delete_cols'
-    if (!rows && !columns) continue
-    const index = 'row' in op ? op.row - 1 : 'column' in op ? columnIndex(op.column) : 0
-    const count = 'count' in op ? op.count : 0,
-      deleting = op.op.startsWith('delete_')
-    formula = shiftFormulaText(
-      formula,
-      names.get(op.sheetId)!,
-      {
-        boundary: deleting ? index + count : index,
-        delta: deleting ? -count : count,
-        deleted: deleting ? { start: index, end: index + count - 1 } : null,
-      },
-      rows ? 'row' : 'column',
-      sheetId !== op.sheetId,
-    )
-  }
-  return formula
 }
 
 /** Holds the supplied immutable root throughout all asynchronous source reads. */
@@ -235,11 +213,20 @@ export async function readCurrentRange(input: {
           ...(numberFormat ? { numberFormat } : {}),
           ...(cell.formula
             ? {
-                formula: shiftedFormula(state, sheet.id, cell.formula),
+                formula: rewriteNameReferences(
+                  shiftedSessionFormula(state, sheet.id, cell.formula),
+                  sheet.id,
+                  {
+                    changes: (state.features?.definedNameReferences ??
+                      []) as unknown as NameReferenceChange[],
+                    sheets: state.sheets.map(({ id, name }) => ({ id, name })),
+                  },
+                ),
                 ...(cell.value === null ? {} : { cachedValue: cell.value }),
                 calculationState:
                   cell.value === null ||
                   state.structuralLog.length ||
+                  !!state.features?.definedNamesEdits ||
                   state.sheets.some((item) => Object.keys(item.cells).length)
                     ? 'pending'
                     : cell.isError
@@ -293,11 +280,85 @@ export async function readCurrentRange(input: {
     })
     cells.push(...anchor.cells)
   }
+  const filterState = sheet.features?.filterEdits
+    ? workbookFilterStateSchema.parse(sheet.features.filterEdits)
+    : undefined
+  const filterHidden = new Set(filterState?.hiddenRows)
+  const visibility = visibilityEditsSchema.parse(sheet.features?.visibilityEdits ?? [])
   const rows = []
   for (let row = bounds.startRow; row <= bounds.endRow; row++) {
     const original = originalAxisIndex(state.structuralLog, sheet.id, row, 'row')
     const properties = original === null ? undefined : sourceRows.get(original)
-    if (properties) rows.push({ row, ...properties })
+    const filtered =
+      filterState &&
+      row > filterState.visibilityRange.startRow &&
+      row <= filterState.visibilityRange.endRow
+        ? filterHidden.has(row)
+        : properties?.hidden
+    const hidden = axisHiddenOverride(visibility, 'rows', row) ?? filtered
+    if (properties || hidden !== undefined)
+      rows.push({ row, ...properties, ...(hidden === undefined ? {} : { hidden }) })
   }
-  return { ...result, merges, rows, pageSetup: features.pageSetup ?? null }
+  const links = new Map<string, string>()
+  const originalLinks = z
+    .array(
+      z.object({
+        row: z.number().int().nonnegative(),
+        column: z.number().int().nonnegative(),
+        target: z.string(),
+      }),
+    )
+    .parse('hyperlinks' in features ? features.hyperlinks : [])
+  for (const link of originalLinks) {
+    const row = currentAxisIndex(state.structuralLog, sheet.id, link.row, 'row')
+    const column = currentAxisIndex(state.structuralLog, sheet.id, link.column, 'column')
+    if (row !== null && column !== null) links.set(formatAddress(row, column), link.target)
+  }
+  for (const [address, target] of Object.entries(
+    (sheet.features?.hyperlinkEdits ?? {}) as Record<string, string | null>,
+  )) {
+    if (target === null) links.delete(address)
+    else links.set(address, target)
+  }
+  const hyperlinks = [...links]
+    .filter(([address]) => {
+      const cell = parseRange(address)
+      return (
+        cell.startRow >= bounds.startRow &&
+        cell.endRow <= bounds.endRow &&
+        cell.startColumn >= bounds.startColumn &&
+        cell.endColumn <= bounds.endColumn
+      )
+    })
+    .map(([address, target]) => ({ address, target }))
+  const filter = filterState?.filter
+  return {
+    ...result,
+    autoFilter:
+      filter === undefined
+        ? 'autoFilter' in features
+          ? features.autoFilter
+          : null
+        : (filter?.range ?? null),
+    autoFilterColumns:
+      filter === undefined
+        ? 'autoFilterColumns' in features
+          ? features.autoFilterColumns
+          : []
+        : (filter?.columns ?? []),
+    merges,
+    dataValidations: projectDataValidationRules(
+      Array.isArray(features.dataValidations)
+        ? (features.dataValidations as import('@genoffice/xlsx-gateway/shared/workbook-protocol').WorkbookRangeResult['dataValidations'])
+        : [],
+      sheet.features?.dataValidationEdits as unknown as DataValidationEdits | undefined,
+    ),
+    rows,
+    hyperlinks,
+    pageSetup: features.pageSetup ?? null,
+    pageBreaks: {
+      rowBreaks: 'rowBreaks' in features ? features.rowBreaks : [],
+      colBreaks: 'colBreaks' in features ? features.colBreaks : [],
+    },
+  }
 }

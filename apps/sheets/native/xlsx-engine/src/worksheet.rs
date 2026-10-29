@@ -65,6 +65,7 @@ pub(crate) fn index_worksheet(
     let mut auto_filter_captured = false;
     let mut in_auto_filter = false;
     let mut filter_column: Option<FilterColumnCriteria> = None;
+    let mut in_color_extension = false;
     let mut sheet_protection: Option<SheetProtectionInfo> = None;
     let mut row_breaks: Vec<usize> = Vec::new();
     let mut col_breaks: Vec<usize> = Vec::new();
@@ -405,6 +406,7 @@ pub(crate) fn index_worksheet(
                     .and_then(|value| value.parse::<usize>().ok())
                     .map(|col_id| FilterColumnCriteria {
                         col_id,
+                        colors: None,
                         values: None,
                         blank: false,
                         customs: None,
@@ -414,9 +416,101 @@ pub(crate) fn index_worksheet(
                 if in_auto_filter && element.local_name().as_ref() == b"filterColumn" =>
             {
                 if let Some(column) = filter_column.take() {
-                    // Color/icon/dynamic/top10-only columns stay criteria-less.
-                    if column.values.is_some() || column.blank || column.customs.is_some() {
+                    // Icon/dynamic/top10-only columns stay criteria-less.
+                    if column.values.is_some()
+                        || column.blank
+                        || column.customs.is_some()
+                        || column.colors.is_some()
+                    {
                         auto_filter_columns.push(column);
+                    }
+                }
+            }
+            Event::Start(element) | Event::Empty(element)
+                if in_auto_filter && element.local_name().as_ref() == b"colorFilter" =>
+            {
+                if let Some(column) = filter_column.as_mut() {
+                    let dxf_id = attribute_value(&reader, &element, b"dxfId")?
+                        .and_then(|value| value.parse::<usize>().ok())
+                        .ok_or_else(|| {
+                            SidecarError::Workbook("Color filter is missing dxfId".to_owned())
+                        })?;
+                    let style = colors.filter_styles.get(dxf_id).ok_or_else(|| {
+                        SidecarError::Workbook("Color filter dxfId is invalid".to_owned())
+                    })?;
+                    let fill = attribute_value(&reader, &element, b"cellColor")?
+                        .is_none_or(|value| value != "0" && value != "false");
+                    column.colors = Some(if fill {
+                        ColorFilterCriteria {
+                            fill: Some(vec![style.fill_color.clone()]),
+                            font: None,
+                        }
+                    } else {
+                        ColorFilterCriteria {
+                            fill: None,
+                            font: Some(vec![
+                                style
+                                    .font_color
+                                    .clone()
+                                    .unwrap_or_else(|| "#000000".to_owned()),
+                            ]),
+                        }
+                    });
+                }
+            }
+            Event::Start(element) if in_auto_filter && element.local_name().as_ref() == b"ext" => {
+                in_color_extension = attribute_value(&reader, &element, b"uri")?.as_deref()
+                    == Some("urn:genoffice:filter-colors:v1");
+            }
+            Event::End(element) if in_auto_filter && element.local_name().as_ref() == b"ext" => {
+                in_color_extension = false;
+            }
+            Event::Start(element)
+                if in_color_extension && element.local_name().as_ref() == b"colors" =>
+            {
+                if let Some(column) = filter_column.as_mut() {
+                    column.colors = Some(
+                        match attribute_value(&reader, &element, b"axis")?.as_deref() {
+                            Some("fill") => ColorFilterCriteria {
+                                fill: Some(Vec::new()),
+                                font: None,
+                            },
+                            Some("font") => ColorFilterCriteria {
+                                fill: None,
+                                font: Some(Vec::new()),
+                            },
+                            _ => {
+                                return Err(SidecarError::Workbook(
+                                    "Invalid filter color axis".to_owned(),
+                                ));
+                            }
+                        },
+                    );
+                }
+            }
+            Event::Start(element) | Event::Empty(element)
+                if in_color_extension && element.local_name().as_ref() == b"color" =>
+            {
+                if let Some(criteria) = filter_column
+                    .as_mut()
+                    .and_then(|column| column.colors.as_mut())
+                {
+                    if let Some(value) = attribute_value(&reader, &element, b"val")? {
+                        if let Some(fill) = criteria.fill.as_mut() {
+                            if fill.len() >= 2000 {
+                                return Err(SidecarError::Workbook(
+                                    "Too many filter colors".to_owned(),
+                                ));
+                            }
+                            fill.push(if value == "none" { None } else { Some(value) });
+                        } else if let Some(font) = criteria.font.as_mut() {
+                            if font.len() >= 2000 {
+                                return Err(SidecarError::Workbook(
+                                    "Too many filter colors".to_owned(),
+                                ));
+                            }
+                            font.push(value);
+                        }
                     }
                 }
             }
@@ -962,8 +1056,12 @@ pub(crate) fn index_worksheet(
             column.customs = None;
         }
     }
-    auto_filter_columns
-        .retain(|column| column.values.is_some() || column.blank || column.customs.is_some());
+    auto_filter_columns.retain(|column| {
+        column.values.is_some()
+            || column.blank
+            || column.customs.is_some()
+            || column.colors.is_some()
+    });
     index.auto_filter_columns = auto_filter_columns;
     index.sheet_protection = sheet_protection;
     // Wire caps (schema and preload reject larger sets; the save side caps

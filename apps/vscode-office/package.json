@@ -119,6 +119,21 @@
       {
         "command": "genoffice.openWorkbook",
         "title": "GenOffice: Open Workbook"
+      },
+      {
+        "command": "genoffice.workbook.find",
+        "title": "GenOffice: Find in Workbook",
+        "enablement": "activeCustomEditorId == genoffice.workbook"
+      },
+      {
+        "command": "genoffice.workbook.replace",
+        "title": "GenOffice: Replace in Workbook",
+        "enablement": "activeCustomEditorId == genoffice.workbook"
+      },
+      {
+        "command": "genoffice.workbook.goto",
+        "title": "GenOffice: Go To Workbook Cell",
+        "enablement": "activeCustomEditorId == genoffice.workbook"
       }
     ],
     "languageModelTools": [
@@ -299,6 +314,121 @@
                     "properties": {
                       "op": {
                         "type": "string",
+                        "const": "subtotal"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "range": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,6}(:[A-Z]{1,3}[1-9][0-9]{0,6})?$"
+                      },
+                      "groupColumn": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{1,3}$"
+                      },
+                      "valueColumn": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{1,3}$"
+                      },
+                      "agg": {
+                        "type": "string",
+                        "enum": [
+                          "sum",
+                          "count",
+                          "average"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "range",
+                      "groupColumn",
+                      "valueColumn",
+                      "agg"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "set_outline"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "axis": {
+                        "type": "string",
+                        "enum": [
+                          "rows",
+                          "cols"
+                        ]
+                      },
+                      "start": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1048576
+                      },
+                      "count": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10000
+                      },
+                      "level": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 7
+                      },
+                      "collapsed": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "axis",
+                      "start",
+                      "count",
+                      "level"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "set_outline_settings"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "summaryBelow": {
+                        "type": "boolean"
+                      },
+                      "summaryRight": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "summaryBelow",
+                      "summaryRight"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
                         "const": "set_cell"
                       },
                       "sheetId": {
@@ -347,6 +477,785 @@
                       "sheetId",
                       "address",
                       "value"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "paste_cells"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "start": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,6}$"
+                      },
+                      "cells": {
+                        "minItems": 1,
+                        "maxItems": 2000,
+                        "type": "array",
+                        "items": {
+                          "minItems": 1,
+                          "maxItems": 2000,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "blank",
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "date",
+                                  "error"
+                                ]
+                              },
+                              "rawValue": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "formula": {
+                                "type": "string",
+                                "pattern": "^=.*"
+                              },
+                              "calculationState": {
+                                "type": "string",
+                                "enum": [
+                                  "ready",
+                                  "pending",
+                                  "error"
+                                ]
+                              },
+                              "cachedValue": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "numberFormat": {
+                                "type": "string"
+                              },
+                              "dateSystem": {
+                                "type": "string",
+                                "enum": [
+                                  "1900",
+                                  "1904"
+                                ]
+                              },
+                              "style": {
+                                "type": "object",
+                                "properties": {
+                                  "bold": {
+                                    "type": "boolean"
+                                  },
+                                  "italic": {
+                                    "type": "boolean"
+                                  },
+                                  "underline": {
+                                    "type": "boolean"
+                                  },
+                                  "underlineStyle": {
+                                    "type": "string",
+                                    "enum": [
+                                      "single",
+                                      "double"
+                                    ]
+                                  },
+                                  "strikethrough": {
+                                    "type": "boolean"
+                                  },
+                                  "vertAlign": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "enum": [
+                                          "superscript",
+                                          "subscript"
+                                        ]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "fontFamily": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 128
+                                  },
+                                  "fontSize": {
+                                    "type": "number",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 409
+                                  },
+                                  "fontColor": {
+                                    "anyOf": [
+                                      {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "pattern": "^#[0-9A-Fa-f]{6}$"
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "theme": {
+                                                "type": "integer",
+                                                "minimum": 0,
+                                                "maximum": 11
+                                              },
+                                              "tint": {
+                                                "type": "number",
+                                                "minimum": -1,
+                                                "maximum": 1
+                                              }
+                                            },
+                                            "required": [
+                                              "theme"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "fillColor": {
+                                    "anyOf": [
+                                      {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "pattern": "^#[0-9A-Fa-f]{6}$"
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "theme": {
+                                                "type": "integer",
+                                                "minimum": 0,
+                                                "maximum": 11
+                                              },
+                                              "tint": {
+                                                "type": "number",
+                                                "minimum": -1,
+                                                "maximum": 1
+                                              }
+                                            },
+                                            "required": [
+                                              "theme"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "fill": {
+                                    "anyOf": [
+                                      {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "pattern": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "solid",
+                                                  "mediumGray",
+                                                  "darkGray",
+                                                  "lightGray",
+                                                  "gray125",
+                                                  "gray0625",
+                                                  "darkHorizontal",
+                                                  "darkVertical",
+                                                  "darkDown",
+                                                  "darkUp",
+                                                  "darkGrid",
+                                                  "darkTrellis",
+                                                  "lightHorizontal",
+                                                  "lightVertical",
+                                                  "lightDown",
+                                                  "lightUp",
+                                                  "lightGrid",
+                                                  "lightTrellis"
+                                                ]
+                                              },
+                                              "fg": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string",
+                                                    "pattern": "^#[0-9A-Fa-f]{6}$"
+                                                  },
+                                                  {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "theme": {
+                                                        "type": "integer",
+                                                        "minimum": 0,
+                                                        "maximum": 11
+                                                      },
+                                                      "tint": {
+                                                        "type": "number",
+                                                        "minimum": -1,
+                                                        "maximum": 1
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "theme"
+                                                    ],
+                                                    "additionalProperties": false
+                                                  }
+                                                ]
+                                              },
+                                              "bg": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string",
+                                                    "pattern": "^#[0-9A-Fa-f]{6}$"
+                                                  },
+                                                  {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "theme": {
+                                                        "type": "integer",
+                                                        "minimum": 0,
+                                                        "maximum": 11
+                                                      },
+                                                      "tint": {
+                                                        "type": "number",
+                                                        "minimum": -1,
+                                                        "maximum": 1
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "theme"
+                                                    ],
+                                                    "additionalProperties": false
+                                                  }
+                                                ]
+                                              }
+                                            },
+                                            "required": [
+                                              "pattern",
+                                              "fg"
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "gradient": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "type": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "linear",
+                                                      "path"
+                                                    ]
+                                                  },
+                                                  "angle": {
+                                                    "type": "number",
+                                                    "minimum": 0,
+                                                    "maximum": 360
+                                                  },
+                                                  "left": {
+                                                    "type": "number",
+                                                    "minimum": 0,
+                                                    "maximum": 1
+                                                  },
+                                                  "right": {
+                                                    "type": "number",
+                                                    "minimum": 0,
+                                                    "maximum": 1
+                                                  },
+                                                  "top": {
+                                                    "type": "number",
+                                                    "minimum": 0,
+                                                    "maximum": 1
+                                                  },
+                                                  "bottom": {
+                                                    "type": "number",
+                                                    "minimum": 0,
+                                                    "maximum": 1
+                                                  },
+                                                  "stops": {
+                                                    "minItems": 2,
+                                                    "maxItems": 10,
+                                                    "type": "array",
+                                                    "items": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "position": {
+                                                          "type": "number",
+                                                          "minimum": 0,
+                                                          "maximum": 1
+                                                        },
+                                                        "color": {
+                                                          "anyOf": [
+                                                            {
+                                                              "type": "string",
+                                                              "pattern": "^#[0-9A-Fa-f]{6}$"
+                                                            },
+                                                            {
+                                                              "type": "object",
+                                                              "properties": {
+                                                                "theme": {
+                                                                  "type": "integer",
+                                                                  "minimum": 0,
+                                                                  "maximum": 11
+                                                                },
+                                                                "tint": {
+                                                                  "type": "number",
+                                                                  "minimum": -1,
+                                                                  "maximum": 1
+                                                                }
+                                                              },
+                                                              "required": [
+                                                                "theme"
+                                                              ],
+                                                              "additionalProperties": false
+                                                            }
+                                                          ]
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "position",
+                                                        "color"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    }
+                                                  }
+                                                },
+                                                "required": [
+                                                  "stops"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            },
+                                            "required": [
+                                              "gradient"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "horizontalAlignment": {
+                                    "type": "string",
+                                    "enum": [
+                                      "left",
+                                      "center",
+                                      "right",
+                                      "justify",
+                                      "distributed"
+                                    ]
+                                  },
+                                  "verticalAlignment": {
+                                    "type": "string",
+                                    "enum": [
+                                      "top",
+                                      "center",
+                                      "bottom"
+                                    ]
+                                  },
+                                  "wrapText": {
+                                    "type": "boolean"
+                                  },
+                                  "textRotation": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 180
+                                      },
+                                      {
+                                        "type": "number",
+                                        "const": 255
+                                      }
+                                    ]
+                                  },
+                                  "indent": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 250
+                                  },
+                                  "protectionLocked": {
+                                    "type": "boolean"
+                                  },
+                                  "protectionHidden": {
+                                    "type": "boolean"
+                                  },
+                                  "numberFormat": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 255
+                                  },
+                                  "borderTop": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "style": {
+                                            "type": "string",
+                                            "enum": [
+                                              "thin",
+                                              "medium",
+                                              "thick",
+                                              "dashed",
+                                              "dotted",
+                                              "double",
+                                              "hair",
+                                              "dashDot",
+                                              "dashDotDot",
+                                              "mediumDashed",
+                                              "mediumDashDot",
+                                              "mediumDashDotDot",
+                                              "slantDashDot"
+                                            ]
+                                          },
+                                          "color": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string",
+                                                "pattern": "^#[0-9A-Fa-f]{6}$"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "theme": {
+                                                    "type": "integer",
+                                                    "minimum": 0,
+                                                    "maximum": 11
+                                                  },
+                                                  "tint": {
+                                                    "type": "number",
+                                                    "minimum": -1,
+                                                    "maximum": 1
+                                                  }
+                                                },
+                                                "required": [
+                                                  "theme"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "style"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "borderBottom": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "style": {
+                                            "type": "string",
+                                            "enum": [
+                                              "thin",
+                                              "medium",
+                                              "thick",
+                                              "dashed",
+                                              "dotted",
+                                              "double",
+                                              "hair",
+                                              "dashDot",
+                                              "dashDotDot",
+                                              "mediumDashed",
+                                              "mediumDashDot",
+                                              "mediumDashDotDot",
+                                              "slantDashDot"
+                                            ]
+                                          },
+                                          "color": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string",
+                                                "pattern": "^#[0-9A-Fa-f]{6}$"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "theme": {
+                                                    "type": "integer",
+                                                    "minimum": 0,
+                                                    "maximum": 11
+                                                  },
+                                                  "tint": {
+                                                    "type": "number",
+                                                    "minimum": -1,
+                                                    "maximum": 1
+                                                  }
+                                                },
+                                                "required": [
+                                                  "theme"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "style"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "borderLeft": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "style": {
+                                            "type": "string",
+                                            "enum": [
+                                              "thin",
+                                              "medium",
+                                              "thick",
+                                              "dashed",
+                                              "dotted",
+                                              "double",
+                                              "hair",
+                                              "dashDot",
+                                              "dashDotDot",
+                                              "mediumDashed",
+                                              "mediumDashDot",
+                                              "mediumDashDotDot",
+                                              "slantDashDot"
+                                            ]
+                                          },
+                                          "color": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string",
+                                                "pattern": "^#[0-9A-Fa-f]{6}$"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "theme": {
+                                                    "type": "integer",
+                                                    "minimum": 0,
+                                                    "maximum": 11
+                                                  },
+                                                  "tint": {
+                                                    "type": "number",
+                                                    "minimum": -1,
+                                                    "maximum": 1
+                                                  }
+                                                },
+                                                "required": [
+                                                  "theme"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "style"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "borderRight": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "style": {
+                                            "type": "string",
+                                            "enum": [
+                                              "thin",
+                                              "medium",
+                                              "thick",
+                                              "dashed",
+                                              "dotted",
+                                              "double",
+                                              "hair",
+                                              "dashDot",
+                                              "dashDotDot",
+                                              "mediumDashed",
+                                              "mediumDashDot",
+                                              "mediumDashDotDot",
+                                              "slantDashDot"
+                                            ]
+                                          },
+                                          "color": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string",
+                                                "pattern": "^#[0-9A-Fa-f]{6}$"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "theme": {
+                                                    "type": "integer",
+                                                    "minimum": 0,
+                                                    "maximum": 11
+                                                  },
+                                                  "tint": {
+                                                    "type": "number",
+                                                    "minimum": -1,
+                                                    "maximum": 1
+                                                  }
+                                                },
+                                                "required": [
+                                                  "theme"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "style"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "styleReset": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "rawValue"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "writeValues": {
+                        "type": "boolean"
+                      },
+                      "format": {
+                        "type": "string",
+                        "enum": [
+                          "all",
+                          "none",
+                          "number",
+                          "except-borders"
+                        ]
+                      },
+                      "skipCells": {
+                        "maxItems": 2000,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,6}$"
+                        }
+                      },
+                      "merges": {
+                        "maxItems": 1000,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,6}(:[A-Z]{1,3}[1-9][0-9]{0,6})?$"
+                        }
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "start",
+                      "cells"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "relocate_range"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "sourceSheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "source": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,6}(:[A-Z]{1,3}[1-9][0-9]{0,6})?$"
+                      },
+                      "start": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,6}$"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "sourceSheetId",
+                      "source",
+                      "start"
                     ],
                     "additionalProperties": false
                   },
@@ -503,6 +1412,9 @@
                       "target": {
                         "type": "string",
                         "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,6}(:[A-Z]{1,3}[1-9][0-9]{0,6})?$"
+                      },
+                      "copyFormat": {
+                        "type": "boolean"
                       }
                     },
                     "required": [
@@ -1232,9 +2144,256 @@
                               "type"
                             ],
                             "additionalProperties": false
+                          },
+                          "borderTop": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "style": {
+                                    "type": "string",
+                                    "enum": [
+                                      "thin",
+                                      "medium",
+                                      "thick",
+                                      "dashed",
+                                      "dotted",
+                                      "double",
+                                      "hair",
+                                      "dashDot",
+                                      "dashDotDot",
+                                      "mediumDashed",
+                                      "mediumDashDot",
+                                      "mediumDashDotDot",
+                                      "slantDashDot"
+                                    ]
+                                  },
+                                  "color": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "pattern": "^#[0-9A-Fa-f]{6}$"
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "theme": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 11
+                                          },
+                                          "tint": {
+                                            "type": "number",
+                                            "minimum": -1,
+                                            "maximum": 1
+                                          }
+                                        },
+                                        "required": [
+                                          "theme"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "style"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "borderBottom": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "style": {
+                                    "type": "string",
+                                    "enum": [
+                                      "thin",
+                                      "medium",
+                                      "thick",
+                                      "dashed",
+                                      "dotted",
+                                      "double",
+                                      "hair",
+                                      "dashDot",
+                                      "dashDotDot",
+                                      "mediumDashed",
+                                      "mediumDashDot",
+                                      "mediumDashDotDot",
+                                      "slantDashDot"
+                                    ]
+                                  },
+                                  "color": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "pattern": "^#[0-9A-Fa-f]{6}$"
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "theme": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 11
+                                          },
+                                          "tint": {
+                                            "type": "number",
+                                            "minimum": -1,
+                                            "maximum": 1
+                                          }
+                                        },
+                                        "required": [
+                                          "theme"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "style"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "borderLeft": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "style": {
+                                    "type": "string",
+                                    "enum": [
+                                      "thin",
+                                      "medium",
+                                      "thick",
+                                      "dashed",
+                                      "dotted",
+                                      "double",
+                                      "hair",
+                                      "dashDot",
+                                      "dashDotDot",
+                                      "mediumDashed",
+                                      "mediumDashDot",
+                                      "mediumDashDotDot",
+                                      "slantDashDot"
+                                    ]
+                                  },
+                                  "color": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "pattern": "^#[0-9A-Fa-f]{6}$"
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "theme": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 11
+                                          },
+                                          "tint": {
+                                            "type": "number",
+                                            "minimum": -1,
+                                            "maximum": 1
+                                          }
+                                        },
+                                        "required": [
+                                          "theme"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "style"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "borderRight": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "style": {
+                                    "type": "string",
+                                    "enum": [
+                                      "thin",
+                                      "medium",
+                                      "thick",
+                                      "dashed",
+                                      "dotted",
+                                      "double",
+                                      "hair",
+                                      "dashDot",
+                                      "dashDotDot",
+                                      "mediumDashed",
+                                      "mediumDashDot",
+                                      "mediumDashDotDot",
+                                      "slantDashDot"
+                                    ]
+                                  },
+                                  "color": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "pattern": "^#[0-9A-Fa-f]{6}$"
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "theme": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 11
+                                          },
+                                          "tint": {
+                                            "type": "number",
+                                            "minimum": -1,
+                                            "maximum": 1
+                                          }
+                                        },
+                                        "required": [
+                                          "theme"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "style"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           }
                         },
                         "additionalProperties": false
+                      },
+                      "reset": {
+                        "type": "boolean"
                       }
                     },
                     "required": [
@@ -1273,6 +2432,32 @@
                       },
                       "hasHeader": {
                         "type": "boolean"
+                      },
+                      "levels": {
+                        "minItems": 1,
+                        "maxItems": 3,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "byColumn": {
+                              "type": "string",
+                              "pattern": "^[A-Z]{1,3}$"
+                            },
+                            "order": {
+                              "type": "string",
+                              "enum": [
+                                "asc",
+                                "desc"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "byColumn",
+                            "order"
+                          ],
+                          "additionalProperties": false
+                        }
                       }
                     },
                     "required": [
@@ -1354,8 +2539,8 @@
                       },
                       "heightPoints": {
                         "type": "number",
-                        "minimum": 2,
-                        "maximum": 409
+                        "minimum": 0,
+                        "maximum": 409.5
                       }
                     },
                     "required": [
@@ -1390,8 +2575,13 @@
                       },
                       "widthPx": {
                         "type": "number",
-                        "minimum": 10,
-                        "maximum": 2000
+                        "minimum": 0,
+                        "maximum": 8000
+                      },
+                      "widthCharacters": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 255
                       }
                     },
                     "required": [
@@ -1438,6 +2628,92 @@
                         "additionalProperties": {
                           "type": "string",
                           "pattern": "^#[0-9A-Fa-f]{6}$"
+                        }
+                      },
+                      "pointColors": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string",
+                          "pattern": "^[0-9]{1,3}$"
+                        },
+                        "additionalProperties": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string",
+                            "pattern": "^[0-9]{1,3}$"
+                          },
+                          "additionalProperties": {
+                            "type": "string",
+                            "pattern": "^#[0-9A-Fa-f]{6}$"
+                          }
+                        }
+                      },
+                      "dataLabelPosition": {
+                        "type": "string",
+                        "enum": [
+                          "center",
+                          "inside-end",
+                          "outside-end"
+                        ]
+                      },
+                      "dataLabelFormat": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "gridlines": {
+                        "type": "boolean"
+                      },
+                      "valueAxis": {
+                        "type": "object",
+                        "properties": {
+                          "min": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "max": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "gapWidthPct": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 500
+                      },
+                      "holeSizePct": {
+                        "type": "integer",
+                        "minimum": 10,
+                        "maximum": 90
+                      },
+                      "explosionPct": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 400
+                      },
+                      "pointExplosions": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string",
+                          "pattern": "^[0-9]{1,3}$"
+                        },
+                        "additionalProperties": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 400
                         }
                       },
                       "legend": {
@@ -1494,6 +2770,78 @@
                           }
                         },
                         "additionalProperties": false
+                      },
+                      "seriesSelection": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "mode": {
+                                "type": "string",
+                                "const": "rows"
+                              },
+                              "rows": {
+                                "minItems": 1,
+                                "maxItems": 24,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "sourceIndex": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 255
+                                    },
+                                    "name": {
+                                      "type": "string",
+                                      "maxLength": 255
+                                    },
+                                    "valuesRef": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 512
+                                    },
+                                    "categoriesRef": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 512
+                                    }
+                                  },
+                                  "required": [
+                                    "name"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "mode",
+                              "rows"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "mode": {
+                                "type": "string",
+                                "const": "transpose"
+                              },
+                              "defaultNames": {
+                                "maxItems": 24,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "maxLength": 255
+                                }
+                              }
+                            },
+                            "required": [
+                              "mode"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
                       },
                       "seriesData": {
                         "minItems": 1,
@@ -1588,6 +2936,443 @@
                     "properties": {
                       "op": {
                         "type": "string",
+                        "const": "add_shape"
+                      },
+                      "anchor": {
+                        "type": "object",
+                        "properties": {
+                          "fromRow": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "fromColumn": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "fromRowOffset": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "fromColumnOffset": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "toRow": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "toColumn": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "toRowOffset": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "toColumnOffset": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "explicitTo": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "fromRow",
+                          "fromColumn",
+                          "fromRowOffset",
+                          "fromColumnOffset",
+                          "toRow",
+                          "toColumn",
+                          "toRowOffset",
+                          "toColumnOffset"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "shapeType": {
+                        "type": "string",
+                        "enum": [
+                          "rect",
+                          "roundRect",
+                          "snip1Rect",
+                          "snip2SameRect",
+                          "snip2DiagRect",
+                          "snipRoundRect",
+                          "round1Rect",
+                          "round2SameRect",
+                          "round2DiagRect",
+                          "ellipse",
+                          "triangle",
+                          "rtTriangle",
+                          "parallelogram",
+                          "trapezoid",
+                          "diamond",
+                          "pentagon",
+                          "hexagon",
+                          "octagon",
+                          "plus",
+                          "mathPlus",
+                          "pie",
+                          "chord",
+                          "teardrop",
+                          "frame",
+                          "halfFrame",
+                          "corner",
+                          "diagStripe",
+                          "donut",
+                          "noSmoking",
+                          "blockArc",
+                          "foldedCorner",
+                          "bevel",
+                          "cube",
+                          "can",
+                          "lightningBolt",
+                          "heart",
+                          "sun",
+                          "moon",
+                          "cloud",
+                          "arc",
+                          "plaque",
+                          "smileyFace",
+                          "leftBracket",
+                          "rightBracket",
+                          "leftBrace",
+                          "rightBrace",
+                          "rightArrow",
+                          "leftArrow",
+                          "upArrow",
+                          "downArrow",
+                          "leftRightArrow",
+                          "upDownArrow",
+                          "quadArrow",
+                          "bentArrow",
+                          "uturnArrow",
+                          "curvedRightArrow",
+                          "stripedRightArrow",
+                          "notchedRightArrow",
+                          "chevron",
+                          "homePlate",
+                          "star4",
+                          "star5",
+                          "star6",
+                          "star7",
+                          "star8",
+                          "star10",
+                          "star12",
+                          "star16",
+                          "star24",
+                          "star32",
+                          "irregularSeal1",
+                          "irregularSeal2",
+                          "ribbon",
+                          "ribbon2",
+                          "wave",
+                          "doubleWave",
+                          "flowChartProcess",
+                          "flowChartAlternateProcess",
+                          "flowChartDecision",
+                          "flowChartPredefinedProcess",
+                          "flowChartInternalStorage",
+                          "flowChartDocument",
+                          "flowChartMultidocument",
+                          "flowChartTerminator",
+                          "flowChartPreparation",
+                          "flowChartManualInput",
+                          "flowChartManualOperation",
+                          "flowChartConnector",
+                          "flowChartOffpageConnector",
+                          "flowChartMagneticDisk",
+                          "flowChartMagneticDrum",
+                          "flowChartDisplay",
+                          "flowChartDelay",
+                          "flowChartOr",
+                          "flowChartCollate",
+                          "flowChartSort",
+                          "flowChartExtract",
+                          "flowChartMerge",
+                          "flowChartSummingJunction",
+                          "flowChartPunchedTape",
+                          "wedgeRectCallout",
+                          "wedgeRoundRectCallout",
+                          "wedgeEllipseCallout",
+                          "cloudCallout",
+                          "textbox"
+                        ]
+                      },
+                      "anchorCell": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,6}$"
+                      },
+                      "fillColor": {
+                        "type": "string",
+                        "pattern": "^#[0-9A-Fa-f]{6}$"
+                      },
+                      "text": {
+                        "type": "string",
+                        "maxLength": 1000
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "shapeType",
+                      "anchorCell"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "add_picture"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "anchor": {
+                        "type": "object",
+                        "properties": {
+                          "fromRow": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "fromColumn": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "fromRowOffset": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "fromColumnOffset": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "toRow": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "toColumn": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "toRowOffset": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "toColumnOffset": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "explicitTo": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "fromRow",
+                          "fromColumn",
+                          "fromRowOffset",
+                          "fromColumnOffset",
+                          "toRow",
+                          "toColumn",
+                          "toRowOffset",
+                          "toColumnOffset"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255
+                      },
+                      "mediaType": {
+                        "type": "string",
+                        "enum": [
+                          "image/png",
+                          "image/jpeg",
+                          "image/gif"
+                        ]
+                      },
+                      "base64": {
+                        "type": "string",
+                        "minLength": 4,
+                        "maxLength": 27962028,
+                        "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "anchor",
+                      "name",
+                      "mediaType",
+                      "base64"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "edit_shape"
+                      },
+                      "visualId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "text": {
+                        "type": "string",
+                        "maxLength": 1000
+                      },
+                      "fillColor": {
+                        "type": "string",
+                        "pattern": "^#[0-9A-Fa-f]{6}$"
+                      },
+                      "anchorCell": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,6}$"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "visualId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "set_rows_hidden"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "row": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1048576
+                      },
+                      "count": {
+                        "default": 1,
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10000
+                      },
+                      "hidden": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "row",
+                      "count",
+                      "hidden"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "set_cols_hidden"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "column": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{1,3}$"
+                      },
+                      "count": {
+                        "default": 1,
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000
+                      },
+                      "hidden": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "column",
+                      "count",
+                      "hidden"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "set_hyperlink"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "address": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,6}$"
+                      },
+                      "target": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 2048
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "address",
+                      "target"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
                         "const": "set_filter"
                       },
                       "sheetId": {
@@ -1612,6 +3397,42 @@
                       "op": {
                         "type": "string",
                         "const": "clear_filter"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "clear_filter_criteria"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "reapply_filter"
                       },
                       "sheetId": {
                         "type": "string",
@@ -1654,13 +3475,254 @@
                             "type": "null"
                           }
                         ]
+                      },
+                      "customs": {
+                        "type": "object",
+                        "properties": {
+                          "and": {
+                            "type": "boolean"
+                          },
+                          "filters": {
+                            "minItems": 1,
+                            "maxItems": 2,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "val": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 32767
+                                    },
+                                    {
+                                      "type": "number"
+                                    }
+                                  ]
+                                },
+                                "operator": {
+                                  "type": "string",
+                                  "enum": [
+                                    "equal",
+                                    "notEqual",
+                                    "greaterThan",
+                                    "greaterThanOrEqual",
+                                    "lessThan",
+                                    "lessThanOrEqual"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "val"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "filters"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "colors": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "fill": {
+                                "minItems": 1,
+                                "maxItems": 2000,
+                                "type": "array",
+                                "items": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "pattern": "^#[0-9A-Fa-f]{6}$"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "fill"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "font": {
+                                "minItems": 1,
+                                "maxItems": 2000,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "pattern": "^#[0-9A-Fa-f]{6}$"
+                                }
+                              }
+                            },
+                            "required": [
+                              "font"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
                       }
                     },
                     "required": [
                       "op",
                       "sheetId",
-                      "column",
-                      "values"
+                      "column"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "add_defined_name"
+                      },
+                      "scopeSheetId": {
+                        "description": "Logical worksheet ID for sheet scope; omit for workbook scope.",
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "name": {
+                        "type": "string",
+                        "pattern": "^[\\p{L}_\\\\][\\p{L}\\p{N}_.\\\\]{0,254}$"
+                      },
+                      "ref": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 8192
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "name",
+                      "ref"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "manage_defined_name"
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255
+                      },
+                      "scopeSheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "replacement": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 255
+                              },
+                              "ref": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 8192
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "ref"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "name",
+                      "replacement"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "add_defined_names"
+                      },
+                      "names": {
+                        "minItems": 1,
+                        "maxItems": 2000,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "scopeSheetId": {
+                              "description": "Logical worksheet ID for sheet scope; omit for workbook scope.",
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "name": {
+                              "type": "string",
+                              "pattern": "^[\\p{L}_\\\\][\\p{L}\\p{N}_.\\\\]{0,254}$"
+                            },
+                            "ref": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 8192
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "ref"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "names"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "delete_defined_name"
+                      },
+                      "scopeSheetId": {
+                        "description": "Logical worksheet ID for sheet scope; omit for workbook scope.",
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "name"
                     ],
                     "additionalProperties": false
                   },
@@ -1676,6 +3738,9 @@
                         "minLength": 1
                       },
                       "showGridlines": {
+                        "type": "boolean"
+                      },
+                      "showFormulas": {
                         "type": "boolean"
                       },
                       "showHeadings": {
@@ -2090,6 +4155,181 @@
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 300
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "visualId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "set_visual_anchor"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "visualId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 300
+                      },
+                      "anchor": {
+                        "type": "object",
+                        "properties": {
+                          "fromRow": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "fromColumn": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "fromRowOffset": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "fromColumnOffset": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "toRow": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "toColumn": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "toRowOffset": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "toColumnOffset": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "explicitTo": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "fromRow",
+                          "fromColumn",
+                          "fromRowOffset",
+                          "fromColumnOffset",
+                          "toRow",
+                          "toColumn",
+                          "toRowOffset",
+                          "toColumnOffset"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "visualId",
+                      "anchor"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "edit_visual"
+                      },
+                      "visualId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 300
+                      },
+                      "altText": {
+                        "type": "string",
+                        "maxLength": 2000
+                      },
+                      "editAs": {
+                        "type": "string",
+                        "enum": [
+                          "twoCell",
+                          "oneCell",
+                          "absolute"
+                        ]
+                      },
+                      "zIndex": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000
+                      },
+                      "fillColor": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^#[0-9A-Fa-f]{6}$"
+                          },
+                          {
+                            "type": "string",
+                            "const": "none"
+                          }
+                        ]
+                      },
+                      "lineColor": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^#[0-9A-Fa-f]{6}$"
+                          },
+                          {
+                            "type": "string",
+                            "const": "none"
+                          }
+                        ]
+                      },
+                      "rotation": {
+                        "type": "number",
+                        "minimum": -360,
+                        "maximum": 360
+                      },
+                      "flipH": {
+                        "type": "boolean"
+                      },
+                      "flipV": {
+                        "type": "boolean"
+                      },
+                      "frameSize": {
+                        "type": "object",
+                        "properties": {
+                          "width": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "height": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "width",
+                          "height"
+                        ],
+                        "additionalProperties": false
                       }
                     },
                     "required": [
@@ -2866,6 +5106,26 @@
           "scope": "resource"
         }
       }
-    }
+    },
+    "keybindings": [
+      {
+        "command": "genoffice.workbook.find",
+        "key": "ctrl+f",
+        "mac": "cmd+f",
+        "when": "activeCustomEditorId == genoffice.workbook && !inputFocus && !terminalFocus && !inQuickOpen"
+      },
+      {
+        "command": "genoffice.workbook.replace",
+        "key": "ctrl+h",
+        "mac": "cmd+h",
+        "when": "activeCustomEditorId == genoffice.workbook && !inputFocus && !terminalFocus && !inQuickOpen"
+      },
+      {
+        "command": "genoffice.workbook.goto",
+        "key": "ctrl+g",
+        "mac": "cmd+g",
+        "when": "activeCustomEditorId == genoffice.workbook && !inputFocus && !terminalFocus && !inQuickOpen"
+      }
+    ]
   }
 }

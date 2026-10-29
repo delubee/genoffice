@@ -1,3 +1,5 @@
+import { normalizedColorFilters, type ColorFilterCriteria } from '../domain/color-filter'
+import type { DxfSink } from './xlsx-cf'
 /// Writes a declarative filter snapshot into worksheet XML: the
 /// `<autoFilter>` element (with per-column value / custom criteria) plus row
 /// visibility inside the filter's row span. Unsupported criteria fail closed.
@@ -12,6 +14,7 @@ interface CellArea {
 }
 
 export interface FilterColumnState {
+  readonly colors?: ColorFilterCriteria | undefined
   readonly colId: number
   readonly values?: readonly string[] | undefined
   readonly blank?: boolean | undefined
@@ -45,8 +48,12 @@ const CUSTOM_OPERATORS = new Set([
   'lessThanOrEqual',
 ])
 
-export function applyFilterState(worksheetXml: string, state: SheetFilterState): string {
-  const element = state.filter === null ? '' : serializeAutoFilter(state.filter)
+export function applyFilterState(
+  worksheetXml: string,
+  state: SheetFilterState,
+  dxfs?: DxfSink,
+): string {
+  const element = state.filter === null ? '' : serializeAutoFilter(state.filter, dxfs)
   const existing = /<autoFilter\b[^>]*\/>|<autoFilter\b[^>]*>[\s\S]*?<\/autoFilter>/.exec(
     worksheetXml,
   )
@@ -62,18 +69,21 @@ export function applyFilterState(worksheetXml: string, state: SheetFilterState):
   return applyRowVisibility(xml, state.visibilityRange, new Set(state.hiddenRows))
 }
 
-function serializeAutoFilter(filter: NonNullable<SheetFilterState['filter']>): string {
+function serializeAutoFilter(
+  filter: NonNullable<SheetFilterState['filter']>,
+  dxfs?: DxfSink,
+): string {
   const ref = toRef(filter.range)
   const columns = [...filter.columns]
     .sort((left, right) => left.colId - right.colId)
-    .map(serializeFilterColumn)
+    .map((column) => serializeFilterColumn(column, dxfs))
     .join('')
   return columns === ''
     ? `<autoFilter ref="${ref}"/>`
     : `<autoFilter ref="${ref}">${columns}</autoFilter>`
 }
 
-function serializeFilterColumn(column: FilterColumnState): string {
+function serializeFilterColumn(column: FilterColumnState, dxfs?: DxfSink): string {
   const parts: string[] = []
   if (column.values !== undefined || column.blank) {
     const blank = column.blank ? ' blank="1"' : ''
@@ -101,6 +111,27 @@ function serializeFilterColumn(column: FilterColumnState): string {
       })
       .join('')
     parts.push(`<customFilters${and}>${filters}</customFilters>`)
+  }
+  if (column.colors) {
+    const colors = normalizedColorFilters(column.colors)
+    const fill = 'fill' in colors
+    const values = 'fill' in colors ? colors.fill : colors.font
+    if (values.length === 1) {
+      if (!dxfs) throw new FilterEditError('A stylesheet is required for a color filter.')
+      const color = values[0]!
+      const format = fill
+        ? color === null
+          ? '<fill><patternFill patternType="none"/></fill>'
+          : `<fill><patternFill patternType="solid"><fgColor rgb="FF${color.slice(1)}"/><bgColor indexed="64"/></patternFill></fill>`
+        : `<font><color rgb="FF${color!.slice(1)}"/></font>`
+      const dxfId = dxfs.internDxf(`<dxf>${format}</dxf>`)
+      parts.push(`<colorFilter dxfId="${dxfId}" cellColor="${fill ? 1 : 0}"/>`)
+    }
+    // Standard SpreadsheetML expresses one color. Preserve the desktop's
+    // multiple checked colors in the filter column's extensibility point.
+    parts.push(
+      `<extLst><ext uri="urn:genoffice:filter-colors:v1"><go:colors xmlns:go="urn:genoffice:filter-colors:v1" axis="${fill ? 'fill' : 'font'}">${values.map((color) => `<go:color val="${color ?? 'none'}"/>`).join('')}</go:colors></ext></extLst>`,
+    )
   }
   if (parts.length === 0) return ''
   return `<filterColumn colId="${column.colId}">${parts.join('')}</filterColumn>`

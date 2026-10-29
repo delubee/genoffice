@@ -23,6 +23,7 @@ export function FunctionArgumentsDialog({
   initialArgs,
   host,
   error,
+  busy = false,
   onOk,
   onCancel,
 }: {
@@ -30,6 +31,7 @@ export function FunctionArgumentsDialog({
   readonly target: FunctionTarget
   readonly initialArgs: readonly string[]
   readonly host: Pick<FunctionArgumentsHost, 'evaluate' | 'observeRangePick'>
+  readonly busy?: boolean
   readonly error: string | null
   readonly onOk: (args: readonly string[]) => void
   readonly onCancel: () => void
@@ -49,20 +51,27 @@ export function FunctionArgumentsDialog({
   const expressionsKey = expressions.join('\u0000')
 
   useEffect(() => {
+    let cancelled = false
     const expressions = expressionsKey.split('\u0000')
     const timer = setTimeout(() => {
       void host.evaluate(target, expressions).then(
         (values: PreviewValue[]) => {
+          if (cancelled) return
           setPreviews((previous) => {
             const next = new Map(previous)
             expressions.forEach((expr, index) => next.set(expr, formatPreviewValue(values[index])))
             return next
           })
         },
-        () => undefined,
+        () => {
+          if (!cancelled) setPreviews(new Map())
+        },
       )
     }, PREVIEW_DEBOUNCE_MS)
-    return () => clearTimeout(timer)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
   }, [expressionsKey, host, target])
 
   useEffect(
@@ -109,7 +118,7 @@ export function FunctionArgumentsDialog({
           if (event.key === 'Enter' && event.target instanceof HTMLInputElement) {
             event.preventDefault()
             if (collapsed) setCollapsed(false)
-            else if (complete) onOk(args)
+            else if (complete && !busy) onOk(args)
             return
           }
           modal.onKeyDown(event)
@@ -129,6 +138,7 @@ export function FunctionArgumentsDialog({
                 </label>
                 <span className="input-row">
                   <input
+                    disabled={busy}
                     id={`fn-arg-${row.index}`}
                     ref={(node) => {
                       inputRefs.current[row.index] = node
@@ -141,6 +151,7 @@ export function FunctionArgumentsDialog({
                   <button
                     type="button"
                     className="secondary fn-args-pick"
+                    disabled={busy}
                     aria-label={collapsed ? t('dlgFnArgsExpand') : t('dlgFnArgsPickRange')}
                     title={collapsed ? t('dlgFnArgsExpand') : t('dlgFnArgsPickRange')}
                     onClick={() => {
@@ -179,10 +190,14 @@ export function FunctionArgumentsDialog({
               </p>
             )}
             <div className="dialog-actions">
-              <button className="secondary" onClick={onCancel}>
+              <button className="secondary" disabled={busy} onClick={onCancel}>
                 {t('dlgCancel')}
               </button>
-              <button className="primary-action" disabled={!complete} onClick={() => onOk(args)}>
+              <button
+                className="primary-action"
+                disabled={busy || !complete}
+                onClick={() => onOk(args)}
+              >
                 {t('dlgOk')}
               </button>
             </div>

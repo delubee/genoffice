@@ -103,6 +103,7 @@ export const vi = {
   appLabelNumberFormat: 'Định dạng số của nhãn',
   appLabelFormatPlaceholder: 'vd: 0.0% / #,##0',
   appGridlines: 'Đường lưới',
+  appChartAxisRangeInvalid: 'Giá trị lớn nhất phải lớn hơn giá trị nhỏ nhất.',
   appAxisMin: 'Tối thiểu',
   appAxisMax: 'Tối đa',
   appBarSection: 'Thanh',
@@ -630,6 +631,14 @@ export const vi = {
   appScopeWorkbook: 'Sổ làm việc',
   appNamesNeedFile: 'Trước tiên hãy mở tệp XLSX — tên đã xác định sẽ lưu vào tệp.',
   appNameGone: 'Tên đó không còn tồn tại.',
+  appDefinedNameInvalid: 'Nhập tên hợp lệ, không dành riêng và tham chiếu hợp lệ.',
+  appDefinedNameDuplicate: 'Tên này đã được sử dụng trong phạm vi này.',
+  appDefinedNameBindingConflict:
+    'Thay đổi này xung đột với định nghĩa ẩn hoặc định nghĩa cấp trang tính.',
+  appAuditPendingValues:
+    'Kiểm tra lỗi dùng giá trị công thức đã lưu; một số kết quả đang chờ tính lại.',
+  appDefinedNameLabelPending:
+    'Kết quả công thức nhãn chưa được xác minh. Hãy dùng nhãn văn bản để tạo tên.',
   appNameApplyFailed: 'Không thể áp dụng tên.',
   appNamesUpdated: 'Đã cập nhật tên đã xác định — lưu bằng ⌘S.',
   appLinkInternal: 'Liên kết trỏ vào bên trong sổ làm việc: {location}',
@@ -1530,4 +1539,9 @@ export const vi = {
   appVisualFlipV: 'Lật dọc',
   appVisualFlipH: 'Lật ngang',
   appCtxPasteVisual: 'Dán ảnh hoặc hình',
+  appDocumentChangedDuringAction: 'Tài liệu đã thay đổi khi chuẩn bị thao tác này. Hãy thử lại.',
+  appClipboardUnsupported: 'Chưa thể dán nội dung này. Không có ô nào bị thay đổi.',
+  appClipboardSelectionChanged: 'Vùng chọn đã thay đổi trước khi dán. Hãy thử lại.',
+  appClipboardBusy: 'Hãy đợi thao tác chỉnh sửa hiện tại hoàn tất.',
+  appClipboardReadUnavailable: 'Không thể đọc bảng nhớ tạm. Dùng {shortcut} để dán.',
 } satisfies Record<keyof typeof zh, string>

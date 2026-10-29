@@ -3,6 +3,7 @@
 /// built-ins, hidden names, and names it failed to install (`preserveNames`)
 /// — stay byte-verbatim.
 
+import { rewriteNameReferences, type NameReferencePlan } from '../domain/defined-name-references'
 import { withFutureFunctionMarkers } from './future-functions'
 
 export class DefinedNameError extends Error {}
@@ -27,19 +28,37 @@ export interface DefinedNamesState {
 const NAME_PATTERN = /^[\p{L}_\\][\p{L}\p{N}_.\\]*$/u
 const CELL_REF_PATTERN = /^(?:[A-Za-z]{1,3}[0-9]+|[Rr][0-9]*[Cc][0-9]*)$/
 
+function definitionInfo(element: string) {
+  const head = element.slice(0, element.indexOf('>') + 1)
+  const name = unescapeXml(/\bname="([^"]*)"/.exec(head)?.[1] ?? '')
+  const body = head.endsWith('/>')
+    ? ''
+    : element.slice(head.length, element.lastIndexOf('</definedName>'))
+  const text = unescapeXml(body.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1'))
+  return {
+    head,
+    name,
+    fileOnly:
+      name.toLowerCase().startsWith('_xlnm') ||
+      /\bhidden="(?:1|true)"/.test(head) ||
+      text.trim() === '',
+  }
+}
+const definitionElements = /<definedName\b[^>]*(?:\/>|>[\s\S]*?<\/definedName>)/g
+
 export function applyDefinedNamesState(workbookXml: string, state: DefinedNamesState): string {
   const preserved = new Set(state.preserveNames)
   const preservedKeys = new Set<string>()
-  for (const match of workbookXml.matchAll(/<definedName\b[^>]*>/g)) {
-    const name = /\bname="([^"]*)"/.exec(match[0])?.[1]
-    if (name === undefined || !preserved.has(unescapeXml(name))) continue
-    const scope = /\blocalSheetId="(\d+)"/.exec(match[0])?.[1]
-    preservedKeys.add(`${unescapeXml(name)}\u0000${scope === undefined ? -1 : Number(scope)}`)
+  for (const match of workbookXml.matchAll(definitionElements)) {
+    const { head, name, fileOnly } = definitionInfo(match[0])
+    if (!fileOnly && !preserved.has(name)) continue
+    const scope = /\blocalSheetId="(\d+)"/.exec(head)?.[1]
+    preservedKeys.add(`${name.toLowerCase()}\u0000${scope === undefined ? -1 : Number(scope)}`)
   }
   const seen = new Set<string>()
   for (const entry of state.names) {
     validateName(entry.name)
-    const key = `${entry.name}\u0000${entry.sheetIndex ?? -1}`
+    const key = `${entry.name.toLowerCase()}\u0000${entry.sheetIndex ?? -1}`
     if (preservedKeys.has(key)) {
       throw new DefinedNameError(
         `The name "${entry.name}" also exists in a form the editor cannot model — ` +
@@ -54,18 +73,10 @@ export function applyDefinedNamesState(workbookXml: string, state: DefinedNamesS
 
   // Drop every modeled entry from the existing section, keeping built-ins,
   // hidden names, and preserve-listed ones in place.
-  const xml = workbookXml.replace(
-    /<definedName\b[^>]*>[\s\S]*?<\/definedName>|<definedName\b[^>]*\/>/g,
-    (element) => {
-      const name = /\bname="([^"]*)"/.exec(element)?.[1] ?? ''
-      const unescaped = unescapeXml(name)
-      const keep =
-        unescaped.startsWith('_xlnm') ||
-        /\bhidden="(?:1|true)"/.test(element) ||
-        preserved.has(unescaped)
-      return keep ? element : ''
-    },
-  )
+  const xml = workbookXml.replace(definitionElements, (element) => {
+    const { name, fileOnly } = definitionInfo(element)
+    return fileOnly || preserved.has(name) ? element : ''
+  })
 
   const additions = state.names
     .map(
@@ -136,7 +147,7 @@ function validateName(name: string): void {
   if (!isValidDefinedName(name)) {
     throw new DefinedNameError(`"${name}" is not a valid defined name.`)
   }
-  if (name.startsWith('_xlnm')) {
+  if (name.toLowerCase().startsWith('_xlnm')) {
     throw new DefinedNameError('Names starting with "_xlnm" are reserved by Excel.')
   }
 }
@@ -159,4 +170,49 @@ function escapeXmlAttribute(input: string): string {
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
+}
+
+/** Decode text and CDATA separately: entity-looking CDATA is literal content. */
+export function decodeDefinedNameFormula(body: string): string {
+  return body
+    .split(/(<!\[CDATA\[[\s\S]*?\]\]>)/g)
+    .map((part) => {
+      if (part.startsWith('<![CDATA[')) return part.slice(9, -3)
+      return part
+        .replace(/<!--[\s\S]*?-->/g, '')
+        .replace(
+          /&(?:#x([0-9a-f]+)|#([0-9]+)|(quot|apos|lt|gt|amp));/gi,
+          (match, hex: string | undefined, dec: string | undefined, named: string | undefined) => {
+            if (named)
+              return (
+                ({ quot: '"', apos: "'", lt: '<', gt: '>', amp: '&' } as Record<string, string>)[
+                  named
+                ] ?? match
+              )
+            const code = hex === undefined ? Number(dec) : Number.parseInt(hex, 16)
+            return code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff)
+              ? String.fromCodePoint(code)
+              : match
+          },
+        )
+    })
+    .join('')
+}
+
+/** Replay source definition dependencies BEFORE replacing modeled definitions.
+ * Replacement journal bodies already incorporate action-time edits. */
+export function rewriteSourceDefinedNameReferences(xml: string, plan: NameReferencePlan): string {
+  return xml.replace(definitionElements, (element) => {
+    const openEnd = element.indexOf('>') + 1
+    const head = element.slice(0, openEnd)
+    if (head.endsWith('/>')) return element
+    const scope = /\blocalSheetId="([^"]*)"/.exec(head)?.[1]
+    const owner = scope === undefined ? '' : plan.sheets[Number(scope)]?.id
+    if (owner === undefined || (scope !== undefined && !/^\d+$/.test(scope)))
+      throw new DefinedNameError('Unknown defined-name reference scope.')
+    const body = element.slice(openEnd, element.lastIndexOf('</definedName>'))
+    const before = decodeDefinedNameFormula(body)
+    const after = rewriteNameReferences(before, owner, plan)
+    return after === before ? element : head + escapeXmlText(after) + '</definedName>'
+  })
 }

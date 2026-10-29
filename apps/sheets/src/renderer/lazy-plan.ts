@@ -54,6 +54,7 @@ export function buildLazyChangePlan(
         sheetId: operation.sheetId,
         range: operation.range,
         format: operation.format,
+        ...(operation.reset ? { reset: true } : {}),
         label: formatOpLabel(operation),
       })
     } else if (isLayoutOp(operation)) {

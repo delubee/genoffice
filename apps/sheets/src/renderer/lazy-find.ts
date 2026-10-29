@@ -1,3 +1,6 @@
+import { coerceReplaceValue } from '@genoffice/xlsx-gateway/domain/search-text'
+import { scalarToText, createSearchTextMatcher } from '@genoffice/xlsx-gateway/domain/search-text'
+export { scalarToText } from '@genoffice/xlsx-gateway/domain/search-text'
 /**
  * Full-sheet Find coverage for streamed (lazy) workbooks.
  *
@@ -70,13 +73,6 @@ export function planLazyFind(state: LazyWorkbookState | null): 'inactive' | 'ext
 
 /// Stringifies a scalar like Univer's extractPureValue: numbers become their
 /// decimal text, booleans become "1"/"0".
-export function scalarToText(value: unknown): string | null {
-  if (value === null || value === undefined) return null
-  if (typeof value === 'number') return `${value}`
-  if (typeof value === 'boolean') return value ? '1' : '0'
-  return String(value)
-}
-
 /// Mirrors the built-in provider's _preprocessQuery: lowercase unless
 /// case-sensitive, then trim.
 export function preprocessNeedle(query: IFindQuery): string {
@@ -88,21 +84,12 @@ export function preprocessNeedle(query: IFindQuery): string {
 /// substring vs whole-cell (spaces trimmed, line breaks kept), case
 /// sensitivity, and formula-vs-value look-in.
 export function buildLazyCellTest(query: IFindQuery): LazyCellTest | null {
-  const caseSensitive = query.caseSensitive === true
-  // The built-in provider preprocesses the query once up front (lowercase
-  // unless case-sensitive, then trim); mirror it so both models agree on
-  // what a hit is.
-  const needle = preprocessNeedle(query)
-  if (!needle) return null
-  const matches = (text: string | null | undefined): boolean => {
-    if (text === null || text === undefined) return false
-    const haystack = caseSensitive ? text : text.toLowerCase()
-    if (query.matchesTheWholeCell) {
-      const trimmed = haystack.replace(/^ +/g, '').replace(/ +$/g, '')
-      return trimmed === needle
-    }
-    return haystack.includes(needle)
-  }
+  if (!preprocessNeedle(query)) return null
+  const matches = createSearchTextMatcher({
+    query: query.findString,
+    matchCase: query.caseSensitive === true,
+    matchEntireCell: query.matchesTheWholeCell === true,
+  })
   return ({ value, formula }) => {
     if (formula && query.findBy === FindBy.FORMULA) return matches(formula)
     return matches(value)
@@ -986,23 +973,7 @@ export class LazyExtendedFindModel extends FindModel {
 /// numeric (SUM keeps counting them), booleans stay boolean, and anything
 /// that no longer parses as the original type falls back to text — the same
 /// outcome as typing the replacement by hand.
-export function coerceReplaceValue(
-  raw: string | number | boolean | null | undefined,
-  replaced: string,
-): string | number | boolean {
-  if (typeof raw === 'number') {
-    if (replaced.trim() === '') return replaced
-    const n = Number(replaced)
-    return Number.isFinite(n) ? n : replaced
-  }
-  if (typeof raw === 'boolean') {
-    const t = replaced.trim().toLowerCase()
-    if (t === '1' || t === 'true') return true
-    if (t === '0' || t === 'false') return false
-    return replaced
-  }
-  return replaced
-}
+export { coerceReplaceValue } from '@genoffice/xlsx-gateway/domain/search-text'
 
 /// Substring replacement honoring the query's case sensitivity, replacing
 /// every occurrence like Excel's Replace All.

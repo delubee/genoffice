@@ -86,3 +86,39 @@ it('tiles a range larger than the ordinary expanded cell budget and guards overl
     copy((sheetId) => [{ op: 'copy_range', sheetId, source: 'A1:A3', target: 'A2' }]),
   ).rejects.toThrow('overlap')
 })
+
+it('ribbon fills replace destination-only formats, retain typed dates and clear formats from blank donors', async () => {
+  const { result, before } = await copy((sheetId) => [
+    { op: 'fill_range', sheetId, source: 'A1:A6', target: 'C1:C6', copyFormat: true },
+    { op: 'format_range', sheetId, range: 'C1', format: { fillColor: '#00AA00' } },
+  ])
+  const cells = result.nextState.sheets[0]!.cells
+  expect(cells.C1).toMatchObject({
+    rawValue: '00123',
+    styleReset: true,
+    style: { bold: true, borderTop: { style: 'double' }, fillColor: '#00AA00' },
+  })
+  expect(cells.C1!.style?.italic).toBeUndefined()
+  expect(cells.C1!.style?.borderBottom).toBeUndefined()
+  expect(cells.C2).toMatchObject({
+    kind: 'date',
+    dateSystem: '1900',
+    styleReset: true,
+    numberFormat: 'yyyy-mm-dd',
+    style: { numberFormat: 'yyyy-mm-dd' },
+  })
+  expect(cells.C5).toMatchObject({ formula: '=D1+$C$1', styleReset: true })
+  expect(cells.C6).toMatchObject({ rawValue: null, styleReset: true, style: {} })
+  expect(cells.C6!.numberFormat).toBeUndefined()
+  expect(result.inverse.state).toEqual(before)
+})
+
+it('takes immutable donor styles when the fill includes the source as the first tile', async () => {
+  const { result } = await copy((sheetId) => [
+    { op: 'fill_range', sheetId, source: 'A1:A2', target: 'A1:A6', copyFormat: true },
+  ])
+  const cells = result.nextState.sheets[0]!.cells
+  expect(cells.A3!.style).toMatchObject({ bold: true, borderTop: { style: 'double' } })
+  expect(cells.A4).toMatchObject({ kind: 'date', rawValue: 60, numberFormat: 'yyyy-mm-dd' })
+  expect(cells.A6!.style?.numberFormat).toBe('yyyy-mm-dd')
+})

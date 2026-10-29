@@ -231,11 +231,16 @@ pub(crate) fn parse_dxf(dxf: Node<'_, '_>, colors: &ColorContext) -> CellStyle {
             else {
                 return parse_gradient_fill(fill, colors).color;
             };
-            pattern
-                .children()
-                .find(|node| node.has_tag_name("bgColor"))
-                .or_else(|| pattern.children().find(|node| node.has_tag_name("fgColor")))
-                .and_then(|node| parse_color(node, colors))
+            let foreground = pattern.children().find(|node| node.has_tag_name("fgColor"));
+            let background = pattern.children().find(|node| node.has_tag_name("bgColor"));
+            // Solid fills use the foreground. A DXF without a pattern type
+            // commonly carries only the conditional-format background color.
+            (if pattern.attribute("patternType") == Some("solid") {
+                foreground.or(background)
+            } else {
+                background.or(foreground)
+            })
+            .and_then(|node| parse_color(node, colors))
         });
     let border = dxf
         .children()

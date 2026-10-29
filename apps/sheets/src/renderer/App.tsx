@@ -103,6 +103,7 @@ import '@univerjs/preset-sheets-conditional-formatting/lib/index.css'
 import {
   INTERCEPTOR_POINT,
   SheetInterceptorService,
+  ISheetClipboardService,
   UniverSheetsCorePreset,
 } from '@univerjs/preset-sheets-core'
 import UniverPresetSheetsCoreEnUS from '@univerjs/preset-sheets-core/locales/en-US'
@@ -178,6 +179,7 @@ import {
 import { installOutlineGutter, type OutlineGutterHandle } from './outline-gutter'
 import {
   loadRowOutlines,
+  outlineGroupsFor,
   outlineSummarySettings,
   showOutlineLevel,
   toggleOutlineGroup,
@@ -2413,7 +2415,14 @@ export function App({
       ? installOutlineGutter({
           runtime,
           host: gutterHost,
-          state: () => lazyWorkbookRef.current,
+          outline: (sheetId) => {
+            const state = lazyWorkbookRef.current
+            return state ? sheetOutline(state, sheetId) : null
+          },
+          groups: (worksheet, axis) => {
+            const state = lazyWorkbookRef.current
+            return state ? outlineGroupsFor(state, worksheet, worksheet.getSheetId(), axis) : []
+          },
           onToggleGroup: (axis, group, collapsed) =>
             toggleOutlineGroup(dataToolsContext(), axis, group, collapsed),
           onLevel: (axis, level) => showOutlineLevel(dataToolsContext(), axis, level),
@@ -3486,6 +3495,13 @@ export function App({
     const gridHost = document.getElementById('univer-container')
     const disposePictureTransfer = gridHost
       ? installPictureTransfer(gridHost, {
+          pasteCells: (html, text) => {
+            void runtime.univer
+              .__getInjector()
+              .get(ISheetClipboardService)
+              .legacyPaste(html, text)
+              .catch((error) => setMessage(t('appApplyFailed', { reason: String(error) })))
+          },
           isCellEditing: () => editingCellRef.current,
           cellAtPoint: (x, y) => cellAtClientPoint(runtime, x, y),
           insert: (file, anchor) => handleInsertPictureFile(visualContext(), file, anchor),
@@ -4038,8 +4054,10 @@ export function App({
           const workbook = univerRef.current?.univerAPI.getActiveWorkbook()
           for (const formatChange of plan.formatChanges) {
             const worksheet = workbook?.getSheetBySheetId(formatChange.sheetId)
-            if (worksheet)
+            if (worksheet) {
+              if (formatChange.reset) worksheet.getRange(formatChange.range).clearFormat()
               applyFormatPatchToRange(worksheet.getRange(formatChange.range), formatChange.format)
+            }
           }
         } finally {
           journalSuppression.active = false

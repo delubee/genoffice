@@ -2,7 +2,7 @@
 import { platformShortcuts } from '@genoffice/i18n'
 import { SHAPE_GALLERY_GROUPS, ShapePreview, useDismissablePopover } from '@genoffice/ui/chrome'
 import type { ChartSeriesVisualState } from '@genoffice/xlsx-gateway/domain/chart-visual'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ColorDropdown } from './ColorDropdown'
 import type { HeaderFooterParts } from './ribbon-model'
 import {
@@ -277,6 +277,7 @@ function TableStyleGallery({
 
 export function SheetsRibbon({
   activeTab,
+  themeEditingAvailable = true,
   selectionFormat,
   formatPainterActive,
   sheetHasContent,
@@ -299,6 +300,7 @@ export function SheetsRibbon({
   onIsSelectionInPivot,
 }: {
   readonly activeTab: RibbonTab
+  readonly themeEditingAvailable?: boolean
   readonly selectionFormat: SelectionFormat | null
   readonly formatPainterActive: boolean
   readonly sheetHasContent: boolean
@@ -337,17 +339,16 @@ export function SheetsRibbon({
     symbol: string,
     title: string,
     options: readonly { value: string; label: string }[],
+    disabled = false,
   ): React.JSX.Element => (
-    <div className="ribbon-tool large" data-tip={title}>
-      <span className="tool-icon-row">
-        <ToolSymbol symbol={symbol} />
-        <CaretIcon />
-      </span>
-      <span>
-        <strong>{label}</strong>
-      </span>
-      <MenuSelect cover label={label} options={options} onPick={onCommand} />
-    </div>
+    <LargeRibbonMenu
+      label={label}
+      symbol={symbol}
+      title={title}
+      options={options}
+      onCommand={onCommand}
+      disabled={disabled}
+    />
   )
   if (activeTab === 'Chart Design') {
     const canConvert = Boolean(selectedChart?.convertible && selectedChart.canEdit)
@@ -786,7 +787,7 @@ export function SheetsRibbon({
               {t('appShapes')}
               <CaretIcon />
               <ShapeGallerySelect
-                label="Shapes"
+                label={t('appShapes')}
                 onPick={(prst) => onCommand(`insert-shape:${prst}`)}
               />
             </span>
@@ -1029,15 +1030,20 @@ export function SheetsRibbon({
               value: `page-layout:theme:${preset.id}`,
               label: preset.name,
             })),
+            !themeEditingAvailable,
           )}
           <div className="row-stack">
-            <span className="styles-row" data-tip={t('appThemeColorsTitle')}>
+            <span
+              className={`styles-row${themeEditingAvailable ? '' : ' is-disabled'}`}
+              data-tip={t('appThemeColorsTitle')}
+            >
               <ToolSymbol symbol="▤" />
               {t('appColors')}
               <CaretIcon />
               <MenuSelect
                 cover
                 label={t('appColors')}
+                disabled={!themeEditingAvailable}
                 options={COLOR_SCHEMES.map((scheme) => ({
                   value: `page-layout:theme-colors:${scheme.id}`,
                   label: scheme.name,
@@ -1045,13 +1051,17 @@ export function SheetsRibbon({
                 onPick={onCommand}
               />
             </span>
-            <span className="styles-row" data-tip={t('appThemeFontsTitle')}>
+            <span
+              className={`styles-row${themeEditingAvailable ? '' : ' is-disabled'}`}
+              data-tip={t('appThemeFontsTitle')}
+            >
               <ToolSymbol symbol="A" />
               {t('appFonts')}
               <CaretIcon />
               <MenuSelect
                 cover
                 label={t('appFonts')}
+                disabled={!themeEditingAvailable}
                 options={FONT_SCHEMES.map((scheme) => ({
                   value: `page-layout:theme-fonts:${scheme.id}`,
                   label: scheme.name,
@@ -1127,14 +1137,14 @@ export function SheetsRibbon({
         </RibbonGroup>
         <RibbonGroup label={t('appGroupScaleToFit')}>
           <div className="row-stack">
-            <label className="styles-row" data-tip={t('appWidth')}>
+            <div className="styles-row" data-tip={t('appWidth')}>
               <ToolSymbol symbol="↔" />
               {t('appWidth')}:{fitOptions('width')}
-            </label>
-            <label className="styles-row" data-tip={t('appHeight')}>
+            </div>
+            <div className="styles-row" data-tip={t('appHeight')}>
               <ToolSymbol symbol="↕" />
               {t('appHeight')}:{fitOptions('height')}
-            </label>
+            </div>
           </div>
         </RibbonGroup>
         <RibbonGroup label={t('appGroupSheetOptions')}>
@@ -1187,176 +1197,12 @@ export function SheetsRibbon({
 
   if (activeTab === 'Formulas') {
     const definedNames = onListNames()
-    // Category buttons all open the same catalog dialog; the per-category
-    // menus funnel into Insert Function.
-    // Each button opens the catalog filtered to its own category; 'All'
-    // for the ones the catalog has no counterpart for (Recently Used / More Functions).
-    const functionCategory = (label: string, symbol: string, category: string) => (
-      <RibbonButton
-        large
-        menu
-        label={label}
-        detail={category === 'All' ? t('appBrowseCatalog') : t('appBrowseCatalogFiltered')}
-        symbol={symbol}
-        onClick={() => onCommand(`insert-function-open:${category}`)}
-      />
-    )
     return (
       <div className="ribbon" data-ribbon-body="">
-        <RibbonGroup label={t('appGroupFunctionLibrary')}>
-          <RibbonButton
-            large
-            label={t('appInsertFunction')}
-            detail={t('appBrowseCatalog')}
-            symbol="ƒx"
-            onClick={() => onCommand('insert-function-open')}
-          />
-          <div className="ribbon-tool large" data-tip={t('appAutoSumTitle')}>
-            <span className="tool-icon-row">
-              <ToolSymbol symbol="Σ" />
-              <CaretIcon />
-            </span>
-            <span>
-              <strong>{t('appAutoSum')}</strong>
-            </span>
-            <MenuSelect
-              cover
-              label="AutoSum"
-              options={autoSumOptions(t)}
-              onPick={(value) => onCommand(`autofn:${value}`)}
-            />
-          </div>
-          {functionCategory(t('appFnCatRecentlyUsed'), '🕘', 'All')}
-          {functionCategory(t('appFnCatFinancial'), '$', 'Financial')}
-          {functionCategory(t('appFnCatLogical'), '?', 'Logical')}
-          {functionCategory(t('appFnCatText'), 'A', 'Text')}
-          {functionCategory(t('appFnCatDateTime'), '🕐', 'Date & Time')}
-          {functionCategory(t('appFnCatLookup'), '🔍', 'Lookup')}
-          {functionCategory(t('appFnCatMathTrig'), 'θ', 'Math')}
-          {functionCategory(t('appFnCatMore'), '⋯', 'All')}
-        </RibbonGroup>
-        <RibbonGroup label={t('appGroupDefinedNames')}>
-          <RibbonButton
-            large
-            label={t('appNameManager')}
-            detail={t('appNameManagerDetail')}
-            symbol="🏷"
-            onClick={() => onCommand('name-manager-open')}
-          />
-          <div className="row-stack">
-            <button
-              className="styles-row as-button"
-              data-tip={t('appDefineName')}
-              onClick={() => onCommand('name-manager-open')}
-            >
-              <ToolSymbol symbol="🏷" />
-              {t('appDefineName')}
-              <CaretIcon />
-            </button>
-            <span className="styles-row" data-tip={t('appUseInFormulaTitle')}>
-              <ToolSymbol symbol="ƒ" />
-              {t('appUseInFormula')}
-              <CaretIcon />
-              <MenuSelect
-                cover
-                label={t('appUseInFormula')}
-                options={
-                  definedNames.length > 0
-                    ? definedNames.map((name) => ({ value: `use-in-formula:${name}`, label: name }))
-                    : [{ value: 'name-manager-open', label: t('appNoNamesYet') }]
-                }
-                onPick={onCommand}
-              />
-            </span>
-            <span className="styles-row" data-tip={t('appCreateFromSelectionTitle')}>
-              <ToolSymbol symbol="⊞" />
-              {t('appCreateFromSelection')}
-              <CaretIcon />
-              <MenuSelect
-                cover
-                label={t('appCreateFromSelection')}
-                options={[
-                  { value: 'create-names:top', label: t('appCreateNamesTopRow') },
-                  { value: 'create-names:left', label: t('appCreateNamesLeftCol') },
-                ]}
-                onPick={onCommand}
-              />
-            </span>
-          </div>
-        </RibbonGroup>
-        <RibbonGroup label={t('appGroupFormulaAuditing')}>
-          <div className="row-stack">
-            <button
-              className="styles-row as-button"
-              data-tip={t('appTracePrecedentsTitle')}
-              onClick={() => onCommand('trace-precedents')}
-            >
-              <ToolSymbol symbol="⇢" />
-              {t('appTracePrecedents')}
-            </button>
-            <button
-              className="styles-row as-button"
-              data-tip={t('appTraceDependentsTitle')}
-              onClick={() => onCommand('trace-dependents')}
-            >
-              <ToolSymbol symbol="⇠" />
-              {t('appTraceDependents')}
-            </button>
-            <button
-              className="styles-row as-button"
-              data-tip={t('appRemoveArrowsTitle')}
-              onClick={() => onCommand('remove-arrows')}
-            >
-              <ToolSymbol symbol="⌫" />
-              {t('appRemoveArrows')}
-            </button>
-          </div>
-          <RibbonButton
-            large
-            label={t('appShowFormulas')}
-            detail={t('appShowFormulasDetail')}
-            symbol="ƒ"
-            onClick={() => onCommand('toggle-show-formulas')}
-          />
-          <RibbonButton
-            large
-            label={t('appErrorChecking')}
-            detail={t('appErrorCheckingDetail')}
-            symbol="⚠"
-            onClick={() => onCommand('error-checking')}
-          />
-          <RibbonButton
-            large
-            label={t('appWatchWindow')}
-            detail={t('appWatchWindowDetail')}
-            symbol="👓"
-            onClick={() => onCommand('watch-window')}
-          />
-        </RibbonGroup>
-        <RibbonGroup label={t('appGroupCalculation')}>
-          {largeMenu(t('appCalculationOptions'), '🧮', t('appCalculationOptionsTitle'), [
-            { value: 'calc-mode:auto', label: t('appCalcAuto') + (calcManual ? '' : ' ✓') },
-            { value: 'calc-mode:manual', label: t('appCalcManual') + (calcManual ? ' ✓' : '') },
-          ])}
-          <div className="row-stack">
-            <button
-              className="styles-row as-button"
-              data-tip={t('appCalculateNowTitle')}
-              onClick={() => onCommand('calculate-now')}
-            >
-              <ToolSymbol symbol="⟳" />
-              {t('appCalculateNow')}
-            </button>
-            <button
-              className="styles-row as-button"
-              data-tip={t('appCalculateSheetTitle')}
-              onClick={() => onCommand('calculate-sheet')}
-            >
-              <ToolSymbol symbol="▦" />
-              {t('appCalculateSheet')}
-            </button>
-          </div>
-        </RibbonGroup>
+        <FunctionLibraryGroup onCommand={onCommand} />
+        <DefinedNamesGroup onCommand={onCommand} definedNames={definedNames} />
+        <FormulaAuditingGroup onCommand={onCommand} />
+        <CalculationGroup onCommand={onCommand} calcManual={calcManual} />
       </div>
     )
   }
@@ -1383,146 +1229,11 @@ export function SheetsRibbon({
             }}
           />
         </RibbonGroup>
-        <RibbonGroup label={t('appGroupGetData')}>
-          <div className="row-stack">
-            <button
-              className="styles-row as-button"
-              data-tip={t('appFromTextCsvTitle')}
-              onClick={() => onCommand('import-csv')}
-            >
-              <ToolSymbol symbol="🗎" />
-              {t('appFromTextCsv')}
-            </button>
-            <button
-              className="styles-row as-button"
-              data-tip={t('appMergeWorkbooksTip')}
-              onClick={() => onCommand('merge-workbooks')}
-            >
-              <ToolSymbol symbol="⧉" />
-              {t('appMergeWorkbooks')}
-            </button>
-            <button
-              className="styles-row as-button"
-              data-tip={t('appRefreshAllTitle')}
-              onClick={() => onCommand('refresh-all')}
-            >
-              <ToolSymbol symbol="⟳" />
-              {t('appRefreshAll')}
-            </button>
-          </div>
-        </RibbonGroup>
-        <RibbonGroup label={t('appGroupSortFilter')}>
-          {largeMenu(t('appSort'), '⇅', t('appSortSelectionTitle'), [
-            { value: 'sort:asc', label: t('appSortAToZ') },
-            { value: 'sort:desc', label: t('appSortZToA') },
-            { value: 'sort-custom-open', label: t('appCustomSort') },
-          ])}
-          <RibbonButton
-            large
-            label={t('appFilter')}
-            detail={platformShortcuts(t('appFilterToggleDetail'))}
-            symbol="▽"
-            onClick={() => onCommand('filter-toggle')}
-          />
-          <div className="row-stack">
-            <button
-              className="styles-row as-button"
-              data-tip={t('appClearFilterTitle')}
-              onClick={() => onCommand('filter-clear')}
-            >
-              <ToolSymbol symbol="⊘" />
-              {t('appClear')}
-            </button>
-            <button
-              className="styles-row as-button"
-              data-tip={t('appReapplyTitle')}
-              onClick={() => onCommand('filter-reapply')}
-            >
-              <ToolSymbol symbol="↻" />
-              {t('appReapply')}
-            </button>
-            <button
-              className="styles-row as-button"
-              data-tip={t('appAdvancedFilterTitle')}
-              onClick={() => onCommand('filter-advanced')}
-            >
-              <ToolSymbol symbol="▽" />
-              {t('appAdvanced')}
-            </button>
-          </div>
-        </RibbonGroup>
-        <RibbonGroup label={t('appGroupDataTools')}>
-          {largeMenu(t('appTextToColumns'), '⇶', t('appTextToColumnsTitle'), [
-            { value: 'text-to-columns:2', label: t('appSplitByComma') },
-            { value: 'text-to-columns:4', label: t('appSplitBySemicolon') },
-            { value: 'text-to-columns:8', label: t('appSplitBySpace') },
-            { value: 'text-to-columns:1', label: t('appSplitByTab') },
-          ])}
-          <RibbonButton
-            large
-            label={t('appFlashFill')}
-            detail={t('appFlashFillDetail')}
-            symbol="⚡"
-            onClick={() => onCommand('flash-fill')}
-          />
-          <RibbonButton
-            large
-            label={t('appRemoveDuplicates')}
-            detail={t('appInSelection')}
-            symbol="⧉"
-            onClick={() => onCommand('remove-duplicates-open')}
-          />
-          <RibbonButton
-            large
-            menu
-            label={t('appDataValidation')}
-            detail={t('appRulesPanel')}
-            symbol="✓"
-            onClick={() => onCommand('dv-open')}
-          />
-          <RibbonButton
-            large
-            label={t('appConsolidate')}
-            detail={t('appCombineRanges')}
-            symbol="⊕"
-            onClick={() => onCommand('consolidate-open')}
-          />
-        </RibbonGroup>
-        <RibbonGroup label={t('appGroupForecast')}>
-          {largeMenu(t('appWhatIfAnalysis'), '❔', t('appWhatIfTitle'), [
-            { value: 'goal-seek-open', label: t('appGoalSeek') },
-          ])}
-        </RibbonGroup>
-        <RibbonGroup label={t('appGroupOutline')}>
-          {largeMenu(t('appOutlineGroup'), '⊟', t('appOutlineGroupTitle'), [
-            { value: 'outline-group:rows', label: t('appGroupRows') },
-            { value: 'outline-group:cols', label: t('appGroupCols') },
-            { value: 'outline-hide-detail:rows', label: t('appHideDetailRows') },
-            { value: 'outline-hide-detail:cols', label: t('appHideDetailCols') },
-            {
-              value: 'outline-summary-below',
-              label: `${outlineSummary.below ? '✓ ' : ''}${t('appOutlineSummaryBelow')}`,
-            },
-            {
-              value: 'outline-summary-right',
-              label: `${outlineSummary.right ? '✓ ' : ''}${t('appOutlineSummaryRight')}`,
-            },
-          ])}
-          {largeMenu(t('appOutlineUngroup'), '⊞', t('appOutlineUngroupTitle'), [
-            { value: 'outline-ungroup:rows', label: t('appUngroupRows') },
-            { value: 'outline-ungroup:cols', label: t('appUngroupCols') },
-            { value: 'outline-show-detail:rows', label: t('appShowDetailRows') },
-            { value: 'outline-show-detail:cols', label: t('appShowDetailCols') },
-            { value: 'outline-clear', label: t('appClearOutline') },
-          ])}
-          <RibbonButton
-            large
-            label={t('appSubtotal')}
-            detail={t('appSubtotalDetail')}
-            symbol="∑"
-            onClick={() => onCommand('subtotal-open')}
-          />
-        </RibbonGroup>
+        <GetDataRibbonGroup onCommand={onCommand} />
+        <SortFilterRibbonGroup onCommand={onCommand} />
+        <DataToolsRibbonGroup onCommand={onCommand} />
+        <ForecastRibbonGroup onCommand={onCommand} />
+        <OutlineRibbonGroup onCommand={onCommand} outlineSummary={outlineSummary} />
       </div>
     )
   }
@@ -2460,6 +2171,7 @@ export function useEscapeClose(open: boolean, close: () => void): void {
 /// anchored below its trigger — same pattern as the slides ribbon's .rb-drop.
 function MenuSelect({
   label,
+  disabled = false,
   'data-tip': tip,
   className,
   cover = false,
@@ -2470,6 +2182,7 @@ function MenuSelect({
 }: {
   /// aria-label (mirrors the old select's aria-label)
   readonly label: string
+  readonly disabled?: boolean
   readonly 'data-tip'?: string
   /// trigger classes for the combobox look (e.g. 'select-like compact')
   readonly className?: string
@@ -2484,6 +2197,40 @@ function MenuSelect({
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    if (!open) return
+    const wrap = wrapRef.current
+    const menu = menuRef.current
+    const view = wrap?.ownerDocument.defaultView
+    if (!wrap || !menu || !view) return
+    // A fixed ribbon popup must fit the webview viewport, including short
+    // embedded editors where the shell status bar sits just outside it.
+    const position = () => {
+      const trigger = wrap.getBoundingClientRect()
+      const margin = 4
+      const below = Math.max(0, view.innerHeight - trigger.bottom - margin * 2)
+      const above = Math.max(0, trigger.top - margin * 2)
+      const desired = Math.min(320, menu.scrollHeight + 2)
+      const useBelow = below >= desired || below >= above
+      const height = Math.min(desired, useBelow ? below : above)
+      const width = Math.min(menu.scrollWidth + 2, Math.max(0, view.innerWidth - margin * 2))
+      menu.style.maxHeight = `${height}px`
+      menu.style.maxWidth = `${Math.max(0, view.innerWidth - margin * 2)}px`
+      menu.style.minWidth = `${Math.min(148, Math.max(0, view.innerWidth - margin * 2))}px`
+      menu.style.top = `${Math.max(margin, useBelow ? trigger.bottom + margin : trigger.top - margin - height)}px`
+      menu.style.left = `${Math.max(margin, Math.min(trigger.left, view.innerWidth - width - margin))}px`
+      menu.style.boxSizing = 'border-box'
+      menu.style.setProperty('position-try-fallbacks', 'none')
+    }
+    position()
+    view.addEventListener('resize', position)
+    wrap.ownerDocument.addEventListener('scroll', position, true)
+    return () => {
+      view.removeEventListener('resize', position)
+      wrap.ownerDocument.removeEventListener('scroll', position, true)
+    }
+  }, [open, options])
   // outside press / window blur / shell chrome press — the shared hook
   useDismissablePopover(open, () => setOpen(false), { inside: () => [wrapRef.current] })
   useEscapeClose(open, () => setOpen(false))
@@ -2491,6 +2238,7 @@ function MenuSelect({
     <div ref={wrapRef} className={`menu-select${cover ? ' menu-select-cover' : ''}`}>
       <button
         type="button"
+        disabled={disabled}
         className={cover ? 'cover-select' : className}
         data-tip={tip}
         aria-label={label}
@@ -2506,7 +2254,7 @@ function MenuSelect({
         )}
       </button>
       {open && (
-        <div className="menu-select-drop" role="listbox" aria-label={label}>
+        <div ref={menuRef} className="menu-select-drop" role="listbox" aria-label={label}>
           {options.map((option) => (
             <button
               type="button"
@@ -2724,6 +2472,260 @@ function NumberFormatSelect({
   )
 }
 
+function LargeRibbonMenu({
+  label,
+  symbol,
+  title,
+  options,
+  onCommand,
+  disabled = false,
+}: {
+  readonly label: string
+  readonly symbol: string
+  readonly title: string
+  readonly options: readonly { value: string; label: string }[]
+  readonly onCommand: (command: string) => void
+  readonly disabled?: boolean
+}): React.JSX.Element {
+  return (
+    <div className={`ribbon-tool large${disabled ? ' is-disabled' : ''}`} data-tip={title}>
+      <span className="tool-icon-row">
+        <ToolSymbol symbol={symbol} />
+        <CaretIcon />
+      </span>
+      <span>
+        <strong>{label}</strong>
+      </span>
+      <MenuSelect cover label={label} options={options} onPick={onCommand} disabled={disabled} />
+    </div>
+  )
+}
+
+/** Shared desktop Get Data entries (From Text/CSV, Merge Workbooks, Refresh All). */
+export function GetDataRibbonGroup({
+  onCommand,
+}: {
+  readonly onCommand: (command: string) => void
+}): React.JSX.Element {
+  const { t } = useI18n()
+  return (
+    <RibbonGroup label={t('appGroupGetData')}>
+      <div className="row-stack">
+        <button
+          className="styles-row as-button"
+          data-tip={t('appFromTextCsvTitle')}
+          onClick={() => onCommand('import-csv')}
+        >
+          <ToolSymbol symbol="🗎" />
+          {t('appFromTextCsv')}
+        </button>
+        <button
+          className="styles-row as-button"
+          data-tip={t('appMergeWorkbooksTip')}
+          onClick={() => onCommand('merge-workbooks')}
+        >
+          <ToolSymbol symbol="⧉" />
+          {t('appMergeWorkbooks')}
+        </button>
+        <button
+          className="styles-row as-button"
+          data-tip={t('appRefreshAllTitle')}
+          onClick={() => onCommand('refresh-all')}
+        >
+          <ToolSymbol symbol="⟳" />
+          {t('appRefreshAll')}
+        </button>
+      </div>
+    </RibbonGroup>
+  )
+}
+
+/** Shared desktop What-if Analysis menu. */
+export function ForecastRibbonGroup({
+  onCommand,
+}: {
+  readonly onCommand: (command: string) => void
+}): React.JSX.Element {
+  const { t } = useI18n()
+  return (
+    <RibbonGroup label={t('appGroupForecast')}>
+      <LargeRibbonMenu
+        label={t('appWhatIfAnalysis')}
+        symbol="❔"
+        title={t('appWhatIfTitle')}
+        onCommand={onCommand}
+        options={[{ value: 'goal-seek-open', label: t('appGoalSeek') }]}
+      />
+    </RibbonGroup>
+  )
+}
+
+/** Shared desktop outline menus and Subtotal entry. */
+export function OutlineRibbonGroup({
+  onCommand,
+  outlineSummary,
+}: {
+  readonly onCommand: (command: string) => void
+  readonly outlineSummary: { below: boolean; right: boolean }
+}): React.JSX.Element {
+  const { t } = useI18n()
+  return (
+    <RibbonGroup label={t('appGroupOutline')}>
+      <LargeRibbonMenu
+        label={t('appOutlineGroup')}
+        symbol="⊟"
+        title={t('appOutlineGroupTitle')}
+        onCommand={onCommand}
+        options={[
+          { value: 'outline-group:rows', label: t('appGroupRows') },
+          { value: 'outline-group:cols', label: t('appGroupCols') },
+          { value: 'outline-hide-detail:rows', label: t('appHideDetailRows') },
+          { value: 'outline-hide-detail:cols', label: t('appHideDetailCols') },
+          {
+            value: 'outline-summary-below',
+            label: `${outlineSummary.below ? '✓ ' : ''}${t('appOutlineSummaryBelow')}`,
+          },
+          {
+            value: 'outline-summary-right',
+            label: `${outlineSummary.right ? '✓ ' : ''}${t('appOutlineSummaryRight')}`,
+          },
+        ]}
+      />
+      <LargeRibbonMenu
+        label={t('appOutlineUngroup')}
+        symbol="⊞"
+        title={t('appOutlineUngroupTitle')}
+        onCommand={onCommand}
+        options={[
+          { value: 'outline-ungroup:rows', label: t('appUngroupRows') },
+          { value: 'outline-ungroup:cols', label: t('appUngroupCols') },
+          { value: 'outline-show-detail:rows', label: t('appShowDetailRows') },
+          { value: 'outline-show-detail:cols', label: t('appShowDetailCols') },
+          { value: 'outline-clear', label: t('appClearOutline') },
+        ]}
+      />
+      <RibbonButton
+        large
+        label={t('appSubtotal')}
+        detail={t('appSubtotalDetail')}
+        symbol="∑"
+        onClick={() => onCommand('subtotal-open')}
+      />
+    </RibbonGroup>
+  )
+}
+
+/** Shared desktop Data → Data Tools controls. */
+export function DataToolsRibbonGroup({
+  onCommand,
+}: {
+  readonly onCommand: (command: string) => void
+}): React.JSX.Element {
+  const { t } = useI18n()
+  return (
+    <RibbonGroup label={t('appGroupDataTools')}>
+      <LargeRibbonMenu
+        label={t('appTextToColumns')}
+        symbol="⇶"
+        title={t('appTextToColumnsTitle')}
+        onCommand={onCommand}
+        options={[
+          { value: 'text-to-columns:2', label: t('appSplitByComma') },
+          { value: 'text-to-columns:4', label: t('appSplitBySemicolon') },
+          { value: 'text-to-columns:8', label: t('appSplitBySpace') },
+          { value: 'text-to-columns:1', label: t('appSplitByTab') },
+        ]}
+      />
+      <RibbonButton
+        large
+        label={t('appFlashFill')}
+        detail={t('appFlashFillDetail')}
+        symbol="⚡"
+        onClick={() => onCommand('flash-fill')}
+      />
+      <RibbonButton
+        large
+        label={t('appRemoveDuplicates')}
+        detail={t('appInSelection')}
+        symbol="⧉"
+        onClick={() => onCommand('remove-duplicates-open')}
+      />
+      <RibbonButton
+        large
+        menu
+        label={t('appDataValidation')}
+        detail={t('appRulesPanel')}
+        symbol="✓"
+        onClick={() => onCommand('dv-open')}
+      />
+      <RibbonButton
+        large
+        label={t('appConsolidate')}
+        detail={t('appCombineRanges')}
+        symbol="⊕"
+        onClick={() => onCommand('consolidate-open')}
+      />
+    </RibbonGroup>
+  )
+}
+
+/** The actual desktop Data → Sort & Filter command group, also embedded in VS Code. */
+export function SortFilterRibbonGroup({
+  onCommand,
+}: {
+  readonly onCommand: (command: string) => void
+}): React.JSX.Element {
+  const { t } = useI18n()
+  return (
+    <RibbonGroup label={t('appGroupSortFilter')}>
+      <LargeRibbonMenu
+        label={t('appSort')}
+        symbol="⇅"
+        title={t('appSortSelectionTitle')}
+        onCommand={onCommand}
+        options={[
+          { value: 'sort:asc', label: t('appSortAToZ') },
+          { value: 'sort:desc', label: t('appSortZToA') },
+          { value: 'sort-custom-open', label: t('appCustomSort') },
+        ]}
+      />
+      <RibbonButton
+        large
+        label={t('appFilter')}
+        detail={platformShortcuts(t('appFilterToggleDetail'))}
+        symbol="▽"
+        onClick={() => onCommand('filter-toggle')}
+      />
+      <div className="row-stack">
+        <button
+          className="styles-row as-button"
+          data-tip={t('appClearFilterTitle')}
+          onClick={() => onCommand('filter-clear')}
+        >
+          <ToolSymbol symbol="⊘" />
+          {t('appClear')}
+        </button>
+        <button
+          className="styles-row as-button"
+          data-tip={t('appReapplyTitle')}
+          onClick={() => onCommand('filter-reapply')}
+        >
+          <ToolSymbol symbol="↻" />
+          {t('appReapply')}
+        </button>
+        <button
+          className="styles-row as-button"
+          data-tip={t('appAdvancedFilterTitle')}
+          onClick={() => onCommand('filter-advanced')}
+        >
+          <ToolSymbol symbol="▽" />
+          {t('appAdvanced')}
+        </button>
+      </div>
+    </RibbonGroup>
+  )
+}
+
 function RibbonGroup({
   label,
   children,
@@ -2791,5 +2793,244 @@ function RibbonButton({
         <small>{detail}</small>
       </span>
     </button>
+  )
+}
+
+/** Shared function library; embedded hosts can migrate the remaining groups independently. */
+export function FunctionLibraryRibbon({
+  onCommand,
+  definedNames,
+  auditing = false,
+  calcManual = false,
+}: {
+  onCommand(command: string): void
+  auditing?: boolean
+  definedNames?: readonly string[]
+  calcManual?: boolean
+}) {
+  return (
+    <div className="ribbon" data-ribbon-body="">
+      <FunctionLibraryGroup onCommand={onCommand} />
+      {definedNames && <DefinedNamesGroup onCommand={onCommand} definedNames={definedNames} />}
+      {auditing && <FormulaAuditingGroup onCommand={onCommand} />}
+      <CalculationGroup onCommand={onCommand} calcManual={calcManual} />
+    </div>
+  )
+}
+
+function CalculationGroup({
+  onCommand,
+  calcManual,
+}: {
+  onCommand(command: string): void
+  calcManual: boolean
+}) {
+  const { t } = useI18n()
+  return (
+    <RibbonGroup label={t('appGroupCalculation')}>
+      <div className="ribbon-tool large" data-tip={t('appCalculationOptionsTitle')}>
+        <span className="tool-icon-row">
+          <ToolSymbol symbol="🧮" />
+          <CaretIcon />
+        </span>
+        <span>
+          <strong>{t('appCalculationOptions')}</strong>
+        </span>
+        <MenuSelect
+          cover
+          label={t('appCalculationOptions')}
+          options={[
+            { value: 'calc-mode:auto', label: t('appCalcAuto') + (calcManual ? '' : ' ✓') },
+            { value: 'calc-mode:manual', label: t('appCalcManual') + (calcManual ? ' ✓' : '') },
+          ]}
+          onPick={onCommand}
+        />
+      </div>
+      <div className="row-stack">
+        <button
+          className="styles-row as-button"
+          data-tip={t('appCalculateNowTitle')}
+          onClick={() => onCommand('calculate-now')}
+        >
+          <ToolSymbol symbol="⟳" />
+          {t('appCalculateNow')}
+        </button>
+        <button
+          className="styles-row as-button"
+          data-tip={t('appCalculateSheetTitle')}
+          onClick={() => onCommand('calculate-sheet')}
+        >
+          <ToolSymbol symbol="▦" />
+          {t('appCalculateSheet')}
+        </button>
+      </div>
+    </RibbonGroup>
+  )
+}
+function FunctionLibraryGroup({ onCommand }: { onCommand(command: string): void }) {
+  const { t } = useI18n()
+  // Category buttons all open the same catalog dialog; the per-category
+  // menus funnel into Insert Function.
+  // Each button opens the catalog filtered to its own category; 'All'
+  // for the ones the catalog has no counterpart for (Recently Used / More Functions).
+  const functionCategory = (label: string, symbol: string, category: string) => (
+    <RibbonButton
+      large
+      menu
+      label={label}
+      detail={category === 'All' ? t('appBrowseCatalog') : t('appBrowseCatalogFiltered')}
+      symbol={symbol}
+      onClick={() => onCommand(`insert-function-open:${category}`)}
+    />
+  )
+  return (
+    <RibbonGroup label={t('appGroupFunctionLibrary')}>
+      <RibbonButton
+        large
+        label={t('appInsertFunction')}
+        detail={t('appBrowseCatalog')}
+        symbol="ƒx"
+        onClick={() => onCommand('insert-function-open')}
+      />
+      <div className="ribbon-tool large" data-tip={t('appAutoSumTitle')}>
+        <span className="tool-icon-row">
+          <ToolSymbol symbol="Σ" />
+          <CaretIcon />
+        </span>
+        <span>
+          <strong>{t('appAutoSum')}</strong>
+        </span>
+        <MenuSelect
+          cover
+          label="AutoSum"
+          options={autoSumOptions(t)}
+          onPick={(value) => onCommand(`autofn:${value}`)}
+        />
+      </div>
+      {functionCategory(t('appFnCatRecentlyUsed'), '🕘', 'All')}
+      {functionCategory(t('appFnCatFinancial'), '$', 'Financial')}
+      {functionCategory(t('appFnCatLogical'), '?', 'Logical')}
+      {functionCategory(t('appFnCatText'), 'A', 'Text')}
+      {functionCategory(t('appFnCatDateTime'), '🕐', 'Date & Time')}
+      {functionCategory(t('appFnCatLookup'), '🔍', 'Lookup')}
+      {functionCategory(t('appFnCatMathTrig'), 'θ', 'Math')}
+      {functionCategory(t('appFnCatMore'), '⋯', 'All')}
+    </RibbonGroup>
+  )
+}
+
+function DefinedNamesGroup({
+  onCommand,
+  definedNames,
+}: {
+  onCommand(command: string): void
+  definedNames: readonly string[]
+}) {
+  const { t } = useI18n()
+  return (
+    <RibbonGroup label={t('appGroupDefinedNames')}>
+      <RibbonButton
+        large
+        label={t('appNameManager')}
+        detail={t('appNameManagerDetail')}
+        symbol="🏷"
+        onClick={() => onCommand('name-manager-open')}
+      />
+      <div className="row-stack">
+        <button
+          className="styles-row as-button"
+          data-tip={t('appDefineName')}
+          onClick={() => onCommand('name-manager-open')}
+        >
+          <ToolSymbol symbol="🏷" />
+          {t('appDefineName')}
+          <CaretIcon />
+        </button>
+        <span className="styles-row" data-tip={t('appUseInFormulaTitle')}>
+          <ToolSymbol symbol="ƒ" />
+          {t('appUseInFormula')}
+          <CaretIcon />
+          <MenuSelect
+            cover
+            label={t('appUseInFormula')}
+            options={
+              definedNames.length > 0
+                ? definedNames.map((name) => ({ value: `use-in-formula:${name}`, label: name }))
+                : [{ value: 'name-manager-open', label: t('appNoNamesYet') }]
+            }
+            onPick={onCommand}
+          />
+        </span>
+        <span className="styles-row" data-tip={t('appCreateFromSelectionTitle')}>
+          <ToolSymbol symbol="⊞" />
+          {t('appCreateFromSelection')}
+          <CaretIcon />
+          <MenuSelect
+            cover
+            label={t('appCreateFromSelection')}
+            options={[
+              { value: 'create-names:top', label: t('appCreateNamesTopRow') },
+              { value: 'create-names:left', label: t('appCreateNamesLeftCol') },
+            ]}
+            onPick={onCommand}
+          />
+        </span>
+      </div>
+    </RibbonGroup>
+  )
+}
+
+export function FormulaAuditingGroup({ onCommand }: { onCommand(command: string): void }) {
+  const { t } = useI18n()
+  return (
+    <RibbonGroup label={t('appGroupFormulaAuditing')}>
+      <div className="row-stack">
+        <button
+          className="styles-row as-button"
+          data-tip={t('appTracePrecedentsTitle')}
+          onClick={() => onCommand('trace-precedents')}
+        >
+          <ToolSymbol symbol="⇢" />
+          {t('appTracePrecedents')}
+        </button>
+        <button
+          className="styles-row as-button"
+          data-tip={t('appTraceDependentsTitle')}
+          onClick={() => onCommand('trace-dependents')}
+        >
+          <ToolSymbol symbol="⇠" />
+          {t('appTraceDependents')}
+        </button>
+        <button
+          className="styles-row as-button"
+          data-tip={t('appRemoveArrowsTitle')}
+          onClick={() => onCommand('remove-arrows')}
+        >
+          <ToolSymbol symbol="⌫" />
+          {t('appRemoveArrows')}
+        </button>
+      </div>
+      <RibbonButton
+        large
+        label={t('appShowFormulas')}
+        detail={t('appShowFormulasDetail')}
+        symbol="ƒ"
+        onClick={() => onCommand('toggle-show-formulas')}
+      />
+      <RibbonButton
+        large
+        label={t('appErrorChecking')}
+        detail={t('appErrorCheckingDetail')}
+        symbol="⚠"
+        onClick={() => onCommand('error-checking')}
+      />
+      <RibbonButton
+        large
+        label={t('appWatchWindow')}
+        detail={t('appWatchWindowDetail')}
+        symbol="👓"
+        onClick={() => onCommand('watch-window')}
+      />
+    </RibbonGroup>
   )
 }

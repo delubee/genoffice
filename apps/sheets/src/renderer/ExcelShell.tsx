@@ -1,6 +1,9 @@
+import { RemoveDuplicatesDialog } from './RemoveDuplicatesDialog'
+import { SortDialog } from './SortDialog'
+import { ChartTextDialog, type ChartTextTarget } from './ChartTextDialog'
+import { LinkDialog } from './LinkDialog'
 import { platformShortcuts } from '@genoffice/i18n'
 import {
-  Dropdown,
   aiPanelInitiallyOpen,
   rememberAiPanelOpen,
   useAiSidebarEnabled,
@@ -30,6 +33,7 @@ import {
   isGridKeyTarget,
   shouldInterceptClearSelection,
 } from './clear-selection-keyboard'
+import { AxisSizeDialog } from './AxisSizeDialog'
 import { FormatCellsDialog } from './FormatCellsDialog'
 import { isModalOpen, resolveGlobalShortcut } from './global-shortcuts'
 import { GoToDialog } from './GoToDialog'
@@ -108,14 +112,6 @@ const TAB_LABEL: Record<RibbonTab, StringKey> = {
   'Shape Format': 'appTabShapeFormat',
   'Table Design': 'appTabTableDesign',
   'Picture Format': 'appTabPictureFormat',
-}
-
-type ChartTextTarget = 'title' | 'axis-category' | 'axis-value'
-
-const CHART_TEXT_LABELS: Record<ChartTextTarget, { heading: StringKey; command: string }> = {
-  title: { heading: 'appChartTitleEl', command: 'chart-title' },
-  'axis-category': { heading: 'appCategoryAxisTitle', command: 'chart-axis-cat' },
-  'axis-value': { heading: 'appValueAxisTitle', command: 'chart-axis-val' },
 }
 
 /// mode=tab: embedded in the shell's tab strip, which owns the traffic
@@ -1223,149 +1219,6 @@ export function ExcelShell({
   )
 }
 
-const NO_SORT_LEVEL = -1
-
-function SortDialog({
-  columns,
-  onCommand,
-  onClose,
-}: {
-  readonly columns: { label: string; colIndex: number }[]
-  readonly onCommand: (command: string) => void
-  readonly onClose: () => void
-}): React.JSX.Element {
-  const { t } = useI18n()
-  const [hasHeader, setHasHeader] = useState(true)
-  const first = columns[0]?.colIndex ?? NO_SORT_LEVEL
-  const [levels, setLevels] = useState<{ colIndex: number; order: 'a' | 'd' }[]>([
-    { colIndex: first, order: 'a' },
-    { colIndex: NO_SORT_LEVEL, order: 'a' },
-    { colIndex: NO_SORT_LEVEL, order: 'a' },
-  ])
-  const apply = (): void => {
-    const rules = levels
-      .filter((level) => level.colIndex !== NO_SORT_LEVEL)
-      .map((level) => `${level.colIndex}${level.order}`)
-    if (rules.length > 0) onCommand(`sort-custom:${hasHeader ? 1 : 0}:${rules.join(',')}`)
-    onClose()
-  }
-  const setLevel = (
-    index: number,
-    patch: Partial<{ colIndex: number; order: 'a' | 'd' }>,
-  ): void => {
-    setLevels((previous) =>
-      previous.map((level, at) => (at === index ? { ...level, ...patch } : level)),
-    )
-  }
-  const modal = useModalDialog(onClose)
-  return (
-    <div className="dialog-backdrop" onClick={onClose}>
-      <div
-        className="format-cells-dialog sort-dialog"
-        role="dialog"
-        {...modal}
-        aria-label={t('appCustomSort')}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header>{t('appSort')}</header>
-        <div className="dialog-body">
-          <label className="sort-header-check">
-            <input
-              type="checkbox"
-              checked={hasHeader}
-              onChange={(event) => setHasHeader(event.target.checked)}
-            />
-            {t('appMyDataHasHeaders')}
-          </label>
-          {levels.map((level, index) => (
-            <div className="sort-level" key={index}>
-              <span>{t(index === 0 ? 'appSortBy' : 'appThenBy')}</span>
-              <Dropdown
-                ariaLabel={t(index === 0 ? 'appSortBy' : 'appThenBy')}
-                value={String(level.colIndex)}
-                options={[
-                  ...(index > 0 ? [{ value: String(NO_SORT_LEVEL), label: t('appSortNone') }] : []),
-                  ...columns.map((column) => ({
-                    value: String(column.colIndex),
-                    label: column.label,
-                  })),
-                ]}
-                onPick={(v) => setLevel(index, { colIndex: Number(v) })}
-              />
-              <Dropdown
-                value={level.order}
-                options={[
-                  { value: 'a', label: t('appSortAsc') },
-                  { value: 'd', label: t('appSortDesc') },
-                ]}
-                onPick={(v) => setLevel(index, { order: v })}
-              />
-            </div>
-          ))}
-        </div>
-        <footer className="dialog-actions">
-          <button onClick={onClose}>{t('appCancel')}</button>
-          <button
-            className="primary"
-            disabled={levels.every((level) => level.colIndex === NO_SORT_LEVEL)}
-            onClick={apply}
-          >
-            {t('appOk')}
-          </button>
-        </footer>
-      </div>
-    </div>
-  )
-}
-
-function RemoveDuplicatesDialog({
-  onCommand,
-  onClose,
-}: {
-  readonly onCommand: (command: string) => void
-  readonly onClose: () => void
-}): React.JSX.Element {
-  const { t } = useI18n()
-  const [hasHeader, setHasHeader] = useState(true)
-  const modal = useModalDialog(onClose)
-  return (
-    <div className="dialog-backdrop" onClick={onClose}>
-      <div
-        className="format-cells-dialog sort-dialog"
-        role="dialog"
-        {...modal}
-        aria-label={t('appRemoveDuplicates')}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header>{t('appRemoveDuplicates')}</header>
-        <div className="dialog-body">
-          <p className="dialog-note">{t('appRemoveDuplicatesNote')}</p>
-          <label className="sort-header-check">
-            <input
-              type="checkbox"
-              checked={hasHeader}
-              onChange={(event) => setHasHeader(event.target.checked)}
-            />
-            {t('appMyDataHasHeaders')}
-          </label>
-        </div>
-        <footer className="dialog-actions">
-          <button onClick={onClose}>{t('appCancel')}</button>
-          <button
-            className="primary"
-            onClick={() => {
-              onCommand(`remove-duplicates:${hasHeader ? 1 : 0}`)
-              onClose()
-            }}
-          >
-            {t('appOk')}
-          </button>
-        </footer>
-      </div>
-    </div>
-  )
-}
-
 /// Create Table (Ctrl+T) / Resize Table: one range box, optionally the
 /// "My table has headers" check.
 function TableRangeDialog({
@@ -1436,182 +1289,8 @@ function TableRangeDialog({
   )
 }
 
-/// Chart Design → Add Chart Element text prompt (title / axis titles).
-/// An empty axis title removes that axis title; an empty chart title blanks it.
-function ChartTextDialog({
-  target,
-  initial,
-  onCommand,
-  onClose,
-}: {
-  readonly target: ChartTextTarget
-  readonly initial: string
-  readonly onCommand: (command: string) => void
-  readonly onClose: () => void
-}): React.JSX.Element {
-  const { t } = useI18n()
-  const [value, setValue] = useState(initial)
-  const { heading, command } = CHART_TEXT_LABELS[target]
-  const apply = (): void => {
-    onCommand(`${command}:${value.trim()}`)
-    onClose()
-  }
-  const modal = useModalDialog(onClose)
-  return (
-    <div className="dialog-backdrop" onClick={onClose}>
-      <div
-        className="format-cells-dialog link-dialog"
-        role="dialog"
-        {...modal}
-        aria-label={t(heading)}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header>{t(heading)}</header>
-        <div className="dialog-body">
-          <label>
-            {t(target === 'title' ? 'appTitleText' : 'appAxisTitleText')}
-            <input
-              autoFocus
-              type="text"
-              value={value}
-              maxLength={255}
-              onChange={(event) => setValue(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') apply()
-              }}
-            />
-          </label>
-        </div>
-        <footer className="dialog-actions">
-          <button onClick={onClose}>{t('appCancel')}</button>
-          <button className="primary" onClick={apply}>
-            {t('appOk')}
-          </button>
-        </footer>
-      </div>
-    </div>
-  )
-}
-
 /// Numeric row-height / column-width entry (Excel's Format → Row Height /
 /// Column Width). Applies to the rows/columns of the current selection.
-function AxisSizeDialog({
-  axis,
-  onCommand,
-  onClose,
-}: {
-  readonly axis: 'row' | 'col'
-  readonly onCommand: (command: string) => void
-  readonly onClose: () => void
-}): React.JSX.Element {
-  const { t } = useI18n()
-  const [value, setValue] = useState('')
-  const max = axis === 'row' ? 409.5 : 255
-  const parsed = Number(value.trim().replace(',', '.'))
-  const valid = value.trim() !== '' && Number.isFinite(parsed) && parsed >= 0 && parsed <= max
-  const apply = (): void => {
-    if (!valid) return
-    onCommand(`${axis === 'row' ? 'row-height' : 'col-width'}:${parsed}`)
-    onClose()
-  }
-  const modal = useModalDialog(onClose)
-  return (
-    <div className="dialog-backdrop" onClick={onClose}>
-      <div
-        className="format-cells-dialog link-dialog"
-        role="dialog"
-        {...modal}
-        aria-label={t(axis === 'row' ? 'appRowHeight' : 'appColWidth')}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header>{t(axis === 'row' ? 'appRowHeight' : 'appColWidth')}</header>
-        <div className="dialog-body">
-          <label>
-            {t(axis === 'row' ? 'appRowHeightLabel' : 'appColWidthLabel')}
-            <input
-              autoFocus
-              type="text"
-              inputMode="decimal"
-              value={value}
-              onChange={(event) => setValue(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') apply()
-              }}
-            />
-          </label>
-        </div>
-        <footer className="dialog-actions">
-          <button onClick={onClose}>{t('appCancel')}</button>
-          <button className="primary" disabled={!valid} onClick={apply}>
-            {t('appOk')}
-          </button>
-        </footer>
-      </div>
-    </div>
-  )
-}
-
-function LinkDialog({
-  currentTarget,
-  onCommand,
-  onClose,
-}: {
-  readonly currentTarget: string | null
-  readonly onCommand: (command: string) => void
-  readonly onClose: () => void
-}): React.JSX.Element {
-  const { t } = useI18n()
-  const [value, setValue] = useState(currentTarget ?? '')
-  const apply = (): void => {
-    if (value.trim()) onCommand(`link-set:${encodeURIComponent(value)}`)
-    onClose()
-  }
-  const modal = useModalDialog(onClose)
-  return (
-    <div className="dialog-backdrop" onClick={onClose}>
-      <div
-        className="format-cells-dialog link-dialog"
-        role="dialog"
-        {...modal}
-        aria-label={t(currentTarget ? 'appEditLinkTitle' : 'appInsertLinkTitle')}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header>{t(currentTarget ? 'appEditLinkTitle' : 'appInsertLinkTitle')}</header>
-        <div className="dialog-body">
-          <label>
-            {t('appLinkAddressLabel')}
-            <input
-              autoFocus
-              type="text"
-              value={value}
-              placeholder={t('appLinkPlaceholder')}
-              onChange={(event) => setValue(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') apply()
-              }}
-            />
-          </label>
-        </div>
-        <footer className="dialog-actions">
-          {currentTarget && (
-            <button
-              onClick={() => {
-                onCommand('link-remove')
-                onClose()
-              }}
-            >
-              {t('appRemoveLink')}
-            </button>
-          )}
-          <button onClick={onClose}>{t('appCancel')}</button>
-          <button className="primary" disabled={!value.trim()} onClick={apply}>
-            {t('appOk')}
-          </button>
-        </footer>
-      </div>
-    </div>
-  )
-}
 
 const STAT_LABEL: Record<StatusBarFunc, StringKey> = {
   AVERAGE: 'appStatAverage',

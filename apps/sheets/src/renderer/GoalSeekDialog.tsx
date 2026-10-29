@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 import type { GoalSeekResult } from './goal-seek'
-import { useI18n } from './i18n/locale'
+import { normalizeLang } from '@genoffice/i18n'
+import { useI18n, tFor, type TFunc } from './i18n/locale'
 import { useModalDialog } from './modal-dialog'
 
 /// Excel's Goal Seek: three fields, then an async solve whose guesses are
@@ -9,15 +10,19 @@ import { useModalDialog } from './modal-dialog'
 /// the outcome; Cancel mid-solve is not offered (runs are a few seconds).
 export function GoalSeekDialog({
   initialSetCell,
+  locale,
   onSolve,
   onClose,
 }: {
+  readonly locale?: string
   readonly initialSetCell: string
   /// Rejects with an Error whose message is user-facing.
   readonly onSolve: (setCell: string, toValue: number, byCell: string) => Promise<GoalSeekResult>
   readonly onClose: () => void
 }): React.JSX.Element {
-  const { t } = useI18n()
+  const { t: desktopT } = useI18n()
+  const t: TFunc = locale ? (key, params) => tFor(normalizeLang(locale), key, params) : desktopT
+  const pending = useRef(false)
   const [setCell, setSetCell] = useState(initialSetCell)
   const [toValue, setToValue] = useState('')
   const [byCell, setByCell] = useState('')
@@ -30,11 +35,13 @@ export function GoalSeekDialog({
     CELL_REF.test(setCell.trim()) && CELL_REF.test(byCell.trim()) && toValue.trim() !== ''
 
   const solve = async (): Promise<void> => {
+    if (pending.current) return
     const target = Number(toValue)
     if (!Number.isFinite(target)) {
       setError(t('dlgGoalSeekNeedNumber'))
       return
     }
+    pending.current = true
     setBusy(true)
     setError(null)
     setOutcome(null)
@@ -52,12 +59,13 @@ export function GoalSeekDialog({
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure))
     } finally {
+      pending.current = false
       setBusy(false)
     }
   }
 
   const modal = useModalDialog(() => {
-    if (!busy) onClose()
+    if (!pending.current) onClose()
   })
   return (
     <div className="dialog-backdrop" onClick={busy ? undefined : onClose}>

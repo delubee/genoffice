@@ -414,7 +414,8 @@ function buildScatterSeriesReplacement(
   const spPr =
     entry.color === undefined
       ? ''
-      : '<c:spPr><a:ln><a:solidFill>' +
+      : '<c:spPr><a:solidFill>' +
+        `<a:srgbClr val="${entry.color.slice(1).toUpperCase()}"/></a:solidFill><a:ln><a:solidFill>` +
         `<a:srgbClr val="${entry.color.slice(1).toUpperCase()}"/></a:solidFill></a:ln></c:spPr>`
   const categories = entry.categories?.slice(0, entry.values.length) ?? []
   const numericCategories = categories.map((value) => Number(value))

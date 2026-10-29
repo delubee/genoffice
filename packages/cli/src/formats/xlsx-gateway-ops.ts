@@ -1,3 +1,12 @@
+import {
+  colorFilterMatches,
+  normalizedColorFilters,
+} from '@genoffice/xlsx-gateway/domain/color-filter'
+import {
+  customFilterPredicate,
+  normalizedCustomFilters,
+} from '@genoffice/xlsx-gateway/domain/custom-filter'
+import type { FilterColumnState } from '@genoffice/xlsx-gateway/gateway/xlsx-filter'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { isAbsolute, resolve } from 'node:path'
@@ -28,7 +37,7 @@ import type {
   DefinedNamesState,
 } from '@genoffice/xlsx-gateway/gateway/xlsx-defined-names'
 import type { ChartAdd, DrawingAnchor } from '@genoffice/xlsx-gateway/gateway/xlsx-drawing-add'
-import type { DvWireRule } from '@genoffice/xlsx-gateway/gateway/xlsx-dv'
+import { dvRuleToWireRule, type DvWireRule } from '@genoffice/xlsx-gateway/gateway/xlsx-dv'
 import {
   areasOverlap,
   buildPivotLayout,
@@ -81,6 +90,8 @@ export const GATEWAY_DSL_OPS = [
   'protect_sheet',
   'set_filter',
   'clear_filter',
+  'clear_filter_criteria',
+  'reapply_filter',
   'set_filter_criteria',
   'add_conditional_format',
   'clear_conditional_formats',
@@ -101,6 +112,7 @@ export const REFUSED_DSL_OPS: Readonly<Record<string, string>> = {
   delete_table: 'removes a table created in the same editor session',
   edit_shape: 'targets a shape created in the same editor session',
   delete_visual: 'targets a visual by its editor session id',
+  edit_visual: 'targets a visual by its editor session id',
 }
 
 /** Existing per-sheet state the payloads must carry over (the gateway rewrites whole sections). */
@@ -223,7 +235,11 @@ const MAX_SPARKLINES_PER_OP = 200
 const NOTE_AUTHOR = 'GenOffice'
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024
 
-type FilterDraft = { range: RangeBounds; columns: Map<number, string[]>; cleared: boolean }
+type FilterDraft = {
+  range: RangeBounds
+  columns: Map<number, Omit<FilterColumnState, 'colId'>>
+  cleared: boolean
+}
 
 export async function buildGatewayPayloads(input: GatewayBuildInput): Promise<GatewayPayloads> {
   const { ops, namesById, before, after, file } = input
@@ -310,6 +326,10 @@ export async function buildGatewayPayloads(input: GatewayBuildInput): Promise<Ga
         const sheet = name(op.sheetId)
         const prior = pageSetup.get(sheet) ?? {}
         const patch: PageSetupPatch = { ...prior }
+        if (op.showFormulas !== undefined) patch.showFormulas = op.showFormulas
+        if (op.showGridlines !== undefined) patch.showGridlines = op.showGridlines
+        if (op.showHeadings !== undefined) patch.showHeadings = op.showHeadings
+        if (op.zoomScale !== undefined) patch.zoomScale = op.zoomScale
         if (op.orientation !== undefined) patch.orientation = op.orientation
         if (op.paperSize !== undefined) patch.paperSize = op.paperSize
         if (op.margins !== undefined) patch.margins = op.margins
@@ -395,6 +415,35 @@ export async function buildGatewayPayloads(input: GatewayBuildInput): Promise<Ga
         filters.set(sheet, { range: current, columns: new Map(), cleared: true })
         break
       }
+      case 'clear_filter_criteria':
+      case 'reapply_filter': {
+        const sheet = name(op.sheetId)
+        const existing = fileState(sheet).autoFilter
+        let draft = filters.get(sheet)
+        if (!draft) {
+          if (
+            ops.some(
+              (candidate) =>
+                'sheetId' in candidate &&
+                candidate.sheetId === op.sheetId &&
+                ['insert_rows', 'delete_rows', 'insert_cols', 'delete_cols'].includes(candidate.op),
+            )
+          )
+            reject(i, op.op, 'Read the filter again after structural changes; use a separate batch')
+          if (!existing) reject(i, op.op, `${sheet} has no filter`)
+          if (op.op === 'reapply_filter' && existing!.hasCriteria)
+            reject(
+              i,
+              op.op,
+              'Imported filter criteria must be reapplied by the live workbook session',
+            )
+          draft = { range: existing!.range, columns: new Map(), cleared: false }
+          filters.set(sheet, draft)
+        }
+        if (draft.cleared) reject(i, op.op, 'The filter was removed earlier in this batch')
+        if (op.op === 'clear_filter_criteria') draft.columns.clear()
+        break
+      }
       case 'set_filter_criteria': {
         const sheet = name(op.sheetId)
         let draft = filters.get(sheet)
@@ -423,7 +472,15 @@ export async function buildGatewayPayloads(input: GatewayBuildInput): Promise<Ga
           reject(i, op.op, `column ${op.column} is outside the filter range`)
         }
         if (op.values === null) draft.columns.delete(colId)
-        else draft.columns.set(colId, [...op.values])
+        else
+          draft.columns.set(
+            colId,
+            op.colors
+              ? { colors: normalizedColorFilters(op.colors) }
+              : op.customs
+                ? { customs: normalizedCustomFilters(op.customs) }
+                : { values: [...op.values!] },
+          )
         break
       }
       case 'add_conditional_format': {
@@ -747,7 +804,7 @@ export async function buildGatewayPayloads(input: GatewayBuildInput): Promise<Ga
 
   for (const sheet of after.sheets) {
     for (const visual of sheet.visuals ?? []) {
-      if (!visual.id.startsWith('demo-chart-')) continue
+      if (!visual.id.startsWith('demo-chart-') || !visual.chart) continue
       const chart = chartAddFromVisual(visual.chart)
       if (!chart) continue
       visuals.push({ sheetName: name(sheet.id), anchor: visual.anchor, chart })
@@ -763,7 +820,7 @@ export async function buildGatewayPayloads(input: GatewayBuildInput): Promise<Ga
         ? null
         : {
             range: draft.range,
-            columns: [...draft.columns].map(([colId, values]) => ({ colId, values })),
+            columns: [...draft.columns].map(([colId, criteria]) => ({ colId, ...criteria })),
           },
       hiddenRows,
       visibilityRange: draft.range,
@@ -862,13 +919,19 @@ function copyName(source: string, taken: Set<string>): string {
 /** Rows of the filter span whose text is not among a column's checked values; like Excel's re-filter, the span's earlier hidden state is recomputed. */
 function filteredRows(draft: FilterDraft, sheet: WorksheetState | undefined): number[] {
   const out = new Set<number>()
-  for (const [colId, values] of draft.columns) {
-    const wanted = new Set(values.map((v) => matchableCellText(v)))
+  for (const [colId, criteria] of draft.columns) {
+    const wanted = new Set((criteria.values ?? []).map((v) => matchableCellText(v)))
+    const predicate = criteria.customs ? customFilterPredicate(criteria.customs) : null
     const column = draft.range.startColumn + colId
     for (let r = draft.range.startRow + 1; r <= draft.range.endRow; r++) {
       const cell = sheet?.cells[`${columnLabel(column)}${r + 1}`]
       const text = matchableCellText((cell?.value ?? null) as string | number | boolean | null)
-      if (!wanted.has(text)) out.add(r)
+      const matches = criteria.colors
+        ? colorFilterMatches(criteria.colors, sheet?.styles?.[`${columnLabel(column)}${r + 1}`])
+        : predicate
+          ? predicate(cell?.value ?? null)
+          : wanted.has(text)
+      if (!matches) out.add(r)
     }
   }
   return [...out].sort((a, b) => a - b)
@@ -969,33 +1032,7 @@ export function cfWireRule(rule: CfRule, bounds: RangeBounds): CfWireRule {
 type DvRule = NonNullable<Extract<WorkbookOperation, { op: 'set_data_validation' }>['validation']>
 
 export function dvWireRule(rule: DvRule): DvWireRule['rule'] {
-  const common = { allowBlank: true, showErrorMessage: true }
-  switch (rule.kind) {
-    case 'list':
-      return { ...common, type: 'list', formula1: rule.values.join(','), showDropDown: true }
-    case 'listRef':
-      return { ...common, type: 'list', formula1: `=${rule.range}`, showDropDown: true }
-    case 'numberBetween':
-      return {
-        ...common,
-        type: 'decimal',
-        operator: 'between',
-        formula1: String(rule.min),
-        formula2: String(rule.max),
-      }
-    case 'dateBetween':
-      return {
-        ...common,
-        type: 'date',
-        operator: 'between',
-        formula1: rule.start,
-        formula2: rule.end,
-      }
-    case 'checkbox':
-      return { ...common, type: 'checkbox' }
-    case 'formula':
-      return { ...common, type: 'custom', formula1: rule.formula }
-  }
+  return dvRuleToWireRule(rule)
 }
 
 /** The chart the in-memory workbook built for add_chart → the gateway's chart part input (the app's toSaveVisualAdds). */
