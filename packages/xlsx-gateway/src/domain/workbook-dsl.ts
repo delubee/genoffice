@@ -1226,6 +1226,18 @@ const refreshPivotSchema = z.object({
   subtotalLabel: z.string().min(1).max(64).optional(),
 })
 
+// Slicer / timeline selection on a file pivot field (Insert → Slicer /
+// Timeline): unselected members become hidden items and the output is
+// rebuilt; null selects every member (clears the filter).
+const filterPivotSchema = z.object({
+  op: z.literal('filter_pivot'),
+  sheetId: z.string().min(1),
+  pivot: z.string().regex(/^xl\/pivotTables\/[^/]+\.xml$/),
+  field: z.number().int().min(0).max(16383),
+  selected: z.array(z.number().int().min(0)).max(1_048_576).nullable(),
+  subtotalLabel: z.string().min(1).max(64).optional(),
+})
+
 // Freeze panes: rows/columns counted from the top-left; 0/0 unfreezes.
 const setFreezeSchema = z.object({
   op: z.literal('set_freeze'),
@@ -1535,6 +1547,7 @@ export const workbookOperationSchema = z.discriminatedUnion('op', [
   setNoteSchema,
   refreshPivotSchema,
   editPivotSchema,
+  filterPivotSchema,
   protectWorkbookSchema,
   setProtectedRangesSchema,
   setThreadSchema,
@@ -1694,6 +1707,7 @@ export type LayoutOperation =
   | z.infer<typeof setNoteSchema>
   | z.infer<typeof refreshPivotSchema>
   | z.infer<typeof editPivotSchema>
+  | z.infer<typeof filterPivotSchema>
   | z.infer<typeof protectWorkbookSchema>
   | z.infer<typeof setProtectedRangesSchema>
   | z.infer<typeof setThreadSchema>
@@ -1782,6 +1796,7 @@ const LAYOUT_OPS = new Set([
   'set_note',
   'refresh_pivot',
   'edit_pivot',
+  'filter_pivot',
   'protect_workbook',
   'set_protected_ranges',
   'set_thread',
@@ -2840,6 +2855,10 @@ export function layoutOpLabel(op: LayoutOperation): string {
       return `Edit PivotTable ${'session' in op.pivot ? op.pivot.session : op.pivot.file}`
     case 'refresh_pivot':
       return 'Refresh pivot tables'
+    case 'filter_pivot':
+      return op.selected === null
+        ? `Clear PivotTable filter ${op.pivot}`
+        : `Filter PivotTable ${op.pivot} field ${op.field + 1}`
   }
 }
 

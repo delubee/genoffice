@@ -139,6 +139,25 @@ export async function prepareCandidateMaterial(input: {
           }
         }
       }
+      if (op.op === 'filter_pivot') {
+        const sheet = state.sheets.find((item) => item.id === op.sheetId)
+        if (sheet) {
+          if (Math.max(sheet.rows, 1) * Math.max(sheet.columns, 1) > LIMITS.rangeCells)
+            throw new WorkbookError(
+              'structural_material_budget',
+              'PivotTable filters need more than 200,000 cells of sheet material.',
+            )
+          addRange(
+            sheet.id,
+            `A1:${formatAddress(Math.max(0, sheet.rows - 1), Math.max(0, sheet.columns - 1))}`,
+          )
+          const definition = filePivotsOfSheet(sheet).find(
+            (pivot) => pivot.path === op.pivot,
+          )?.definition
+          const source = definition && pivotSourceSheet(state, definition.sourceSheet)
+          if (source && definition) addRange(source.id, definition.sourceRef)
+        }
+      }
       if (op.op === 'refresh_pivot') {
         // Growth checks need the whole output sheet; recompute reads each source range.
         const sheet = state.sheets.find((item) => item.id === op.sheetId)

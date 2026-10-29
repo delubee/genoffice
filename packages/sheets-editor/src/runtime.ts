@@ -6413,6 +6413,44 @@ export class WorkbookRuntime implements EditorProjection {
       },
     }
   }
+  /** Insert → Slicer / Timeline: the file PivotTable under the cursor, as the desktop requires. */
+  filePivotAtSelection() {
+    const hit = this.pivotAtSelection()
+    if (!hit) throw new Error(t('appCursorNotInPivot'))
+    if (hit.session || !hit.file?.definition) throw new Error(t('appPivotDefNotLoadedSave'))
+    return { sheetId: hit.sheet.id, pivotPath: hit.key, definition: hit.file.definition }
+  }
+  /** The current (session-filtered) definition of a file PivotTable. */
+  filePivotDefinition(sheetId: string, pivotPath: string) {
+    const sheet = this.state?.sheets.find((item) => item.id === sheetId)
+    return sheet && filePivotsOfSheet(sheet).find((pivot) => pivot.path === pivotPath)?.definition
+  }
+  /** Slicer / timeline selection (null = all members); returns a message or null. */
+  async filterPivot(
+    target: { readonly sheetId: string; readonly pivotPath: string; readonly field: number },
+    selected: readonly number[] | null,
+  ) {
+    if (!(await this.flushEditor())) return 'Finish editing before filtering the PivotTable.'
+    try {
+      await this.enqueue(
+        [
+          {
+            op: 'filter_pivot',
+            sheetId: target.sheetId,
+            pivot: target.pivotPath,
+            field: target.field,
+            selected: selected === null ? null : [...selected],
+            subtotalLabel: t('appPivotSubtotal'),
+          },
+        ],
+        undefined,
+        { failureInDialog: true },
+      )
+    } catch (error) {
+      return pivotErrorMessage(error)
+    }
+    return null
+  }
   /** Fields pane apply: a new layout for the seeded pivot; returns a pane message or null. */
   async editPivot(
     seed: Awaited<ReturnType<WorkbookRuntime['pivotEditSeed']>>,

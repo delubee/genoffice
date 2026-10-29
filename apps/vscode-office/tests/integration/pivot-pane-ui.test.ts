@@ -283,4 +283,117 @@ suite('Desktop PivotTable Fields pane UI', () => {
       await browser.close()
     }
   })
+
+  test('filters a reopened file PivotTable through the shared Insert → Slicer panel', async function () {
+    const port = process.env.GENOFFICE_TEST_CDP_PORT
+    if (!port) return this.skip()
+    this.timeout(180_000)
+    const api = (await vscode.extensions
+      .getExtension('genoffice.genoffice-workbook')!
+      .activate()) as Api
+    const name = 'pivot-slicer-ui.xlsx'
+    const uri = vscode.Uri.joinPath(vscode.workspace.workspaceFolders![0]!.uri, name)
+    const values: (string | number)[][] = [
+      ['Region', 'Fruit', 'Amount'],
+      ['North', 'Apples', 12.5],
+      ['South', 'Pears', 7],
+      ['North', 'Pears', 3],
+      ['East', 'Apples', 10],
+    ]
+    const fixture = await applyCellEditsToXlsx(
+      await manualWorkbook(),
+      values.flatMap((row, r) =>
+        row.map((value, c) => ({
+          sheetName: 'Other',
+          row: r + 2,
+          column: c + 2,
+          writeValue: true,
+          cell: { value },
+        })),
+      ),
+    )
+    await vscode.workspace.fs.writeFile(uri, fixture.buffer)
+    const browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`)
+    try {
+      await vscode.commands.executeCommand('vscode.openWith', uri, 'genoffice.workbook')
+      let document = api.getDocument(uri)!
+      await document.whenViewReady()
+      let frame = await viewOf(browser, name)
+      await vscode.commands.executeCommand('notifications.clearAll')
+      await vscode.commands.executeCommand('workbench.action.closeAuxiliaryBar')
+      await vscode.commands.executeCommand('workbench.action.closeSidebar')
+      await vscode.commands.executeCommand('workbench.action.closePanel')
+      await frame.page().setViewportSize({ width: 1200, height: 900 })
+      await goTo(frame, 'Other!C3:E7')
+      await frame.locator('#ribbon-tab-insert').click()
+      await frame
+        .getByRole('button', { name: /^PivotTable\b/ })
+        .first()
+        .click()
+      const dialog = frame.getByRole('dialog', { name: 'Create PivotTable', exact: true })
+      await dialog.locator('input:not([readonly])').fill('G3')
+      const created = document.engine.descriptor.revision
+      await dialog.getByRole('button', { name: 'Create', exact: true }).click()
+      await settle(document, created + 1)
+      // Session pivots are written on save before slicers can bind, as on the desktop.
+      await goTo(frame, 'Other!G4')
+      await frame.locator('#ribbon-tab-insert').click()
+      const header = frame.locator('.workbook-desktop-header')
+      await header.getByRole('button', { name: 'Slicer', exact: true }).click()
+      await frame.getByRole('alert').filter({ hasText: /save/i }).first().waitFor()
+      await vscode.commands.executeCommand('workbench.action.files.save')
+      document = await reopen(api, uri, document.sessionId)
+      frame = await viewOf(browser, name)
+      await goTo(frame, 'Other!G4')
+      await frame.locator('#ribbon-tab-insert').click()
+      // No date field: the timeline picker refuses, as on the desktop.
+      await frame
+        .locator('.workbook-desktop-header')
+        .getByRole('button', { name: 'Timeline', exact: true })
+        .click()
+      await frame.getByRole('alert').first().waitFor()
+      await frame
+        .locator('.workbook-desktop-header')
+        .getByRole('button', { name: 'Slicer', exact: true })
+        .click()
+      const picker = frame.getByRole('dialog', { name: 'Insert Slicer', exact: true })
+      await picker.getByRole('button', { name: 'Region', exact: true }).click()
+      await picker.waitFor({ state: 'hidden' })
+      const panel = frame.getByRole('region', { name: 'Slicer Region', exact: true })
+      await panel.waitFor()
+      let revision = document.engine.descriptor.revision
+      const unfiltered = structuredClone(document.engine.state)
+      await panel.getByRole('button', { name: 'North', exact: true }).click()
+      await settle(document, revision + 1)
+      let cells = document.engine.state.sheets[1]!.cells
+      assert.deepEqual(
+        ['G4', 'G5', 'G6'].map((address) => cells[address]?.rawValue),
+        ['South', 'East', 'Grand Total'],
+      )
+      assert.equal(cells.H6!.rawValue, 17)
+      assert.equal(cells.G7?.rawValue ?? null, null)
+      await vscode.commands.executeCommand('undo')
+      assert.deepEqual(document.engine.state, unfiltered)
+      await vscode.commands.executeCommand('redo')
+      await vscode.commands.executeCommand('workbench.action.files.save')
+      const zip = await JSZip.loadAsync(await vscode.workspace.fs.readFile(uri))
+      const table = Object.keys(zip.files).find((part) =>
+        /^xl\/pivotTables\/pivotTable\d+\.xml$/.test(part),
+      )!
+      assert.match(await zip.file(table)!.async('string'), /<location\b[^>]*ref="G3:H6"/)
+      revision = document.engine.descriptor.revision
+      await panel.getByRole('button', { name: 'Remove slicer (restore all members)' }).click()
+      await settle(document, revision + 1)
+      await panel.waitFor({ state: 'hidden' })
+      cells = document.engine.state.sheets[1]!.cells
+      assert.equal(cells.G7!.rawValue, 'Grand Total')
+      assert.equal(cells.H7!.rawValue, 32.5)
+    } finally {
+      if (api.getDocument(uri))
+        await vscode.commands.executeCommand('workbench.action.files.save', uri)
+      await vscode.commands.executeCommand('workbench.action.closeAllEditors')
+      await vscode.workspace.fs.delete(uri)
+      await browser.close()
+    }
+  })
 })

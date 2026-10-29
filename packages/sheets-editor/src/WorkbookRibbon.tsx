@@ -20,6 +20,7 @@ import { editorText } from './i18n'
 import { DesktopHomeRibbon } from './DesktopHomeRibbon'
 import { DataValidationDialog } from './DataValidationDialog'
 import { usePivotCreate } from './PivotCreate'
+import { usePivotSlicers } from './PivotSlicers'
 import { ConsolidateDialog } from '../../../apps/sheets/src/renderer/ConsolidateDialog'
 import { SortDialog } from '../../../apps/sheets/src/renderer/SortDialog'
 import type { ConsolidateConfig } from '../../../apps/sheets/src/renderer/consolidate'
@@ -76,6 +77,7 @@ export function WorkbookRibbon({
   > | null>(null)
   const [dedupeNotice, setDedupeNotice] = useState<number | null>(null)
   const pivot = usePivotCreate(runtime, locale, onError)
+  const slicers = usePivotSlicers(runtime, locale, onError)
   const [dataNotice, setDataNotice] = useState<{
     key: 'appCsvImported' | 'appMergeWorkbooksDone' | 'appOpenCanceled' | 'appPivotsRefreshed'
     params: Record<string, string | number>
@@ -496,6 +498,7 @@ export function WorkbookRibbon({
         onError={onError}
         onPivotCreate={pivot.open}
         onPivotEdit={pivot.edit}
+        onPivotFilter={slicers.open}
         activeTab={
           currentTab === 'shapeFormat'
             ? 'Shape Format'
@@ -561,6 +564,7 @@ export function WorkbookRibbon({
         </p>
       )}
       {pivot.dialog}
+      {slicers.panels}
       {dataNotice && (
         <p role="status">
           {tFor(normalizeLang(locale ?? navigator.language), dataNotice.key, dataNotice.params)}

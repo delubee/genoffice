@@ -81,7 +81,7 @@ import {
   pivotPageRows,
   pivotSourceGrid,
 } from './pivot-placement'
-import { growPivotDefinition, recomputePivotData } from './pivot-engine'
+import { applyPivotSlicer, growPivotDefinition, recomputePivotData } from './pivot-engine'
 import {
   workbookPivotAddSchema,
   workbookTableAddSchema,
@@ -376,6 +376,12 @@ export async function computeCandidateState(
       material,
       options,
     )
+  }
+  const filterPivot = intent.operations.find((op) => op.op === 'filter_pivot')
+  if (filterPivot) {
+    if (intent.operations.length !== 1)
+      throw new Error('A PivotTable filter must be a standalone transaction.')
+    return filterSessionPivot(before, current, intent, filterPivot, material, options)
   }
   const editPivot = intent.operations.find((op) => op.op === 'edit_pivot')
   if (editPivot) {
@@ -2445,35 +2451,7 @@ async function refreshSessionPivots(
         throw new Error(
           `pivot_layout:sourceSheetMissing:${JSON.stringify({ name: definition.sourceSheet })}`,
         )
-      const source = parseRange(definition.sourceRef)
-      const cells = []
-      for (let row = source.startRow; row <= source.endRow; row++) {
-        const line = []
-        for (let column = source.startColumn; column <= source.endColumn; column++) {
-          const cell = sourceSheet.cells[formatAddress(row, column)]
-          if (
-            cell?.formula &&
-            (cell.calculationState !== 'ready' || !Object.hasOwn(cell, 'cachedValue'))
-          )
-            throw new Error(
-              'Wait for PivotTable source formulas to finish calculating, then retry.',
-            )
-          line.push({
-            value: ((cell?.formula ? cell.cachedValue : cell?.rawValue) ?? null) as
-              string | number | boolean | null,
-            pattern: cell?.numberFormat ?? cell?.style?.numberFormat,
-            static1904: current.dateSystem === '1904' && !cell?.formula,
-          })
-        }
-        cells.push(line)
-      }
-      const grid = pivotSourceGrid(
-        cells,
-        definition.dataFields.flatMap(({ field }) => {
-          const owner = definition.fields[field]
-          return owner && owner.formula === undefined ? [owner.name] : []
-        }),
-      )
+      const grid = filePivotSourceGrid(current, sourceSheet, definition)
       const growth = growPivotDefinition(definition, grid)
       const { data } = recomputePivotData(growth.definition, grid)
       const bounds = parseRange(definition.outputRef)
@@ -2533,6 +2511,130 @@ async function refreshSessionPivots(
     }
   }
   return stateChangeset(before, next, [...written.affected, ...edits.keys()])
+}
+
+/** A file pivot's source values (cached formula results; waits for pending formulas). */
+function filePivotSourceGrid(
+  current: ReturnType<typeof workbookStateSchema.parse>,
+  sourceSheet: ReturnType<typeof workbookStateSchema.parse>['sheets'][number],
+  definition: import('../shared/workbook-protocol').WorkbookPivotDefinition,
+) {
+  const source = parseRange(definition.sourceRef)
+  const cells = []
+  for (let row = source.startRow; row <= source.endRow; row++) {
+    const line = []
+    for (let column = source.startColumn; column <= source.endColumn; column++) {
+      const cell = sourceSheet.cells[formatAddress(row, column)]
+      if (
+        cell?.formula &&
+        (cell.calculationState !== 'ready' || !Object.hasOwn(cell, 'cachedValue'))
+      )
+        throw new Error('Wait for PivotTable source formulas to finish calculating, then retry.')
+      line.push({
+        value: ((cell?.formula ? cell.cachedValue : cell?.rawValue) ?? null) as
+          string | number | boolean | null,
+        pattern: cell?.numberFormat ?? cell?.style?.numberFormat,
+        static1904: current.dateSystem === '1904' && !cell?.formula,
+      })
+    }
+    cells.push(line)
+  }
+  return pivotSourceGrid(
+    cells,
+    definition.dataFields.flatMap(({ field }) => {
+      const owner = definition.fields[field]
+      return owner && owner.formula === undefined ? [owner.name] : []
+    }),
+  )
+}
+
+/**
+ * Slicer / timeline selection, as the desktop applies it: the field's
+ * unselected members become hidden items, the layout is rebuilt and the
+ * output rewritten through the refresh growth path. Cells the shrunken
+ * output no longer covers are cleared.
+ */
+async function filterSessionPivot(
+  before: Parameters<typeof stateChangeset>[0],
+  current: ReturnType<typeof workbookStateSchema.parse>,
+  intent: ReturnType<typeof transactionInputSchema.parse>,
+  op: Extract<import('./workbook-dsl').WorkbookOperation, { op: 'filter_pivot' }>,
+  material: CandidateMaterial,
+  options: Parameters<typeof computeCandidateState>[3],
+) {
+  const sheet = current.sheets.find((item) => item.id === op.sheetId)
+  if (!sheet) throw new Error('unknown_sheet')
+  if (!material.completeSheetIds.includes(sheet.id)) throw new Error('incomplete_pivot_material')
+  const pivot = filePivotsOfSheet(sheet).find((item) => item.path === op.pivot)
+  if (!pivot) throw new Error('pivot_layout:pivotStale')
+  if (pivot.error === 'relayout_pending') throw new Error('pivot_layout:relayoutPending')
+  const definition = pivot.definition
+  if (!definition || !pivot.cachePath) throw new Error('pivot_layout:defNotLoaded')
+  const sourceSheet = pivotSourceSheet(current, definition.sourceSheet)
+  if (!sourceSheet)
+    throw new Error(
+      `pivot_layout:sourceSheetMissing:${JSON.stringify({ name: definition.sourceSheet })}`,
+    )
+  const grid = filePivotSourceGrid(current, sourceSheet, definition)
+  const next = applyPivotSlicer(definition, grid, op.field, op.selected)
+  if (next === definition) return stateChangeset(before, current, [])
+  const { data } = recomputePivotData(next, grid)
+  const bounds = parseRange(definition.outputRef)
+  let output: ReturnType<typeof grownPivotBlock>
+  try {
+    output = grownPivotBlock(next, data, bounds, op.subtotalLabel ?? 'Subtotal')
+  } catch (error) {
+    if (error instanceof PivotGrowError)
+      throw new Error('pivot_layout:growUnsupported', { cause: error })
+    throw error
+  }
+  for (const area of output.growth)
+    for (let row = area.startRow; row <= area.endRow; row++)
+      for (let column = area.startColumn; column <= area.endColumn; column++) {
+        const cell = sheet.cells[formatAddress(row, column)]
+        if (cell && (cell.formula || (cell.rawValue !== null && cell.rawValue !== '')))
+          throw new Error('pivot_layout:growConflict')
+      }
+  const block = parseRange(output.outputRef)
+  const writes: import('./workbook-dsl').WorkbookOperation[] = []
+  if (block.endRow < bounds.endRow)
+    writes.push({
+      op: 'clear_range',
+      sheetId: sheet.id,
+      range: areaRef({ ...bounds, startRow: block.endRow + 1 }),
+    })
+  if (block.endColumn < bounds.endColumn)
+    writes.push({
+      op: 'clear_range',
+      sheetId: sheet.id,
+      range: areaRef({
+        ...bounds,
+        startColumn: block.endColumn + 1,
+        endRow: Math.min(bounds.endRow, block.endRow),
+      }),
+    })
+  writes.push(...matrixWrites(sheet.id, bounds.startRow, bounds.startColumn, output.block))
+  const written = await applyBoundedWrites(current, intent, writes, material, options)
+  const state = structuredClone(written.state)
+  const target = state.sheets.find((item) => item.id === sheet.id)!
+  const features = (target.features ?? {}) as {
+    pivotDefinitionEdits?: Record<string, unknown>
+    pivotRefresh?: { cachePaths: string[]; outputRefs: Record<string, string> }
+  }
+  target.features = {
+    ...target.features,
+    pivotDefinitionEdits: JSON.parse(
+      JSON.stringify({
+        ...features.pivotDefinitionEdits,
+        [pivot.path]: { ...next, outputRef: output.outputRef },
+      }),
+    ),
+    pivotRefresh: {
+      cachePaths: [...new Set([...(features.pivotRefresh?.cachePaths ?? []), pivot.cachePath])],
+      outputRefs: { ...features.pivotRefresh?.outputRefs, [pivot.cachePath]: output.outputRef },
+    },
+  }
+  return stateChangeset(before, state, [...written.affected, `${sheet.id}!${output.outputRef}`])
 }
 
 type ProtectionEdit = {

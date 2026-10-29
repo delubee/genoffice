@@ -3,6 +3,7 @@ export const SESSION_OPERATION_NAMES = [
   'add_pivot',
   'refresh_pivot',
   'edit_pivot',
+  'filter_pivot',
   'protect_sheet',
   'protect_workbook',
   'set_protected_ranges',

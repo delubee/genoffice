@@ -598,7 +598,7 @@ PivotTable create follow-up (2026-10-29):
 - [x] Mount the shared Data PivotTable group and Insert PivotTable button with the actual desktop dialog (async, retained draft on rejection); verify native create/history/save/reopen.
 - [x] Refresh / Refresh All recompute for file pivots through the shared pivot engine, with growth, refreshOnLoad and location persistence; session-created pivots refresh after save, as on the desktop.
 - [x] Edit PivotTable with the actual desktop PivotTable Fields pane: relayout of session and file pivots, cursor-following pane, deferred Update, history and saved regenerated definitions.
-- [ ] Slicers, timelines and PivotChart.
+- [x] Slicers, timelines and PivotChart.
 - [ ] `Desktop Insert Link UI` is flaky (Go To stays disabled in some runs, also at HEAD fc726c60); passed in the later Data/Insert run.
 - [ ] CLI: `mcp.test.ts` schema budget (96,298 > 94,208 bytes at HEAD), sidecar `info`, missing generated fixture and Homebrew install tests fail at HEAD; pre-existing.
 - [ ] A host-side commit that lands while a reopened view performs its first reads leaves the view on "The requested state is no longer current"; the view should resync instead of showing the error screen.
@@ -625,6 +625,7 @@ Review protection foundation (2026-10-29):
 - [x] Tables: canonical `add_table` and new `edit_table` (rename, style, style options, header/totals rows with the desktop's cell writes, resize, convert to range) for session and file tables; Univer table preset projects file and session tables with Excel palettes; Insert Table / Format as Table / Create & Resize Table dialogs / Table Design contextual tab; saved table parts and reopen verified natively.
 - [x] Insert > Sparklines: canonical `add_sparkline` in sessions (cells derived from the current sheet name at projection/save), shared desktop renderer, native menu/history/save/reopen.
 - [x] Insert > PivotChart: one transaction (add_chart + series edit of the predicted chart id) with the desktop's pivot series; native verified on a reopened file pivot.
-- [ ] Insert remaining: Slicer, Timeline; Ctrl+T Create Table shortcut in the plugin.
+- [x] Insert > Slicer / Timeline: canonical `filter_pivot` (the desktop's applyPivotSlicer + growth rewrite; shrunken output cleared), actual desktop field pickers and floating panels as session UI; native filter/undo/save/remove verified.
+- [ ] Ctrl+T Create Table shortcut in the plugin.
 - [ ] Allow-edit ranges do not yet permit edits inside a protected sheet (desktop guard allows them).
 - [ ] Browser suite under full load: `function confirmation preserves an unfinished grid draft` and `Sort & Filter group toggles smart source regions` failed once each after the table preset was added (130/132); both pass alone. Watch for a focus-timing regression.

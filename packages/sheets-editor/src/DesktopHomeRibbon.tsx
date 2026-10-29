@@ -48,8 +48,10 @@ export function DesktopHomeRibbon({
   ribbonContainer,
   onPivotCreate,
   onPivotEdit,
+  onPivotFilter,
 }: {
   onPivotCreate?(): void
+  onPivotFilter?(kind: 'slicer' | 'timeline'): void
   onPivotEdit?(): void
   runtime: WorkbookRuntime | null
   locale?: string
@@ -222,6 +224,10 @@ export function DesktopHomeRibbon({
           setViewNotice(t('appProtectionWillRemove'))
         }
       })
+      return
+    }
+    if (value === 'slicer-open' || value === 'timeline-open') {
+      onPivotFilter?.(value === 'slicer-open' ? 'slicer' : 'timeline')
       return
     }
     if (value === 'pivot-open' || value === 'pivot-edit') {
