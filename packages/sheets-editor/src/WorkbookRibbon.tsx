@@ -562,6 +562,8 @@ export function WorkbookRibbon({
         runtime={runtime}
         locale={locale}
         onError={onError}
+        onPivotCreate={pivot.open}
+        onPivotEdit={pivot.edit}
         activeTab={
           currentTab === 'shapeFormat'
             ? 'Shape Format'

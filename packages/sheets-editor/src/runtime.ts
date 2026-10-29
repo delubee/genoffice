@@ -260,22 +260,30 @@ import {
   pickCsvFile,
 } from '../../../apps/sheets/src/renderer/csv-import-model'
 import { decodeCsvBuffer } from '@genoffice/xlsx-gateway/gateway/csv-import'
-import { filePivotsOfSheet } from '@genoffice/xlsx-gateway/domain/session-candidate'
+import {
+  filePivotsOfSheet,
+  pivotSourceSheet,
+} from '@genoffice/xlsx-gateway/domain/session-candidate'
 import {
   PIVOT_SOURCE_COL_LIMIT,
   PIVOT_SOURCE_ROW_LIMIT,
 } from '@genoffice/xlsx-gateway/domain/pivot-layout'
 import {
   isNumericPivotColumn,
+  pivotPageRows,
   pivotSourceGrid,
 } from '@genoffice/xlsx-gateway/domain/pivot-placement'
+import type { WorkbookPivotAdd } from '@genoffice/xlsx-gateway/shared/workbook-protocol'
 import {
   defaultPivotModel,
   modelToConfig,
   validatePivotModel,
   type PivotField,
+  type PivotLayoutModel,
 } from '../../../apps/sheets/src/renderer/pivot-field-model'
 import {
+  modelOfDefinition,
+  modelOfPivotAdd,
   pivotConfigToOpParts,
   pivotErrorMessage,
 } from '../../../apps/sheets/src/renderer/pivot-op-parts'
@@ -5082,24 +5090,23 @@ export class WorkbookRuntime implements EditorProjection {
     else await this.enqueueStaged(stages, frozen)
     return { rows, columns, cell: formatAddress(origin.row, origin.column) }
   }
-  /** Insert/Data → PivotTable: source fields of the selection, frozen for the dialog. */
-  async pivotCreateContext() {
-    if (!(await this.flushEditor())) throw new Error('Finish editing before creating a PivotTable.')
-    const target = this.ribbonTarget,
-      state = this.state
-    if (!target || !state) throw new Error(t('appSelectCellFirst'))
-    const bounds = parseRange(target.address)
-    const frozen = { stateId: state.stateId, revision: this.revision }
-    const context = { sheetId: target.sheetId, sourceRange: target.address, frozen }
+  /** Reads a PivotTable source through the host: field captions, numeric flags and label grid. */
+  private async readPivotSource(
+    sheetId: string,
+    range: string,
+    frozen: { stateId: string; revision: number },
+  ) {
+    const state = this.state
+    if (!state) throw new Error(t('appOpenXlsxFirst'))
+    const bounds = parseRange(range)
     const rows = bounds.endRow - bounds.startRow + 1,
       columns = Math.min(PIVOT_SOURCE_COL_LIMIT, bounds.endColumn - bounds.startColumn + 1)
-    if (rows < 2) return { ...context, fields: [] as PivotField[] }
     if (rows > PIVOT_SOURCE_ROW_LIMIT) throw new Error(t('appPivotSourceRowLimit'))
     const cells = new Map<string, ViewCell>()
     const step = Math.max(1, Math.floor(2000 / columns))
     for (let row = bounds.startRow; row <= bounds.endRow; row += step) {
       const page = (await this.host.read(
-        target.sheetId,
+        sheetId,
         {
           startRow: row,
           endRow: Math.min(bounds.endRow, row + step - 1),
@@ -5125,26 +5132,152 @@ export class WorkbookRuntime implements EditorProjection {
         static1904: state.dateSystem === '1904' && !cell?.formula,
       }
     }
-    const header = pivotSourceGrid([
-      Array.from({ length: columns }, (_, offset) =>
-        sourceCell(bounds.startRow, bounds.startColumn + offset),
+    const raw = Array.from({ length: rows }, (_, r) =>
+      Array.from({ length: columns }, (_, c) =>
+        sourceCell(bounds.startRow + r, bounds.startColumn + c),
       ),
-    ])[0]!
-    const fields: PivotField[] = header.map((value, offset) => {
-      const column = bounds.startColumn + offset
-      const values = []
-      for (let row = bounds.startRow + 1; row <= bounds.endRow; row++)
-        values.push(sourceCell(row, column))
-      return {
-        label:
-          value === null || value === ''
-            ? t('appColumnLabel', { col: columnLabel(column) })
-            : String(value).trim(),
-        colIndex: column,
-        numeric: isNumericPivotColumn(values),
-      }
-    })
+    )
+    const grid = pivotSourceGrid(raw)
+    const fields: PivotField[] = grid[0]!.map((value, offset) => ({
+      label:
+        value === null || value === ''
+          ? t('appColumnLabel', { col: columnLabel(bounds.startColumn + offset) })
+          : String(value).trim(),
+      colIndex: bounds.startColumn + offset,
+      numeric: isNumericPivotColumn(raw.slice(1).map((line) => line[offset]!)),
+    }))
+    return { fields, grid }
+  }
+  /** Insert/Data → PivotTable: source fields of the selection, frozen for the dialog. */
+  async pivotCreateContext() {
+    if (!(await this.flushEditor())) throw new Error('Finish editing before creating a PivotTable.')
+    const target = this.ribbonTarget,
+      state = this.state
+    if (!target || !state) throw new Error(t('appSelectCellFirst'))
+    const bounds = parseRange(target.address)
+    const frozen = { stateId: state.stateId, revision: this.revision }
+    const context = { sheetId: target.sheetId, sourceRange: target.address, frozen }
+    if (bounds.endRow - bounds.startRow < 1) return { ...context, fields: [] as PivotField[] }
+    const { fields } = await this.readPivotSource(target.sheetId, target.address, frozen)
     return { ...context, fields }
+  }
+  /** The PivotTable under the selection (session or file), for the Fields pane. */
+  private pivotAtSelection() {
+    const selected = this.selection,
+      state = this.state
+    if (!selected || !state) return null
+    const sheet = state.sheets.find((item) => item.id === selected.sheetId)
+    if (!sheet) return null
+    const { startRow: row, startColumn: column } = selected.range
+    const inside = (area: GridRange, pageRows: number) =>
+      row >= area.startRow - pageRows &&
+      row <= area.endRow &&
+      column >= area.startColumn &&
+      column <= area.endColumn
+    for (const add of (sheet.features?.pivotAdditions ?? []) as WorkbookPivotAdd[])
+      if (inside(add.location, pivotPageRows(add.pageFieldIndices?.length ?? 0)))
+        return { sheet, key: `session:${add.name}`, session: add }
+    const relayouts = (sheet.features?.pivotRelayouts ?? {}) as Record<string, WorkbookPivotAdd>
+    for (const pivot of filePivotsOfSheet(sheet)) {
+      const relayout = relayouts[pivot.path]
+      const area = relayout
+        ? relayout.location
+        : pivot.definition
+          ? parseRange(pivot.definition.outputRef)
+          : null
+      const pageRows = relayout
+        ? pivotPageRows(relayout.pageFieldIndices?.length ?? 0)
+        : pivot.definition
+          ? pivotPageRows(pivot.definition.pageFields.length)
+          : 0
+      if (area && inside(area, pageRows)) return { sheet, key: pivot.path, file: pivot, relayout }
+    }
+    return null
+  }
+  /** Identity of the pivot under the cursor; the Fields pane follows it like the desktop. */
+  get pivotSelectionKey() {
+    return this.pivotAtSelection()?.key ?? null
+  }
+  /** Edit PivotTable: the Fields pane seed for the pivot under the cursor. */
+  async pivotEditSeed() {
+    if (!(await this.flushEditor()))
+      throw new Error('Finish editing before editing the PivotTable.')
+    const state = this.state
+    const hit = this.pivotAtSelection()
+    if (!state || !hit) throw new Error(t('appPutCursorInPivot'))
+    const frozen = { stateId: state.stateId, revision: this.revision }
+    const add = hit.session ?? hit.relayout
+    let model: PivotLayoutModel, sourceSheetId: string, sourceRange: string, fieldNames: string[]
+    if (add) {
+      model = modelOfPivotAdd(add)
+      sourceSheetId = add.sourceSheetId
+      sourceRange = `${formatAddress(add.sourceArea.startRow, add.sourceArea.startColumn)}:${formatAddress(add.sourceArea.endRow, add.sourceArea.endColumn)}`
+      fieldNames = [...add.fieldNames]
+    } else {
+      const definition = hit.file?.definition
+      if (!definition) throw new Error(t('appPivotDefNotLoadedSave'))
+      const parsed = modelOfDefinition(definition)
+      if (typeof parsed === 'string') throw new Error(parsed)
+      const source = pivotSourceSheet(state, definition.sourceSheet)
+      if (!source)
+        throw new Error(t('appPivotSourceSheetNotFound', { name: definition.sourceSheet }))
+      model = parsed.model
+      sourceSheetId = source.id
+      sourceRange = definition.sourceRef
+      fieldNames = definition.fields.slice(0, parsed.sourceFieldCount).map((field) => field.name)
+    }
+    const read = await this.readPivotSource(sourceSheetId, sourceRange, frozen)
+    const fields: PivotField[] = fieldNames.map((label, index) => ({
+      label,
+      colIndex: parseRange(sourceRange).startColumn + index,
+      numeric: read.fields[index]?.numeric ?? false,
+    }))
+    return {
+      key: hit.key,
+      sheetId: hit.sheet.id,
+      pivot: hit.session ? ({ session: hit.session.name } as const) : ({ file: hit.key } as const),
+      fields,
+      sourceRange,
+      targetCell: sourceRange.split(':')[0]!,
+      model,
+      members: (fieldIndex: number) => {
+        const members: string[] = []
+        for (const line of read.grid.slice(1)) {
+          const label = String(line[fieldIndex] ?? '')
+          if (!members.includes(label)) members.push(label)
+        }
+        return members
+      },
+    }
+  }
+  /** Fields pane apply: a new layout for the seeded pivot; returns a pane message or null. */
+  async editPivot(
+    seed: Awaited<ReturnType<WorkbookRuntime['pivotEditSeed']>>,
+    model: PivotLayoutModel,
+  ) {
+    const parts = pivotConfigToOpParts(
+      modelToConfig(model, seed.sourceRange, seed.targetCell),
+      seed.fields,
+    )
+    if (typeof parts === 'string') return parts
+    try {
+      await this.enqueue(
+        [
+          {
+            op: 'edit_pivot',
+            sheetId: seed.sheetId,
+            pivot: seed.pivot,
+            ...parts,
+            subtotalLabel: t('appPivotSubtotal'),
+          },
+        ],
+        undefined,
+        { failureInDialog: true },
+      )
+    } catch (error) {
+      return pivotErrorMessage(error)
+    }
+    return null
   }
   /** Create PivotTable with Excel's default placement; returns a dialog message or null. */
   async createPivot(

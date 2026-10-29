@@ -1,6 +1,7 @@
 import {
   filePivotsOfSheet,
   pivotSourceSheet,
+  sessionPivotAdditions,
 } from '@genoffice/xlsx-gateway/domain/session-candidate'
 import { chartSelectionReferences } from '@genoffice/xlsx-gateway/domain/chart-series-selection'
 import {
@@ -85,6 +86,48 @@ export async function prepareCandidateMaterial(input: {
       }
       if (op.op === 'add_chart') addRange(op.sheetId, op.dataRange)
       if (op.op === 'add_pivot') addRange(op.sheetId, op.sourceRange)
+      if (op.op === 'edit_pivot') {
+        const sheet = state.sheets.find((item) => item.id === op.sheetId)
+        if (sheet) {
+          if (Math.max(sheet.rows, 1) * Math.max(sheet.columns, 1) > LIMITS.rangeCells)
+            throw new WorkbookError(
+              'structural_material_budget',
+              'PivotTable edits need more than 200,000 cells of sheet material.',
+            )
+          addRange(
+            sheet.id,
+            `A1:${formatAddress(Math.max(0, sheet.rows - 1), Math.max(0, sheet.columns - 1))}`,
+          )
+          const area = (range: {
+            startRow: number
+            startColumn: number
+            endRow: number
+            endColumn: number
+          }) =>
+            `${formatAddress(range.startRow, range.startColumn)}:${formatAddress(range.endRow, range.endColumn)}`
+          if ('session' in op.pivot) {
+            const name = op.pivot.session
+            const add = sessionPivotAdditions(state).find(
+              (pivot) => pivot.sheetId === sheet.id && pivot.name === name,
+            )
+            if (add) addRange(add.sourceSheetId, area(add.sourceArea))
+          } else {
+            const path = op.pivot.file
+            const relayout = (
+              (sheet.features?.pivotRelayouts ?? {}) as Record<
+                string,
+                { sourceSheetId: string; sourceArea: Parameters<typeof area>[0] }
+              >
+            )[path]
+            const definition = filePivotsOfSheet(sheet).find(
+              (pivot) => pivot.path === path,
+            )?.definition
+            const source = definition && pivotSourceSheet(state, definition.sourceSheet)
+            if (relayout) addRange(relayout.sourceSheetId, area(relayout.sourceArea))
+            else if (source && definition) addRange(source.id, definition.sourceRef)
+          }
+        }
+      }
       if (op.op === 'refresh_pivot') {
         // Growth checks need the whole output sheet; recompute reads each source range.
         const sheet = state.sheets.find((item) => item.id === op.sheetId)

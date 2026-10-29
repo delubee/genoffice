@@ -76,7 +76,6 @@ import {
   modelToConfig,
   validatePivotModel,
   type PivotLayoutModel,
-  type PivotModelError,
 } from './pivot-field-model'
 import {
   PivotDialog,
@@ -85,6 +84,7 @@ import {
   type PivotField,
 } from './PivotDialog'
 import { PivotFieldPane } from './PivotFieldPane'
+import { PIVOT_MODEL_ERRORS } from './pivot-op-parts'
 import { PrintDialog } from './PrintDialog'
 import { STATUS_BAR_FUNCS, type StatusBarFunc } from './status-bar-stats'
 import { SubtotalDialog, type SubtotalConfig } from './SubtotalDialog'
@@ -313,18 +313,6 @@ interface PivotPaneState {
   readonly deferred: boolean
   readonly dirty: boolean
   readonly error: string | null
-}
-
-const PIVOT_MODEL_ERRORS: Record<PivotModelError, StringKey> = {
-  needRow: 'appNeedRowField',
-  needValue: 'dlgPivotErrNeedValue',
-  colNeedsSingleValue: 'dlgPivotErrColNeedsSingleValue',
-  calcIncomplete: 'dlgPivotErrCalcFieldIncomplete',
-  rangeStep: 'dlgPivotErrRangeStep',
-  labelFilterText: 'dlgPivotErrLabelFilterText',
-  oneValueFilter: 'dlgPivotErrOneValueFilter',
-  filterConflict: 'dlgPivotErrFilterConflict',
-  dupValueName: 'dlgPivotErrDupValueName',
 }
 
 export function ExcelShell({

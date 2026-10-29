@@ -1,4 +1,6 @@
 import { sessionPivotAdditions } from '@genoffice/xlsx-gateway/domain/session-candidate'
+import type { PivotRefreshUpdate } from '@genoffice/xlsx-gateway/gateway/xlsx-pivot-expand'
+import type { WorkbookPivotAdd } from '@genoffice/xlsx-gateway/shared/workbook-protocol'
 import {
   visibilityEditsSchema,
   visibilityStructuralOp,
@@ -531,15 +533,36 @@ export class SessionPackageWriter implements PackageWriter {
       // Refreshed file pivots: refreshOnLoad for their caches and widened locations. The
       // writer checks growth areas against its input, so they share the cell-edit stage.
       const pivotCacheRefreshPaths: string[] = [],
-        pivotRefreshUpdates: { cachePath: string; sheetName: string; newOutputRef: string }[] = []
+        pivotRefreshUpdates: PivotRefreshUpdate[] = []
       for (const sheet of state.sheets) {
         const refresh = (sheet.features?.pivotRefresh ?? {}) as {
           cachePaths?: string[]
           outputRefs?: Record<string, string>
         }
         pivotCacheRefreshPaths.push(...(refresh.cachePaths ?? []))
-        for (const [cachePath, newOutputRef] of Object.entries(refresh.outputRefs ?? {}))
-          pivotRefreshUpdates.push({ cachePath, sheetName: sheet.name, newOutputRef })
+        const relayouts = Object.values(
+          (sheet.features?.pivotRelayouts ?? {}) as Record<
+            string,
+            WorkbookPivotAdd & { cachePath: string }
+          >,
+        )
+        for (const [cachePath, newOutputRef] of Object.entries(refresh.outputRefs ?? {})) {
+          const edited = relayouts.find((item) => item.cachePath === cachePath)
+          let relayout: NonNullable<PivotRefreshUpdate['relayout']> | undefined
+          if (edited) {
+            const { sheetId: _sheet, sourceSheetId, cachePath: _cache, ...layout } = edited
+            const origin = state.sheets.find((item) => item.id === sourceSheetId)
+            if (!origin)
+              throw new WorkbookError('invalid_document', 'An edited PivotTable lost its source.')
+            relayout = { ...layout, sourceSheetName: origin.name }
+          }
+          pivotRefreshUpdates.push({
+            cachePath,
+            sheetName: sheet.name,
+            newOutputRef,
+            ...(relayout ? { relayout } : {}),
+          })
+        }
       }
       if (
         edits.length ||

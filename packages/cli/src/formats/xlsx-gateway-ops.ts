@@ -105,6 +105,7 @@ export const GATEWAY_DSL_OPS = [
 /** Ops whose save payload only the live editor can produce, with the reason the agent sees. */
 export const REFUSED_DSL_OPS: Readonly<Record<string, string>> = {
   refresh_pivot: 'the pivot layout is computed by the editor',
+  edit_pivot: 'the pivot layout is computed by the editor',
   add_table_row: 'edits a table created in the same editor session',
   add_table_column: 'edits a table created in the same editor session',
   delete_table_row: 'edits a table created in the same editor session',

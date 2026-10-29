@@ -148,9 +148,41 @@ it('bakes a session PivotTable, saves native pivot parts and reopens it as a fil
         ),
       ).rejects.toThrow('pivot_layout:overlapSession')
 
+      // Edit PivotTable: Fruit on rows shrinks the block; the old last row clears.
+      const edit: WorkbookOperation[] = [
+        {
+          op: 'edit_pivot',
+          sheetId,
+          pivot: { session: 'Pivot1' },
+          rowFields: 'Fruit',
+          values: [{ field: 'Amount', agg: 'sum' }],
+        },
+      ]
+      const edited = await computeCandidateState(
+        result.nextState,
+        intent(edit),
+        await prepareCandidateMaterial({
+          state: result.nextState,
+          operations: edit,
+          source,
+          sourceSessionId: opened.original.sidecarSessionId,
+        }),
+      )
+      const editedCells = edited.nextState.sheets[0]!.cells
+      expect(editedCells.E2!.rawValue).toBe('Fruit')
+      expect(editedCells.E5!.rawValue).toBe('Grand Total')
+      expect(editedCells.F5!.rawValue).toBe(32.5)
+      expect(editedCells.E6?.rawValue ?? null).toBe(null)
+      expect(editedCells.F6?.rawValue ?? null).toBe(null)
+      expect(edited.nextState.sheets[0]!.features?.pivotAdditions).toEqual([
+        expect.objectContaining({
+          name: 'Pivot1',
+          location: { startRow: 1, startColumn: 4, endRow: 4, endColumn: 5 },
+        }),
+      ])
       const staged = await new SessionPackageWriter(client, opened.metadata).stage(
         opened.original.path,
-        result.nextState,
+        edited.nextState,
         join(directory, 'saved.xlsx'),
       )
       const saved = await JSZip.loadAsync(await readFile(staged.stagedPath))
@@ -166,12 +198,12 @@ it('bakes a session PivotTable, saves native pivot parts and reopens it as a fil
       try {
         const sheet = (reopened.metadata as { sheets: { pivotRanges?: unknown[] }[] }).sheets[0]!
         expect(sheet.pivotRanges).toEqual([
-          { startRow: 1, startColumn: 4, endRow: 5, endColumn: 5 },
+          { startRow: 1, startColumn: 4, endRow: 4, endColumn: 5 },
         ])
         const read = (await source.readBaseRange(
           reopened.sessionId,
           (reopened.metadata as { sheets: { id: string }[] }).sheets[0]!.id,
-          'F6:F6',
+          'F5:F5',
         )) as { cells: { value: unknown }[] }
         expect(read.cells[0]!.value).toBe(32.5)
       } finally {

@@ -70,7 +70,7 @@
     {
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "sha256": "21018258d688787abe7a19decb84a0e8f855d8ae00a8ee80a9a53b662001422c"
+      "sha256": "433fe34a4d959369d207a6a6c671bd5758df16e5467818bf979530580f2548ad"
     },
     {
       "document": "Sheets",
@@ -9423,41 +9423,41 @@
       ]
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:574:24:command-dispatch",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:562:24:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 574,
-      "endLine": 574,
+      "line": 562,
+      "endLine": 562,
       "kind": "command-dispatch",
       "expression": "onCommand('sheet-protect')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:577:12:command-dispatch",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:565:12:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 577,
-      "endLine": 577,
+      "line": 565,
+      "endLine": 565,
       "kind": "command-dispatch",
       "expression": "onCommand('sheet-unprotect')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:584:10:command-dispatch",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:572:10:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 584,
-      "endLine": 584,
+      "line": 572,
+      "endLine": 572,
       "kind": "command-dispatch",
       "expression": "onCommand(command)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:725:9:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:713:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 725,
-      "endLine": 729,
+      "line": 713,
+      "endLine": 717,
       "kind": "actionable-element",
       "element": "nav",
       "labels": [
@@ -9472,11 +9472,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:730:11:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:718:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 730,
-      "endLine": 737,
+      "line": 718,
+      "endLine": 725,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -9494,11 +9494,11 @@
       ]
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:740:11:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:728:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 740,
-      "endLine": 747,
+      "line": 728,
+      "endLine": 735,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -9516,11 +9516,11 @@
       ]
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:750:11:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:738:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 750,
-      "endLine": 757,
+      "line": 738,
+      "endLine": 745,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -9538,11 +9538,11 @@
       ]
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:760:11:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:748:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 760,
-      "endLine": 767,
+      "line": 748,
+      "endLine": 755,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -9560,11 +9560,11 @@
       ]
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:776:13:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:764:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 776,
-      "endLine": 780,
+      "line": 764,
+      "endLine": 768,
       "kind": "actionable-element",
       "element": "input",
       "labels": [],
@@ -9579,11 +9579,11 @@
       ]
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:784:13:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:772:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 784,
-      "endLine": 792,
+      "line": 772,
+      "endLine": 780,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -9598,11 +9598,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:802:9:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:790:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 802,
-      "endLine": 836,
+      "line": 790,
+      "endLine": 824,
       "kind": "actionable-element",
       "element": "Ribbon",
       "labels": [],
@@ -9635,11 +9635,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:841:9:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:829:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 841,
-      "endLine": 876,
+      "line": 829,
+      "endLine": 864,
       "kind": "actionable-element",
       "element": "AiChatPanel",
       "labels": [],
@@ -9708,11 +9708,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:883:17:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:871:17:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 883,
-      "endLine": 883,
+      "line": 871,
+      "endLine": 871,
       "kind": "actionable-element",
       "element": "button",
       "labels": [],
@@ -9725,11 +9725,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:886:17:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:874:17:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 886,
-      "endLine": 891,
+      "line": 874,
+      "endLine": 879,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -9744,11 +9744,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:898:13:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:886:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 898,
-      "endLine": 906,
+      "line": 886,
+      "endLine": 894,
       "kind": "actionable-element",
       "element": "AiSelectionAsk",
       "labels": [],
@@ -9765,11 +9765,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:910:11:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:898:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 910,
-      "endLine": 910,
+      "line": 898,
+      "endLine": 898,
       "kind": "actionable-element",
       "element": "footer",
       "labels": [],
@@ -9782,11 +9782,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:922:17:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:910:17:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 922,
-      "endLine": 931,
+      "line": 910,
+      "endLine": 919,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -9802,21 +9802,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:929:63:command-dispatch",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:917:63:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 929,
-      "endLine": 929,
+      "line": 917,
+      "endLine": 917,
       "kind": "command-dispatch",
       "expression": "onCommand('toggle-page-break-preview')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:934:17:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:922:17:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 934,
-      "endLine": 943,
+      "line": 922,
+      "endLine": 931,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -9832,21 +9832,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:941:63:command-dispatch",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:929:63:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 941,
-      "endLine": 941,
+      "line": 929,
+      "endLine": 929,
       "kind": "command-dispatch",
       "expression": "onCommand('toggle-page-break-preview')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:947:15:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:935:15:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 947,
-      "endLine": 952,
+      "line": 935,
+      "endLine": 940,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -9862,21 +9862,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:951:32:command-dispatch",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:939:32:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 951,
-      "endLine": 951,
+      "line": 939,
+      "endLine": 939,
       "kind": "command-dispatch",
       "expression": "onCommand('zoom-out')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:955:15:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:943:15:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 955,
-      "endLine": 962,
+      "line": 943,
+      "endLine": 950,
       "kind": "actionable-element",
       "element": "input",
       "labels": [],
@@ -9891,21 +9891,21 @@
       ]
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:961:38:command-dispatch",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:949:38:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 961,
-      "endLine": 961,
+      "line": 949,
+      "endLine": 949,
       "kind": "command-dispatch",
       "expression": "onCommand(`zoom:${event.target.value}`)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:963:15:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:951:15:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 963,
-      "endLine": 968,
+      "line": 951,
+      "endLine": 956,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -9921,21 +9921,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:967:32:command-dispatch",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:955:32:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 967,
-      "endLine": 967,
+      "line": 955,
+      "endLine": 955,
       "kind": "command-dispatch",
       "expression": "onCommand('zoom-in')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:971:15:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:959:15:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 971,
-      "endLine": 976,
+      "line": 959,
+      "endLine": 964,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -9951,11 +9951,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:982:13:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:970:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 982,
-      "endLine": 987,
+      "line": 970,
+      "endLine": 975,
       "kind": "actionable-element",
       "element": "StatusBarStatsMenu",
       "labels": [],
@@ -9972,11 +9972,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:992:9:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:980:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 992,
-      "endLine": 997,
+      "line": 980,
+      "endLine": 985,
       "kind": "actionable-element",
       "element": "FormatCellsDialog",
       "labels": [],
@@ -9993,11 +9993,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1000:9:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:988:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1000,
-      "endLine": 1004,
+      "line": 988,
+      "endLine": 992,
       "kind": "actionable-element",
       "element": "AxisSizeDialog",
       "labels": [],
@@ -10014,11 +10014,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1007:9:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:995:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1007,
-      "endLine": 1011,
+      "line": 995,
+      "endLine": 999,
       "kind": "actionable-element",
       "element": "LinkDialog",
       "labels": [],
@@ -10035,11 +10035,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1014:9:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1002:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1014,
-      "endLine": 1025,
+      "line": 1002,
+      "endLine": 1013,
       "kind": "actionable-element",
       "element": "ChartTextDialog",
       "labels": [],
@@ -10056,11 +10056,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1028:9:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1016:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1028,
-      "endLine": 1032,
+      "line": 1016,
+      "endLine": 1020,
       "kind": "actionable-element",
       "element": "SortDialog",
       "labels": [],
@@ -10077,11 +10077,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1035:9:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1023:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1035,
-      "endLine": 1035,
+      "line": 1023,
+      "endLine": 1023,
       "kind": "actionable-element",
       "element": "RemoveDuplicatesDialog",
       "labels": [],
@@ -10098,11 +10098,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1038:9:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1026:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1038,
-      "endLine": 1045,
+      "line": 1026,
+      "endLine": 1033,
       "kind": "actionable-element",
       "element": "TableRangeDialog",
       "labels": [
@@ -10121,11 +10121,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1048:9:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1036:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1048,
-      "endLine": 1054,
+      "line": 1036,
+      "endLine": 1042,
       "kind": "actionable-element",
       "element": "TableRangeDialog",
       "labels": [
@@ -10144,21 +10144,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1052:32:command-dispatch",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1040:32:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1052,
-      "endLine": 1052,
+      "line": 1040,
+      "endLine": 1040,
       "kind": "command-dispatch",
       "expression": "onCommand(`table-resize:${range}`)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1060:13:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1048:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1060,
-      "endLine": 1065,
+      "line": 1048,
+      "endLine": 1053,
       "kind": "actionable-element",
       "element": "NameManagerDialog",
       "labels": [],
@@ -10175,11 +10175,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1072:13:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1060:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1072,
-      "endLine": 1081,
+      "line": 1060,
+      "endLine": 1069,
       "kind": "actionable-element",
       "element": "PivotDialog",
       "labels": [],
@@ -10196,11 +10196,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1085:9:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1073:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1085,
-      "endLine": 1111,
+      "line": 1073,
+      "endLine": 1099,
       "kind": "actionable-element",
       "element": "PivotFieldPane",
       "labels": [],
@@ -10229,11 +10229,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1114:9:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1102:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1114,
-      "endLine": 1119,
+      "line": 1102,
+      "endLine": 1107,
       "kind": "actionable-element",
       "element": "FillSeriesDialog",
       "labels": [],
@@ -10250,11 +10250,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1122:9:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1110:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1122,
-      "endLine": 1126,
+      "line": 1110,
+      "endLine": 1114,
       "kind": "actionable-element",
       "element": "GoalSeekDialog",
       "labels": [],
@@ -10271,11 +10271,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1129:9:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1117:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1129,
-      "endLine": 1135,
+      "line": 1117,
+      "endLine": 1123,
       "kind": "actionable-element",
       "element": "InsertFunctionFlow",
       "labels": [],
@@ -10288,11 +10288,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1138:9:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1126:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1138,
-      "endLine": 1142,
+      "line": 1126,
+      "endLine": 1130,
       "kind": "actionable-element",
       "element": "SubtotalDialog",
       "labels": [],
@@ -10309,11 +10309,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1145:9:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1133:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1145,
-      "endLine": 1150,
+      "line": 1133,
+      "endLine": 1138,
       "kind": "actionable-element",
       "element": "ConsolidateDialog",
       "labels": [],
@@ -10330,11 +10330,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1153:9:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1141:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1153,
-      "endLine": 1157,
+      "line": 1141,
+      "endLine": 1145,
       "kind": "actionable-element",
       "element": "ZoomDialog",
       "labels": [],
@@ -10351,11 +10351,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1160:9:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1148:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1160,
-      "endLine": 1164,
+      "line": 1148,
+      "endLine": 1152,
       "kind": "actionable-element",
       "element": "PasteSpecialDialog",
       "labels": [],
@@ -10372,11 +10372,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1167:9:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1155:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1167,
-      "endLine": 1171,
+      "line": 1155,
+      "endLine": 1159,
       "kind": "actionable-element",
       "element": "GoToDialog",
       "labels": [],
@@ -10393,11 +10393,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1174:9:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1162:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1174,
-      "endLine": 1179,
+      "line": 1162,
+      "endLine": 1167,
       "kind": "actionable-element",
       "element": "ProtectSheetDialog",
       "labels": [],
@@ -10418,11 +10418,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1185:13:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1173:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1185,
-      "endLine": 1190,
+      "line": 1173,
+      "endLine": 1178,
       "kind": "actionable-element",
       "element": "AllowEditRangesDialog",
       "labels": [],
@@ -10439,11 +10439,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1194:9:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1182:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1194,
-      "endLine": 1199,
+      "line": 1182,
+      "endLine": 1187,
       "kind": "actionable-element",
       "element": "PrintDialog",
       "labels": [],
@@ -10460,11 +10460,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1202:9:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1190:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1202,
-      "endLine": 1210,
+      "line": 1190,
+      "endLine": 1198,
       "kind": "actionable-element",
       "element": "HeaderFooterDialog",
       "labels": [],
@@ -10481,11 +10481,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1212:7:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1200:7:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1212,
-      "endLine": 1217,
+      "line": 1200,
+      "endLine": 1205,
       "kind": "actionable-element",
       "element": "SheetTabContextMenu",
       "labels": [],
@@ -10498,11 +10498,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1249:5:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1237:5:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1249,
-      "endLine": 1249,
+      "line": 1237,
+      "endLine": 1237,
       "kind": "actionable-element",
       "element": "div",
       "labels": [],
@@ -10515,11 +10515,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1250:7:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1238:7:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1250,
-      "endLine": 1256,
+      "line": 1238,
+      "endLine": 1244,
       "kind": "actionable-element",
       "element": "div",
       "labels": [
@@ -10534,11 +10534,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1260:11:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1248:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1260,
-      "endLine": 1269,
+      "line": 1248,
+      "endLine": 1257,
       "kind": "actionable-element",
       "element": "input",
       "labels": [],
@@ -10557,11 +10557,11 @@
       ]
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1272:15:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1260:15:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1272,
-      "endLine": 1276,
+      "line": 1260,
+      "endLine": 1264,
       "kind": "actionable-element",
       "element": "input",
       "labels": [],
@@ -10576,11 +10576,11 @@
       ]
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1282:11:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1270:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1282,
-      "endLine": 1282,
+      "line": 1270,
+      "endLine": 1270,
       "kind": "actionable-element",
       "element": "button",
       "labels": [],
@@ -10593,11 +10593,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1283:11:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1271:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1283,
-      "endLine": 1283,
+      "line": 1271,
+      "endLine": 1271,
       "kind": "actionable-element",
       "element": "button",
       "labels": [],
@@ -10610,11 +10610,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1334:9:actionable-element",
+      "id": "apps/sheets/src/renderer/ExcelShell.tsx:1322:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/ExcelShell.tsx",
-      "line": 1334,
-      "endLine": 1340,
+      "line": 1322,
+      "endLine": 1328,
       "kind": "actionable-element",
       "element": "button",
       "labels": [],

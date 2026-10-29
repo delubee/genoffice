@@ -67,7 +67,7 @@ async function material(
   return prepareCandidateMaterial({ state, operations, source, sourceSessionId: sessionId })
 }
 
-it('refreshes a file PivotTable in place and grows it for new members, saving refreshOnLoad and the new location', async () => {
+it('refreshes a file PivotTable in place, grows it for new members, relayouts it and saves the regenerated definition', async () => {
   const directory = await resources.directory(),
     path = join(directory, 'sales.xlsx')
   await writeFile(path, await salesWorkbook())
@@ -182,9 +182,41 @@ it('refreshes a file PivotTable in place and grows it for new members, saving re
       }
       expect(refreshed.cachePaths).toHaveLength(1)
       expect(Object.values(refreshed.outputRefs)).toEqual(['E2:F7'])
+      // Edit the file pivot: Fruit on rows; refresh waits for the save.
+      const pivotPath = (
+        second.nextState.sheets[0]!.features?.originalMetadata as {
+          pivotTables: { path: string }[]
+        }
+      ).pivotTables[0]!.path
+      const relayout: WorkbookOperation[] = [
+        {
+          op: 'edit_pivot',
+          sheetId,
+          pivot: { file: pivotPath },
+          rowFields: 'Fruit',
+          values: [{ field: 'Amount', agg: 'sum' }],
+        },
+      ]
+      const third = await computeCandidateState(
+        second.nextState,
+        intent(relayout),
+        await material(second.nextState, relayout, source, reopened.original.sidecarSessionId),
+      )
+      const relaid = third.nextState.sheets[0]!.cells
+      expect(relaid.E2!.rawValue).toBe('Fruit')
+      expect(relaid.E5!.rawValue).toBe('Grand Total')
+      expect(relaid.F5!.rawValue).toBe(40)
+      expect(relaid.E7?.rawValue ?? null).toBe(null)
+      await expect(
+        computeCandidateState(
+          third.nextState,
+          intent(refresh),
+          await material(third.nextState, refresh, source, reopened.original.sidecarSessionId),
+        ),
+      ).rejects.toThrow('pivot_layout:relayoutPending')
       const staged = await new SessionPackageWriter(client, reopened.metadata).stage(
         reopened.original.path,
-        second.nextState,
+        third.nextState,
         join(directory, 'stage-2.xlsx'),
       )
       const saved = await JSZip.loadAsync(await readFile(staged.stagedPath))
@@ -195,15 +227,16 @@ it('refreshes a file PivotTable in place and grows it for new members, saving re
       const table = Object.keys(saved.files).find((name) =>
         /^xl\/pivotTables\/pivotTable\d+\.xml$/.test(name),
       )!
-      expect(await saved.file(table)!.async('string')).toMatch(/<location\b[^>]*ref="E2:F7"/)
+      const tableXml = await saved.file(table)!.async('string')
+      expect(tableXml).toMatch(/<location\b[^>]*ref="E2:F5"/)
       const final = await source.openSnapshot(staged.stagedPath)
       try {
         const sheet = (final.metadata as { sheets: { id: string; pivotRanges?: unknown[] }[] })
           .sheets[0]!
         expect(sheet.pivotRanges).toEqual([
-          { startRow: 1, startColumn: 4, endRow: 6, endColumn: 5 },
+          { startRow: 1, startColumn: 4, endRow: 4, endColumn: 5 },
         ])
-        const read = (await source.readBaseRange(final.sessionId, sheet.id, 'F7:F7')) as {
+        const read = (await source.readBaseRange(final.sessionId, sheet.id, 'F5:F5')) as {
           cells: { value: unknown }[]
         }
         expect(read.cells[0]!.value).toBe(40)

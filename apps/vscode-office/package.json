@@ -4301,6 +4301,340 @@
                   {
                     "type": "object",
                     "properties": {
+                      "rowFields": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 255
+                          },
+                          {
+                            "minItems": 1,
+                            "maxItems": 8,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 255
+                            }
+                          }
+                        ]
+                      },
+                      "columnField": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 255
+                          },
+                          {
+                            "minItems": 1,
+                            "maxItems": 8,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 255
+                            }
+                          }
+                        ]
+                      },
+                      "pageFields": {
+                        "maxItems": 4,
+                        "type": "array",
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 255
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "field": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 255
+                                },
+                                "item": {
+                                  "type": "string",
+                                  "maxLength": 255
+                                }
+                              },
+                              "required": [
+                                "field"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        }
+                      },
+                      "values": {
+                        "minItems": 1,
+                        "maxItems": 8,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "field": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 255
+                            },
+                            "agg": {
+                              "type": "string",
+                              "enum": [
+                                "sum",
+                                "count",
+                                "average",
+                                "max",
+                                "min",
+                                "product",
+                                "countNums"
+                              ]
+                            },
+                            "numFmt": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 255
+                            },
+                            "showDataAs": {
+                              "type": "string",
+                              "enum": [
+                                "percentOfTotal",
+                                "percentOfRow",
+                                "percentOfCol",
+                                "percentOfParentRow",
+                                "percentOfParentCol",
+                                "index"
+                              ]
+                            },
+                            "name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 255
+                            },
+                            "formula": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 1024
+                            }
+                          },
+                          "required": [
+                            "field",
+                            "agg"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "groupings": {
+                        "maxItems": 8,
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "const": "date"
+                                },
+                                "field": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 255
+                                },
+                                "dateUnit": {
+                                  "type": "string",
+                                  "enum": [
+                                    "year",
+                                    "quarter",
+                                    "month"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "field",
+                                "dateUnit"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "const": "range"
+                                },
+                                "field": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 255
+                                },
+                                "rangeStep": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0
+                                },
+                                "rangeStart": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "field",
+                                "rangeStep"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        }
+                      },
+                      "filters": {
+                        "maxItems": 8,
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "const": "label"
+                                },
+                                "field": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 255
+                                },
+                                "op": {
+                                  "type": "string",
+                                  "enum": [
+                                    "equal",
+                                    "contains",
+                                    "beginsWith"
+                                  ]
+                                },
+                                "value": {
+                                  "type": "string",
+                                  "maxLength": 255
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "field",
+                                "op",
+                                "value"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "const": "value"
+                                },
+                                "field": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 255
+                                },
+                                "valueIndex": {
+                                  "default": 0,
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 7
+                                },
+                                "op": {
+                                  "type": "string",
+                                  "enum": [
+                                    "top",
+                                    "greaterThan",
+                                    "between"
+                                  ]
+                                },
+                                "count": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 10000
+                                },
+                                "from": {
+                                  "type": "number"
+                                },
+                                "to": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "field",
+                                "valueIndex",
+                                "op"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        }
+                      },
+                      "subtotalLabel": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "op": {
+                        "type": "string",
+                        "const": "edit_pivot"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "pivot": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "session": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 255
+                              }
+                            },
+                            "required": [
+                              "session"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "file": {
+                                "type": "string",
+                                "pattern": "^xl\\/pivotTables\\/[^/]+\\.xml$"
+                              }
+                            },
+                            "required": [
+                              "file"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "rowFields",
+                      "values",
+                      "op",
+                      "sheetId",
+                      "pivot"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
                       "op": {
                         "type": "string",
                         "const": "insert_rows"

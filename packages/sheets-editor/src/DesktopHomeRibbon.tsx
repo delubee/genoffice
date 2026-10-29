@@ -1,4 +1,3 @@
-import { usePivotCreate } from './PivotCreate'
 import { WatchWindowPanel } from '../../../apps/sheets/src/renderer/WatchWindowPanel'
 import { NameManagerDialog } from '../../../apps/sheets/src/renderer/NameManagerDialog'
 import { PasteSpecialDialog } from '../../../apps/sheets/src/renderer/PasteSpecialDialog'
@@ -38,7 +37,11 @@ export function DesktopHomeRibbon({
   onError,
   activeTab = 'Home',
   ribbonContainer,
+  onPivotCreate,
+  onPivotEdit,
 }: {
+  onPivotCreate?(): void
+  onPivotEdit?(): void
   runtime: WorkbookRuntime | null
   locale?: string
   onError(message: string): void
@@ -54,7 +57,6 @@ export function DesktopHomeRibbon({
 }) {
   const lang = normalizeLang(locale ?? navigator.language)
   setModuleLang(lang)
-  const pivot = usePivotCreate(runtime, locale, onError)
   const [nameNotice, setNameNotice] = useState<{ count: number; skipped: number } | null>(null)
   const [dialog, setDialog] = useState<{
     kind: 'format' | 'row' | 'col' | 'link' | 'symbol' | 'header-footer' | 'recommended-charts'
@@ -86,8 +88,9 @@ export function DesktopHomeRibbon({
       onError('The document is still loading.')
       return
     }
-    if (value === 'pivot-open') {
-      pivot.open()
+    if (value === 'pivot-open' || value === 'pivot-edit') {
+      if (value === 'pivot-open') onPivotCreate?.()
+      else onPivotEdit?.()
       return
     }
     if (value === 'calc-mode:auto' || value === 'calc-mode:manual') {
@@ -337,7 +340,6 @@ export function DesktopHomeRibbon({
           onIsSelectionInPivot={() => runtime?.selectionInPivot ?? false}
         />
       )}
-      {pivot.dialog}
       {nameNotice && (
         <p className="dialog-note" role="status">
           {t(nameNotice.skipped ? 'appNamesCreatedSkipped' : 'appNamesCreated', nameNotice)}

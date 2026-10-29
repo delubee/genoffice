@@ -3456,3 +3456,19 @@ appearances and installed Linux/Windows VSIX. Not complete Data-tab parity.
   pivot range.
 - Data/Insert native set: 19 passing. Unit: gateway 331, session 257, editor 42,
   extension 61, desktop pivot/ribbon 194. CLI: only the 4 failures present at HEAD.
+
+### Edit PivotTable / Fields pane (2026-10-29)
+
+- workbook-session `pivot-save`: session pivot relayout to Fruit shrinks E2:F6 to
+  E2:F5, clears the old last row, and saves/reopens with the new range.
+- workbook-session `pivot-refresh`: a grown file pivot relayouts to Fruit, refresh
+  then refuses until save, and the saved definition location is E2:F5 on reopen.
+- Native VS Code 1.109.5 `Desktop PivotTable Fields pane UI`: create through the
+  dialog; the pane follows the cursor; checking Fruit nests rows (one revision);
+  unchecking Region shrinks and clears leftovers; deferred mode waits for Update;
+  exact Undo/Redo; save/reopen; the pane opens on the file pivot with Fruit
+  checked, rejects an empty-rows layout in-pane without a revision, relayouts to
+  Region and saves location G3:H7, confirmed by another reopen.
+- Data/Insert/Pivot native set: 19 passing plus 1 Go To flake (Advanced Filter
+  passes alone). Unit: gateway 331, session 257, editor 42, extension 61, desktop
+  pivot/ribbon 194; CLI only the 4 failures present at HEAD.

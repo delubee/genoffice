@@ -597,9 +597,10 @@ PivotTable create follow-up (2026-10-29):
 - [x] Persist session pivots as native pivot parts through a final package-writer stage; refuse coordinate/sheet changes that would desync a pending pivot.
 - [x] Mount the shared Data PivotTable group and Insert PivotTable button with the actual desktop dialog (async, retained draft on rejection); verify native create/history/save/reopen.
 - [x] Refresh / Refresh All recompute for file pivots through the shared pivot engine, with growth, refreshOnLoad and location persistence; session-created pivots refresh after save, as on the desktop.
-- [ ] Edit PivotTable with the desktop PivotTable Fields pane (relayout of session and file pivots).
+- [x] Edit PivotTable with the actual desktop PivotTable Fields pane: relayout of session and file pivots, cursor-following pane, deferred Update, history and saved regenerated definitions.
 - [ ] Slicers, timelines and PivotChart.
 - [ ] `Desktop Insert Link UI` is flaky (Go To stays disabled in some runs, also at HEAD fc726c60); passed in the later Data/Insert run.
 - [ ] CLI: `mcp.test.ts` schema budget (96,298 > 94,208 bytes at HEAD), sidecar `info`, missing generated fixture and Homebrew install tests fail at HEAD; pre-existing.
 - [ ] A host-side commit that lands while a reopened view performs its first reads leaves the view on "The requested state is no longer current"; the view should resync instead of showing the error screen.
 - [ ] Selection-in-pivot hints and edit protection should follow grown (refreshed) output ranges, not only the original pivot ranges.
+- [ ] Go To flake: "Go" stays disabled after `fill` in some native runs (Advanced Filter, Insert Link, Column Header Filter, Fields pane); each passes alone. Ruled out: goToVisible resets, LocaleScope suspension. Suspect a portal re-mount or focus race while the view initialises.

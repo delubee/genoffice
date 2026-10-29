@@ -783,6 +783,28 @@ const addPivotSchema = z.object({
     .optional(),
 })
 
+// Edit PivotTable: a new layout for an existing pivot on sheetId, keeping its
+// source and top-left anchor. `pivot` names a pivot created this session or
+// a file pivot by its part path (xl/pivotTables/pivotTableN.xml).
+const editPivotSchema = addPivotSchema
+  .pick({
+    rowFields: true,
+    columnField: true,
+    pageFields: true,
+    values: true,
+    groupings: true,
+    filters: true,
+    subtotalLabel: true,
+  })
+  .extend({
+    op: z.literal('edit_pivot'),
+    sheetId: z.string().min(1),
+    pivot: z.union([
+      z.object({ session: z.string().min(1).max(255) }),
+      z.object({ file: z.string().regex(/^xl\/pivotTables\/[^/]+\.xml$/) }),
+    ]),
+  })
+
 const setRowsHiddenSchema = z
   .object({
     op: z.literal('set_rows_hidden'),
@@ -1450,6 +1472,7 @@ export const workbookOperationSchema = z.discriminatedUnion('op', [
   setFreezeSchema,
   setNoteSchema,
   refreshPivotSchema,
+  editPivotSchema,
   insertRowsSchema,
   deleteRowsSchema,
   insertColsSchema,
@@ -1604,6 +1627,7 @@ export type LayoutOperation =
   | z.infer<typeof setFreezeSchema>
   | z.infer<typeof setNoteSchema>
   | z.infer<typeof refreshPivotSchema>
+  | z.infer<typeof editPivotSchema>
   | DeleteVisualOperation
   | DeleteTableOperation
   | AddSparklineOperation
@@ -1687,6 +1711,7 @@ const LAYOUT_OPS = new Set([
   'set_freeze',
   'set_note',
   'refresh_pivot',
+  'edit_pivot',
   'delete_visual',
   'set_visual_anchor',
   'edit_visual',
@@ -2729,6 +2754,8 @@ export function layoutOpLabel(op: LayoutOperation): string {
       return op.text === null
         ? `Remove note at ${op.address}`
         : `Note at ${op.address}: "${op.text.length > 60 ? `${op.text.slice(0, 60)}…` : op.text}"`
+    case 'edit_pivot':
+      return `Edit PivotTable ${'session' in op.pivot ? op.pivot.session : op.pivot.file}`
     case 'refresh_pivot':
       return 'Refresh pivot tables'
   }

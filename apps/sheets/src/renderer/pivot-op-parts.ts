@@ -4,8 +4,22 @@
  */
 import type { AddPivotOperation } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
 import type { PivotLayoutErrorCode } from '@genoffice/xlsx-gateway/domain/pivot-layout'
-import { t } from './i18n/locale'
-import type { OoXmlPivotConfig, PivotField } from './pivot-field-model'
+import { t, type StringKey } from './i18n/locale'
+import type {
+  OoXmlPivotConfig,
+  PivotField,
+  PivotModelError,
+  PivotLayoutModel,
+  PivotValueSpec,
+} from './pivot-field-model'
+import {
+  defaultDataFieldCaption,
+  isPivotAggregation,
+} from '@genoffice/xlsx-gateway/domain/pivot-value-modes'
+import type {
+  WorkbookPivotAdd,
+  WorkbookPivotDefinition,
+} from '@genoffice/xlsx-gateway/shared/workbook-protocol'
 
 export function pivotConfigToOpParts(
   config: OoXmlPivotConfig,
@@ -137,6 +151,10 @@ const SESSION_ERROR_KEYS = {
   layoutMismatch: 'appPivotLayoutMismatch',
   growUnsupported: 'appPivotGrowUnsupported',
   growConflict: 'appPivotGrowConflict',
+  relayoutPending: 'appPivotDefNotLoadedSave',
+  relayoutOverlap: 'appPivotRelayoutOverlap',
+  pivotStale: 'appSlicerPivotStale',
+  editUnsupported: 'appPivotEditUnsupported',
 } as const satisfies Record<string, Parameters<typeof t>[0]>
 
 /** Localizes a session `pivot_layout:<code>[:<params>]` rejection; other errors pass through. */
@@ -152,4 +170,150 @@ export function pivotErrorMessage(error: unknown): string {
     params = {}
   }
   return t(key, params)
+}
+
+/// Layout model of a journaled pivot (session add or pending relayout).
+export function modelOfPivotAdd(add: WorkbookPivotAdd): PivotLayoutModel {
+  const columns =
+    add.columnFieldIndices ?? (add.columnFieldIndex === undefined ? [] : [add.columnFieldIndex])
+  const values: PivotValueSpec[] = add.values.map((value, index) => {
+    const filter = add.filters?.find((entry) => entry.kind === 'value' && entry.dataField === index)
+    return {
+      fieldIndex: value.fieldIndex,
+      agg: value.agg,
+      ...(value.showDataAs !== undefined ? { showDataAs: value.showDataAs } : {}),
+      ...(value.name !== undefined ? { name: value.name } : {}),
+      ...(value.formula !== undefined ? { formula: value.formula, calcName: value.calcName } : {}),
+      ...(filter !== undefined && filter.kind === 'value'
+        ? {
+            filter: {
+              op: filter.op,
+              ...(filter.count !== undefined ? { count: filter.count } : {}),
+              ...(filter.from !== undefined ? { from: filter.from } : {}),
+              ...(filter.to !== undefined ? { to: filter.to } : {}),
+            },
+          }
+        : {}),
+    }
+  })
+  const groupings: Record<number, PivotLayoutModel['groupings'][number]> = {}
+  for (const grouping of add.groupings ?? []) {
+    groupings[grouping.fieldIndex] =
+      grouping.kind === 'date'
+        ? { kind: 'date', dateUnit: grouping.dateUnit }
+        : { kind: 'range', rangeStep: grouping.rangeStep }
+  }
+  const labelFilters: Record<number, PivotLayoutModel['labelFilters'][number]> = {}
+  for (const filter of add.filters ?? []) {
+    if (filter.kind === 'label') labelFilters[filter.field] = { op: filter.op, value: filter.value }
+  }
+  return {
+    filters: (add.pageFieldIndices ?? []).map((fieldIndex, page) => {
+      const item = add.pageItems?.[page] ?? null
+      return {
+        fieldIndex,
+        item: item === null ? null : (add.pageLevelItems?.[page]?.[item] ?? null),
+      }
+    }),
+    columns,
+    rows: [...add.rowFieldIndices],
+    values,
+    groupings,
+    labelFilters,
+  }
+}
+
+/// Layout model of a file pivot from its parsed definition. Returns a message
+/// key when the definition is outside what the pane can edit.
+export function modelOfDefinition(
+  definition: WorkbookPivotDefinition,
+): { model: PivotLayoutModel; sourceFieldCount: number } | string {
+  if (definition.unsupported.length > 0) {
+    return t('appPivotEditUnsupported', { reasons: definition.unsupported.join('; ') })
+  }
+  if (definition.rowFields.some((field) => field < 0)) return t('appPivotEditValuesOnRows')
+  if (definition.dataFields.some((dataField) => !isPivotAggregation(dataField.subtotal))) {
+    return t('appPivotEditAggUnsupported')
+  }
+  const sourceFieldCount = definition.fields.filter((field) => field.formula === undefined).length
+  const memberLabel = (field: number, item: number | null): string | null => {
+    if (item === null) return null
+    const x = definition.fieldItems[field]?.[item]?.x
+    const shared =
+      x === null || x === undefined ? undefined : definition.fields[field]?.sharedItems[x]
+    return shared === undefined || shared === null ? '' : String(shared)
+  }
+  const values: PivotValueSpec[] = definition.dataFields.map((dataField, index) => {
+    const source = definition.fields[dataField.field]
+    const agg = dataField.subtotal as PivotValueSpec['agg']
+    const isCalc = source?.formula !== undefined
+    const defaultName = defaultDataFieldCaption(agg, source?.name ?? '')
+    const filter = definition.filters.find(
+      (entry) => entry.kind === 'value' && entry.dataField === index,
+    )
+    return {
+      fieldIndex: isCalc ? -1 : dataField.field,
+      agg,
+      ...(dataField.showDataAs !== undefined ? { showDataAs: dataField.showDataAs } : {}),
+      ...(dataField.name !== defaultName && !isCalc ? { name: dataField.name } : {}),
+      ...(isCalc ? { formula: source.formula, calcName: source.name } : {}),
+      ...(filter !== undefined && filter.kind === 'value'
+        ? {
+            filter: {
+              op: filter.op,
+              ...(filter.count !== undefined ? { count: filter.count } : {}),
+              ...(filter.from !== undefined ? { from: filter.from } : {}),
+              ...(filter.to !== undefined ? { to: filter.to } : {}),
+            },
+          }
+        : {}),
+    }
+  })
+  // The pane's value filter always targets the level-1 row field.
+  if (
+    definition.filters.some(
+      (filter) => filter.kind === 'value' && filter.field !== definition.rowFields[0],
+    )
+  ) {
+    return t('appPivotEditHasFeatures')
+  }
+  const groupings: Record<number, PivotLayoutModel['groupings'][number]> = {}
+  definition.fields.forEach((field, index) => {
+    if (!field.grouping) return
+    groupings[index] =
+      field.grouping.kind === 'date'
+        ? { kind: 'date', dateUnit: field.grouping.dateUnit }
+        : { kind: 'range', rangeStep: field.grouping.rangeStep }
+  })
+  const labelFilters: Record<number, PivotLayoutModel['labelFilters'][number]> = {}
+  for (const filter of definition.filters) {
+    if (filter.kind === 'label') labelFilters[filter.field] = { op: filter.op, value: filter.value }
+  }
+  return {
+    sourceFieldCount,
+    model: {
+      filters: definition.pageFields.map((page) => ({
+        fieldIndex: page.field,
+        item: memberLabel(page.field, page.item),
+      })),
+      columns: definition.colFields.filter((field) => field >= 0),
+      rows: [...definition.rowFields],
+      values,
+      groupings,
+      labelFilters,
+    },
+  }
+}
+
+/** Fields-pane validation messages, shared by the desktop and VS Code panes. */
+export const PIVOT_MODEL_ERRORS: Record<PivotModelError, StringKey> = {
+  needRow: 'appNeedRowField',
+  needValue: 'dlgPivotErrNeedValue',
+  colNeedsSingleValue: 'dlgPivotErrColNeedsSingleValue',
+  calcIncomplete: 'dlgPivotErrCalcFieldIncomplete',
+  rangeStep: 'dlgPivotErrRangeStep',
+  labelFilterText: 'dlgPivotErrLabelFilterText',
+  oneValueFilter: 'dlgPivotErrOneValueFilter',
+  filterConflict: 'dlgPivotErrFilterConflict',
+  dupValueName: 'dlgPivotErrDupValueName',
 }
