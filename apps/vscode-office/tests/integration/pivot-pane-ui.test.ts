@@ -201,4 +201,86 @@ suite('Desktop PivotTable Fields pane UI', () => {
       await browser.close()
     }
   })
+
+  test('inserts a PivotChart beside a reopened file PivotTable through the shared Insert menu', async function () {
+    const port = process.env.GENOFFICE_TEST_CDP_PORT
+    if (!port) return this.skip()
+    this.timeout(180_000)
+    const api = (await vscode.extensions
+      .getExtension('genoffice.genoffice-workbook')!
+      .activate()) as Api
+    const name = 'pivot-chart-ui.xlsx'
+    const uri = vscode.Uri.joinPath(vscode.workspace.workspaceFolders![0]!.uri, name)
+    const values: (string | number)[][] = [
+      ['Region', 'Fruit', 'Amount'],
+      ['North', 'Apples', 12.5],
+      ['South', 'Pears', 7],
+      ['North', 'Pears', 3],
+      ['East', 'Apples', 10],
+    ]
+    const fixture = await applyCellEditsToXlsx(
+      await manualWorkbook(),
+      values.flatMap((row, r) =>
+        row.map((value, c) => ({
+          sheetName: 'Other',
+          row: r + 2,
+          column: c + 2,
+          writeValue: true,
+          cell: { value },
+        })),
+      ),
+    )
+    await vscode.workspace.fs.writeFile(uri, fixture.buffer)
+    const browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`)
+    try {
+      await vscode.commands.executeCommand('vscode.openWith', uri, 'genoffice.workbook')
+      let document = api.getDocument(uri)!
+      await document.whenViewReady()
+      let frame = await viewOf(browser, name)
+      await vscode.commands.executeCommand('notifications.clearAll')
+      await vscode.commands.executeCommand('workbench.action.closeAuxiliaryBar')
+      await vscode.commands.executeCommand('workbench.action.closeSidebar')
+      await vscode.commands.executeCommand('workbench.action.closePanel')
+      await frame.page().setViewportSize({ width: 1200, height: 900 })
+      await goTo(frame, 'Other!C3:E7')
+      await frame.locator('#ribbon-tab-insert').click()
+      await frame
+        .getByRole('button', { name: /^PivotTable\b/ })
+        .first()
+        .click()
+      const dialog = frame.getByRole('dialog', { name: 'Create PivotTable', exact: true })
+      await dialog.locator('input:not([readonly])').fill('G3')
+      const created = document.engine.descriptor.revision
+      await dialog.getByRole('button', { name: 'Create', exact: true }).click()
+      await settle(document, created + 1)
+      await vscode.commands.executeCommand('workbench.action.files.save')
+      document = await reopen(api, uri, document.sessionId)
+      frame = await viewOf(browser, name)
+      await goTo(frame, 'Other!G4')
+      await frame.locator('#ribbon-tab-insert').click()
+      const revision = document.engine.descriptor.revision
+      await frame
+        .locator('.workbook-desktop-header')
+        .getByRole('button', { name: 'PivotChart', exact: true })
+        .click()
+      await frame.getByRole('listbox').getByRole('option', { name: 'Column', exact: true }).click()
+      await settle(document, revision + 1)
+      if (await frame.getByRole('alert').count())
+        assert.fail(await frame.getByRole('alert').first().innerText())
+      const visuals = document.engine.state.sheets[1]!.features?.visuals as {
+        chart: { series: { valuesRef?: string }[] }
+      }[]
+      assert.equal(visuals.length, 1)
+      assert.match(String(visuals[0]!.chart.series[0]!.valuesRef), /\$H\$4:\$H\$6$/)
+      await vscode.commands.executeCommand('workbench.action.files.save')
+      const zip = await JSZip.loadAsync(await vscode.workspace.fs.readFile(uri))
+      assert.ok(Object.keys(zip.files).some((part) => /^xl\/charts\/chart\d+\.xml$/.test(part)))
+    } finally {
+      if (api.getDocument(uri))
+        await vscode.commands.executeCommand('workbench.action.files.save', uri)
+      await vscode.commands.executeCommand('workbench.action.closeAllEditors')
+      await vscode.workspace.fs.delete(uri)
+      await browser.close()
+    }
+  })
 })

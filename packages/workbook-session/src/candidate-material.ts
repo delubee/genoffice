@@ -202,6 +202,22 @@ export async function prepareCandidateMaterial(input: {
           ) ||
           (!!native && sheet.originalSheetId === native.sheetId),
       )
+      // A chart added earlier in this transaction (PivotChart): explicit row refs.
+      const pending = !owner
+        ? input.operations.find(
+            (other) =>
+              other.op === 'add_chart' && op.chartPath.startsWith(`demo-chart-${other.sheetId}-`),
+          )
+        : undefined
+      if (pending && 'sheetId' in pending && op.seriesSelection?.mode === 'rows') {
+        for (const row of op.seriesSelection.rows)
+          for (const reference of [row.valuesRef, row.categoriesRef])
+            if (reference) {
+              const resolved = resolveChartRange(reference, state.sheets, pending.sheetId)
+              addRange(resolved.sheetId, resolved.range)
+            }
+        continue
+      }
       if (!owner) throw new WorkbookError('unsupported_operation', 'unknown_chart')
       if (op.seriesSelection) {
         const own = ((owner.features?.charts ?? []) as unknown as SheetVisual[]).find(

@@ -172,6 +172,12 @@ export function DesktopHomeRibbon({
       void run(async () => setViewNotice(await runtime.tableCommand(value)))
       return
     }
+    if (value.startsWith('insert-pivot-chart:')) {
+      void run(async () =>
+        setViewNotice(await runtime.insertPivotChart(value.slice('insert-pivot-chart:'.length))),
+      )
+      return
+    }
     if (value.startsWith('sparkline:')) {
       const type = value.slice('sparkline:'.length)
       if (type === 'line' || type === 'column' || type === 'stacked')

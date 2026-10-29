@@ -318,6 +318,7 @@ import {
   PIVOT_SOURCE_COL_LIMIT,
   PIVOT_SOURCE_ROW_LIMIT,
 } from '@genoffice/xlsx-gateway/domain/pivot-layout'
+import { buildPivotChartData } from '@genoffice/xlsx-gateway/domain/pivot-chart'
 import {
   isNumericPivotColumn,
   pivotPageRows,
@@ -3428,6 +3429,77 @@ export class WorkbookRuntime implements EditorProjection {
       return null
     }
     throw new Error(`Unknown note command: ${command}`)
+  }
+  /** Insert > PivotChart: a chart beside the file PivotTable, its series built like the desktop's. */
+  async insertPivotChart(kind: string) {
+    if (!(await this.flushEditor())) throw new Error(t('appClipboardBusy'))
+    const state = this.state
+    const hit = this.pivotAtSelection()
+    if (!state || !hit) throw new Error(t('appCursorNotInPivot'))
+    const definition = hit.file?.definition
+    if (!definition || hit.relayout) throw new Error(t('appPivotDefNotLoadedSave'))
+    const frozen = { stateId: state.stateId, revision: this.revision }
+    const bounds = parseRange(definition.outputRef)
+    const width = bounds.endColumn - bounds.startColumn + 1
+    const cells = new Map<string, ViewCell>()
+    const step = Math.max(1, Math.floor(2000 / width))
+    for (let row = bounds.startRow; row <= bounds.endRow; row += step) {
+      const page = (await this.host.read(
+        hit.sheet.id,
+        { ...bounds, startRow: row, endRow: Math.min(bounds.endRow, row + step - 1) },
+        frozen.stateId,
+      )) as { cells: ViewCell[] }
+      for (const cell of page.cells) cells.set(cell.address, cell)
+    }
+    const values = Array.from({ length: bounds.endRow - bounds.startRow + 1 }, (_, r) =>
+      Array.from({ length: width }, (_, c) => {
+        const cell = cells.get(formatAddress(bounds.startRow + r, bounds.startColumn + c))
+        return (cell?.formula ? cell.cachedValue : cell?.rawValue) as
+          string | number | boolean | null | undefined
+      }),
+    )
+    const chart = buildPivotChartData(definition, hit.sheet.name, bounds, values)
+    if (!chart.series.length) throw new Error(t('appPivotNoChartData'))
+    const chartType = (['column', 'bar', 'line', 'pie', 'doughnut', 'radar'] as const).find(
+      (type) => type === kind,
+    )
+    if (!chartType) throw new Error(`Unknown PivotChart type: ${kind}`)
+    // The session numbers new charts per sheet; the series edit targets that id.
+    const existing = (
+      (hit.sheet.features?.visuals ?? hit.sheet.features?.charts ?? []) as unknown[]
+    ).length
+    const chartPath = `demo-chart-${hit.sheet.id}-${existing + 1}`
+    try {
+      await this.enqueue(
+        [
+          {
+            op: 'add_chart',
+            sheetId: hit.sheet.id,
+            chartType,
+            dataRange: definition.outputRef,
+            title: chart.title,
+            anchorCell: formatAddress(bounds.startRow, bounds.endColumn + 2),
+          },
+          {
+            op: 'edit_chart',
+            chartPath,
+            seriesSelection: {
+              mode: 'rows',
+              rows: chart.series.slice(0, 24).map((series) => ({
+                name: series.name.slice(0, 255),
+                ...(series.valuesRef ? { valuesRef: series.valuesRef } : {}),
+                ...(series.categoriesRef ? { categoriesRef: series.categoriesRef } : {}),
+              })),
+            },
+          },
+        ],
+        frozen,
+        { failureInDialog: true },
+      )
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : String(error), { cause: error })
+    }
+    return t(chart.truncated ? 'appPivotChartInsertedTruncated' : 'appPivotChartInserted')
   }
   private sparklineLayers: { dispose(): void }[] = []
   /** File and session sparklines of the active sheet (shared desktop renderer). */
