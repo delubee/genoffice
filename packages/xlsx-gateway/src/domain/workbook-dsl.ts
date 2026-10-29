@@ -1115,6 +1115,8 @@ const setPageSetupSchema = z.object({
   showFormulas: z.boolean().optional(),
   showHeadings: z.boolean().optional(),
   zoomScale: z.number().int().min(10).max(400).optional(),
+  /** sheetView/@rightToLeft: the grid is mirrored (column A at the right edge) */
+  rightToLeft: z.boolean().optional(),
   orientation: z.enum(['portrait', 'landscape']).optional(),
   /** OOXML paper-size code: 1 Letter, 8 A3, 9 A4, 11 A5 … */
   paperSize: z.number().int().min(1).max(118).optional(),

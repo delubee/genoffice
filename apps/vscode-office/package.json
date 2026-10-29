@@ -3693,6 +3693,84 @@
                     "properties": {
                       "op": {
                         "type": "string",
+                        "const": "protect_sheet"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "protected": {
+                        "type": "boolean"
+                      },
+                      "password": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255
+                      },
+                      "allow": {
+                        "type": "object",
+                        "properties": {
+                          "selectLockedCells": {
+                            "type": "boolean"
+                          },
+                          "selectUnlockedCells": {
+                            "type": "boolean"
+                          },
+                          "formatCells": {
+                            "type": "boolean"
+                          },
+                          "formatColumns": {
+                            "type": "boolean"
+                          },
+                          "formatRows": {
+                            "type": "boolean"
+                          },
+                          "insertColumns": {
+                            "type": "boolean"
+                          },
+                          "insertRows": {
+                            "type": "boolean"
+                          },
+                          "insertHyperlinks": {
+                            "type": "boolean"
+                          },
+                          "deleteColumns": {
+                            "type": "boolean"
+                          },
+                          "deleteRows": {
+                            "type": "boolean"
+                          },
+                          "sort": {
+                            "type": "boolean"
+                          },
+                          "autoFilter": {
+                            "type": "boolean"
+                          },
+                          "pivotTables": {
+                            "type": "boolean"
+                          },
+                          "objects": {
+                            "type": "boolean"
+                          },
+                          "scenarios": {
+                            "type": "boolean"
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "protected"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
                         "const": "set_filter"
                       },
                       "sheetId": {
@@ -4070,6 +4148,9 @@
                         "type": "integer",
                         "minimum": 10,
                         "maximum": 400
+                      },
+                      "rightToLeft": {
+                        "type": "boolean"
                       },
                       "orientation": {
                         "type": "string",

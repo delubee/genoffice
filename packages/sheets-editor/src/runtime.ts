@@ -233,8 +233,10 @@ import {
 import {
   ILayoutService,
   IRenderManagerService,
+  SheetSkeletonManagerService,
   UniverSheetsCorePreset,
 } from '@univerjs/preset-sheets-core'
+import { clampZoomRatio } from '../../../apps/sheets/src/renderer/zoom-range'
 import { AddWorksheetMergeMutation } from '@univerjs/sheets'
 import {
   DeltaColumnWidthCommand,
@@ -260,6 +262,14 @@ import {
   pickCsvFile,
 } from '../../../apps/sheets/src/renderer/csv-import-model'
 import { decodeCsvBuffer } from '@genoffice/xlsx-gateway/gateway/csv-import'
+import {
+  installCrossHighlight,
+  loadCrossHighlightPreference,
+  storeCrossHighlightPreference,
+  type CrossHighlightHandle,
+} from '../../../apps/sheets/src/renderer/cross-highlight'
+import { installPageBreakPreview } from '../../../apps/sheets/src/renderer/page-break-preview'
+import type { PageSetupJournalState } from '../../../apps/sheets/src/renderer/edit-journal'
 import {
   filePivotsOfSheet,
   pivotSourceSheet,
@@ -2872,8 +2882,169 @@ export class WorkbookRuntime implements EditorProjection {
       margins: prior?.margins,
       showGridlines: view.gridlines,
       showHeadings: view.headings,
-      rightToLeft: false,
+      rightToLeft: view.rightToLeft,
+      pageBreakPreview: sheetId ? this.pageBreakPreviews.has(sheetId) : false,
     }
+  }
+  private formulaBarHidden = false
+  private crossHighlightOn = loadCrossHighlightPreference()
+  private crossHighlight: CrossHighlightHandle | undefined
+  private pageBreakPreviews = new Map<string, { dispose(): void }[]>()
+  get formulaBarVisible() {
+    return !this.formulaBarHidden
+  }
+  get crossHighlightVisible() {
+    return this.crossHighlightOn
+  }
+  /** Display-only overlays (cross highlight, page-break preview) follow each projection. */
+  private refreshViewOverlays() {
+    if (!this.crossHighlight && this.crossHighlightOn) {
+      this.crossHighlight = installCrossHighlight(this.runtime, {
+        theme: () => (this.darkTheme() ? 'dark' : 'light'),
+      })
+      this.crossHighlight.setVisible(true)
+    } else this.crossHighlight?.refresh()
+    for (const sheetId of [...this.pageBreakPreviews.keys()]) void this.installPageBreaks(sheetId)
+  }
+  private async installPageBreaks(sheetId: string) {
+    const state = this.state
+    const sheet = state?.sheets.find((item) => item.id === sheetId)
+    const worksheet = this.runtime.univerAPI.getActiveWorkbook()?.getSheetBySheetId(sheetId)
+    if (!state || !sheet || !worksheet) return
+    if (!this.filePageBreaks.has(sheetId) || !this.filePageSetup.has(sheetId)) {
+      const read = (await this.host.read(
+        sheetId,
+        { startRow: 0, endRow: 0, startColumn: 0, endColumn: 0 },
+        state.stateId,
+      )) as { pageSetup?: unknown; pageBreaks?: { rowBreaks: number[]; colBreaks: number[] } }
+      this.filePageSetup.set(sheetId, read.pageSetup ?? null)
+      this.filePageBreaks.set(sheetId, read.pageBreaks ?? { rowBreaks: [], colBreaks: [] })
+    }
+    if (!this.pageBreakPreviews.has(sheetId) || this.state !== state) return
+    const prior = (sheet.features?.pageSetupEdits ?? {}) as PageSettingsPatch
+    const raw = this.filePageBreaks.get(sheetId)!
+    const mapped = (axis: 'row' | 'column', values: number[]) =>
+      values
+        .map((value) => currentAxisIndex(state.structuralLog, sheetId, value, axis))
+        .filter((value): value is number => value !== null && value > 0)
+    for (const layer of this.pageBreakPreviews.get(sheetId) ?? []) layer.dispose()
+    this.pageBreakPreviews.set(
+      sheetId,
+      installPageBreakPreview(
+        this.runtime,
+        worksheet,
+        {
+          ...((this.filePageSetup.get(sheetId) ?? {}) as object),
+          ...prior,
+        } as PageSetupJournalState,
+        {
+          rowBreaks: prior.rowBreaks ?? mapped('row', raw.rowBreaks),
+          colBreaks: prior.colBreaks ?? mapped('column', raw.colBreaks),
+        },
+        { rows: sheet.rows, columns: sheet.columns },
+        `page-break-${sheetId}`,
+      ),
+    )
+  }
+  /** View tab commands (workbook views, show, zoom, window). */
+  async viewCommand(command: string): Promise<string | null> {
+    const target = this.ribbonTarget,
+      state = this.state
+    if (!target || !state) throw new Error(t('appSelectCellFirst'))
+    if (command === 'toggle-formula-bar') {
+      this.formulaBarHidden = !this.formulaBarHidden
+      this.container.classList.toggle('formula-bar-hidden', this.formulaBarHidden)
+      this.changed()
+      return t(this.formulaBarHidden ? 'appFormulaBarHidden' : 'appFormulaBarShown')
+    }
+    if (command === 'toggle-cross-highlight') {
+      this.crossHighlightOn = !this.crossHighlightOn
+      storeCrossHighlightPreference(this.crossHighlightOn)
+      if (this.crossHighlightOn) this.refreshViewOverlays()
+      this.crossHighlight?.setVisible(this.crossHighlightOn)
+      this.changed()
+      return t(this.crossHighlightOn ? 'appCrossHighlightOn' : 'appCrossHighlightOff')
+    }
+    if (command === 'toggle-page-break-preview') {
+      const layers = this.pageBreakPreviews.get(target.sheetId)
+      if (layers) {
+        for (const layer of layers) layer.dispose()
+        this.pageBreakPreviews.delete(target.sheetId)
+        this.changed()
+        return t('appPageBreakPreviewOff')
+      }
+      this.pageBreakPreviews.set(target.sheetId, [])
+      await this.installPageBreaks(target.sheetId)
+      this.changed()
+      return t('appPageBreakPreviewOn')
+    }
+    if (!(await this.flushEditor())) throw new Error(t('appClipboardBusy'))
+    const frozen = { stateId: state.stateId, revision: this.revision }
+    const view = this.projectedView()
+    const bounds = parseRange(target.address)
+    let operation: WorkbookOperation
+    let message: string | null
+    if (command === 'toggle-right-to-left') {
+      operation = { op: 'set_page_setup', sheetId: target.sheetId, rightToLeft: !view.rightToLeft }
+      message = t(view.rightToLeft ? 'appRightToLeftOff' : 'appRightToLeftOn')
+    } else if (command.startsWith('zoom:') || command === 'zoom-reset') {
+      const percent = command === 'zoom-reset' ? 100 : Number(command.slice('zoom:'.length))
+      if (!Number.isInteger(percent) || percent < 10 || percent > 400)
+        throw new Error('Unsupported zoom level.')
+      operation = { op: 'set_page_setup', sheetId: target.sheetId, zoomScale: percent }
+      message = t('appZoom', { percent })
+    } else if (command === 'zoom-to-selection') {
+      const workbook = this.runtime.univerAPI.getActiveWorkbook()
+      const render = workbook
+        ? this.runtime.univer
+            .__getInjector()
+            .get(IRenderManagerService)
+            .getRenderById(workbook.getId())
+        : null
+      const skeleton = render?.with(SheetSkeletonManagerService).getCurrentSkeleton()
+      if (!render || !skeleton) throw new Error(t('appSelectCellFirst'))
+      const rows = skeleton.rowHeightAccumulation,
+        columns = skeleton.columnWidthAccumulation
+      const top = bounds.startRow > 0 ? (rows[bounds.startRow - 1] ?? 0) : 0
+      const bottom = rows[Math.min(bounds.endRow, rows.length - 1)] ?? 0
+      const left = bounds.startColumn > 0 ? (columns[bounds.startColumn - 1] ?? 0) : 0
+      const right = columns[Math.min(bounds.endColumn, columns.length - 1)] ?? 0
+      const width = render.engine.width - skeleton.rowHeaderWidthAndMarginLeft,
+        height = render.engine.height - skeleton.columnHeaderHeightAndMarginTop
+      if (right <= left || bottom <= top || width <= 0 || height <= 0) return null
+      const ratio = clampZoomRatio(Math.min(width / (right - left), height / (bottom - top)))
+      const percent = Math.max(10, Math.min(400, Math.round(ratio * 100)))
+      operation = { op: 'set_page_setup', sheetId: target.sheetId, zoomScale: percent }
+      message = t('appZoom', { percent })
+    } else if (
+      command === 'freeze-here' ||
+      command === 'freeze-top-row' ||
+      command === 'freeze-first-col' ||
+      command === 'unfreeze'
+    ) {
+      const [rows, columns] =
+        command === 'freeze-here'
+          ? [bounds.startRow, bounds.startColumn]
+          : command === 'freeze-top-row'
+            ? [1, 0]
+            : command === 'freeze-first-col'
+              ? [0, 1]
+              : [0, 0]
+      operation = { op: 'set_freeze', sheetId: target.sheetId, rows, columns }
+      message =
+        command === 'freeze-here' ? t('appFrozenAtSelection') : command === 'unfreeze' ? null : null
+    } else throw new Error(`Unknown View command: ${command}`)
+    await this.enqueue([operation], frozen, { failureInDialog: true })
+    if (command === 'zoom-to-selection')
+      void this.runtime.univerAPI.executeCommand('sheet.command.scroll-to-cell', {
+        range: {
+          startRow: bounds.startRow,
+          startColumn: bounds.startColumn,
+          endRow: bounds.startRow,
+          endColumn: bounds.startColumn,
+        },
+      })
+    return message
   }
   async pageLayoutCommand(command: string) {
     if (!(await this.flushEditor())) throw new Error(t('appClipboardBusy'))
@@ -3569,7 +3740,13 @@ export class WorkbookRuntime implements EditorProjection {
                 }
               | undefined
             const page = sheet.features?.pageSetupEdits as
-              { showGridlines?: boolean; showHeadings?: boolean; zoomScale?: number } | undefined
+              | {
+                  showGridlines?: boolean
+                  showHeadings?: boolean
+                  zoomScale?: number
+                  rightToLeft?: boolean
+                }
+              | undefined
             const freeze = (sheet.features?.freezeEdits ?? metadata?.freeze) as
               { frozenRows: number; frozenColumns: number } | undefined
             const originalColumns = new Map<number, { w?: number; hd?: 0 | 1 }>()
@@ -3666,6 +3843,11 @@ export class WorkbookRuntime implements EditorProjection {
                   hidden: (page?.showHeadings ?? metadata?.showRowColHeaders ?? true) ? 0 : 1,
                 },
                 zoomRatio: (page?.zoomScale ?? metadata?.zoomScale ?? 100) / 100,
+                rightToLeft:
+                  (page?.rightToLeft ??
+                  (metadata as { rightToLeft?: boolean } | undefined)?.rightToLeft)
+                    ? 1
+                    : 0,
                 ...(freeze
                   ? {
                       freeze: {
@@ -3768,6 +3950,7 @@ export class WorkbookRuntime implements EditorProjection {
       this.installChartVisuals()
       void this.loadOutlineProjection().catch(this.report)
       this.findReplace.contextChanged()
+      this.refreshViewOverlays()
       this.changed()
     } finally {
       this.installing--
@@ -4157,6 +4340,7 @@ export class WorkbookRuntime implements EditorProjection {
       zoom: sheet?.getZoom(),
       gridlines: config?.showGridlines === 1,
       headings: config?.rowHeader.hidden !== 1,
+      rightToLeft: config?.rightToLeft === 1,
       showFormulas: sheet ? this.showFormulasFor(sheet.getSheetId()) : false,
     }
   }

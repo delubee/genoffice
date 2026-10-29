@@ -1,7 +1,7 @@
 import { DOCS_NORMAL_EDITOR_UNIT_ID_KEY } from '@univerjs/core'
 import { DocSelectionRenderService, type IRenderManagerService } from '@univerjs/preset-sheets-core'
 
-/** Engine synchronization must preserve focused ribbon tabs and chart-pane controls. */
+/** Engine synchronization must preserve focused ribbon tabs, dialogs and pane controls. */
 export function installRibbonFocusBoundary(renders: IRenderManagerService, grid: HTMLElement) {
   let tab: HTMLElement | null = null
   const root = grid.closest('.workbook-editor')
@@ -31,6 +31,15 @@ export function installRibbonFocusBoundary(renders: IRenderManagerService, grid:
     const original = selection.focus
     const guarded = () => {
       if (tab?.isConnected && owner.activeElement === tab) return
+      // Dialogs and side panes own focus while open; engine sync must not move
+      // typing into the hidden cell editor (Go To, Fields pane, chart pane, …).
+      const active = owner.activeElement
+      if (
+        active instanceof HTMLElement &&
+        !grid.contains(active) &&
+        active.closest('[role="dialog"], [role="complementary"], .chart-format-pane')
+      )
+        return
       original.call(selection)
     }
     selection.focus = guarded

@@ -1,5 +1,6 @@
 import { sessionPivotAdditions } from '@genoffice/xlsx-gateway/domain/session-candidate'
 import type { PivotRefreshUpdate } from '@genoffice/xlsx-gateway/gateway/xlsx-pivot-expand'
+import type { SheetProtectionState } from '@genoffice/xlsx-gateway/gateway/xlsx-gateway'
 import type { WorkbookPivotAdd } from '@genoffice/xlsx-gateway/shared/workbook-protocol'
 import {
   visibilityEditsSchema,
@@ -202,6 +203,7 @@ export class SessionPackageWriter implements PackageWriter {
       const pageSetupStates: SheetPageSetupState[] = [],
         noteStates: SheetNoteState[] = []
       const filterStates: SheetFilterState[] = []
+      const sheetProtections: SheetProtectionState[] = []
       const dvStates: SheetDvState[] = []
       for (const sheet of state.sheets) {
         if (names.get(sheet.id) !== sheet.name)
@@ -342,6 +344,12 @@ export class SessionPackageWriter implements PackageWriter {
             ...settings
           } = page ?? { op: undefined, sheetId: undefined }
           pageSetupStates.push({ sheetName: sheet.name, ...settings, ...freeze })
+        }
+        const protection = sheet.features?.protectionEdits as
+          (Omit<SheetProtectionState, 'sheetName'> & { hasPassword: boolean }) | undefined
+        if (protection) {
+          const { hasPassword: _hasPassword, ...write } = protection
+          sheetProtections.push({ sheetName: sheet.name, ...write })
         }
         if (sheet.features?.hyperlinkEdits) {
           hyperlinkEdits.push({
@@ -566,6 +574,7 @@ export class SessionPackageWriter implements PackageWriter {
       }
       if (
         edits.length ||
+        sheetProtections.length ||
         pivotCacheRefreshPaths.length ||
         pivotRefreshUpdates.length ||
         hyperlinkEdits.length ||
@@ -581,6 +590,7 @@ export class SessionPackageWriter implements PackageWriter {
       )
         await writeStage({
           edits,
+          sheetProtections,
           pivotCacheRefreshPaths,
           pivotRefreshUpdates,
           hyperlinkEdits,

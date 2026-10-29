@@ -50,6 +50,7 @@ export function DesktopHomeRibbon({
     | 'Insert'
     | 'Page Layout'
     | 'Formulas'
+    | 'View'
     | 'Chart Design'
     | 'Shape Format'
     | 'Picture Format'
@@ -57,6 +58,7 @@ export function DesktopHomeRibbon({
 }) {
   const lang = normalizeLang(locale ?? navigator.language)
   setModuleLang(lang)
+  const [viewNotice, setViewNotice] = useState<string | null>(null)
   const [nameNotice, setNameNotice] = useState<{ count: number; skipped: number } | null>(null)
   const [dialog, setDialog] = useState<{
     kind: 'format' | 'row' | 'col' | 'link' | 'symbol' | 'header-footer' | 'recommended-charts'
@@ -84,8 +86,23 @@ export function DesktopHomeRibbon({
   }
   const command = (value: string) => {
     setNameNotice(null)
+    setViewNotice(null)
     if (!runtime) {
       onError('The document is still loading.')
+      return
+    }
+    if (
+      value === 'toggle-formula-bar' ||
+      value === 'toggle-cross-highlight' ||
+      value === 'toggle-page-break-preview' ||
+      value === 'toggle-right-to-left' ||
+      value.startsWith('zoom:') ||
+      value === 'zoom-reset' ||
+      value === 'zoom-to-selection' ||
+      value.startsWith('freeze-') ||
+      value === 'unfreeze'
+    ) {
+      void run(async () => setViewNotice(await runtime.viewCommand(value)))
       return
     }
     if (value === 'pivot-open' || value === 'pivot-edit') {
@@ -302,8 +319,8 @@ export function DesktopHomeRibbon({
           sheetHasContent={runtime?.ribbonEcho.hasContent ?? false}
           sheetProtected={runtime?.ribbonEcho.protected ?? null}
           workbookProtected={null}
-          formulaBarVisible={true}
-          crossHighlightVisible={false}
+          formulaBarVisible={runtime?.formulaBarVisible ?? true}
+          crossHighlightVisible={runtime?.crossHighlightVisible ?? false}
           themeEditingAvailable={false}
           pageLayout={
             runtime?.pageLayoutEcho ?? {
@@ -339,6 +356,11 @@ export function DesktopHomeRibbon({
           }}
           onIsSelectionInPivot={() => runtime?.selectionInPivot ?? false}
         />
+      )}
+      {viewNotice && (
+        <p className="dialog-note" role="status">
+          {viewNotice}
+        </p>
       )}
       {nameNotice && (
         <p className="dialog-note" role="status">

@@ -276,3 +276,8 @@ body {
 .workbook-content.has-outline {
   padding-left: var(--outline-gutter-w, 0px);
 }
+
+/* View → Formula Bar: the shared desktop toggle hides Univer's formula bar. */
+.formula-bar-hidden [data-u-comp='formula-bar'] {
+  display: none;
+}

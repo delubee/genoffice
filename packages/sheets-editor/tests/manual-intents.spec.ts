@@ -660,17 +660,45 @@ test('seven ribbon tabs execute page, formula, data, review and view operations'
     await page.getByRole('button', { name: 'Replace all in selection', exact: true }).click()
     await expect.poll(async () => (await snapshot()).sheets[0].cells.A2.rawValue).toBe('East')
     await tab('View')
-    await page.getByRole('button', { name: 'Freeze top row', exact: true }).click()
+    await expect(page.locator('#ribbon-panel-view')).toHaveClass(/workbook-desktop-panel/)
+    await pageSettingChoice(page, 'Freeze Panes', 'Freeze Top Row')
     await expect
       .poll(() => page.evaluate(() => (window as any).toolbar.view().freeze.ySplit))
       .toBe(1)
-    await page.getByLabel('Zoom', { exact: true }).selectOption('125')
+    await pageSettingChoice(page, 'Zoom', '125%')
     await expect.poll(() => page.evaluate(() => (window as any).toolbar.view().zoom)).toBe(1.25)
-    await page.getByRole('checkbox', { name: 'Gridlines', exact: true }).click()
+    const show = page.locator('.workbook-desktop-header .check-column-view')
+    await show.getByRole('button', { name: /Gridlines/ }).click()
     await expect
       .poll(() => page.evaluate(() => (window as any).toolbar.view().gridlines))
       .toBe(false)
-    await expect(page.getByRole('checkbox', { name: 'Gridlines', exact: true })).not.toBeChecked()
+    await expect(show.getByRole('button', { name: /Gridlines/ }).locator('.check-box')).toHaveText(
+      '',
+    )
+    // Right-to-left is saved sheet-view state; formula bar and cross highlight are view preferences.
+    await show.getByRole('button', { name: /Right-to-Left/ }).click()
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => (window as any).toolbar.snapshot().sheets[0].features.pageSetupEdits.rightToLeft,
+        ),
+      )
+      .toBe(true)
+    await expect(
+      show.getByRole('button', { name: /Right-to-Left/ }).locator('.check-box'),
+    ).toHaveText('✓')
+    await show.getByRole('button', { name: /Formula Bar/ }).click()
+    await expect(page.locator('[data-u-comp="formula-bar"]').first()).toBeHidden()
+    await show.getByRole('button', { name: /Formula Bar/ }).click()
+    await expect(page.locator('[data-u-comp="formula-bar"]').first()).toBeVisible()
+    await show.getByRole('button', { name: /Right-to-Left/ }).click()
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => (window as any).toolbar.snapshot().sheets[0].features.pageSetupEdits.rightToLeft,
+        ),
+      )
+      .toBe(false)
     await expect(page.getByRole('alert')).toHaveCount(0)
     await tab('Home')
     await page.screenshot({ path: test.info().outputPath('excel-ribbon.png') })

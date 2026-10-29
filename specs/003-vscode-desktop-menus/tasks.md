@@ -603,4 +603,15 @@ PivotTable create follow-up (2026-10-29):
 - [ ] CLI: `mcp.test.ts` schema budget (96,298 > 94,208 bytes at HEAD), sidecar `info`, missing generated fixture and Homebrew install tests fail at HEAD; pre-existing.
 - [ ] A host-side commit that lands while a reopened view performs its first reads leaves the view on "The requested state is no longer current"; the view should resync instead of showing the error screen.
 - [ ] Selection-in-pivot hints and edit protection should follow grown (refreshed) output ranges, not only the original pivot ranges.
-- [ ] Go To flake: "Go" stays disabled after `fill` in some native runs (Advanced Filter, Insert Link, Column Header Filter, Fields pane); each passes alone. Ruled out: goToVisible resets, LocaleScope suspension. Suspect a portal re-mount or focus race while the view initialises.
+- [x] Go To flake: engine-sync focus calls moved typing from open dialogs/panes into the hidden cell editor; the ribbon focus boundary now also protects focused dialog/pane controls. Full native run: 51 passing, only the 3 pre-existing failures.
+
+View tab follow-up (2026-10-29):
+
+- [x] Mount the actual desktop View band: Normal/Page Break Preview, Gridlines/Formula Bar/Headings/Right-to-Left/cross highlight, Zoom menu/100%/Zoom to Selection and Freeze Panes menu.
+- [x] Persist zoom, right-to-left, gridlines/headings and freeze through canonical set_page_setup/set_freeze with history; project right-to-left; formula bar, cross highlight and page-break preview are display-only like the desktop (shared overlays).
+- [x] Verify browser and native View band commands, exact Undo/Redo, saved sheetView XML and independent reopen.
+
+Review protection foundation (2026-10-29):
+
+- [x] Session `protect_sheet`: Excel-hash passwords with a transaction-derived salt (view/host agree), verified unprotect, edits refused while protected, protection changes allowed on protected sheets, host-only candidate for the 100,000-round hash, saved/removed sheetProtection element.
+- [ ] Review tab UI: actual desktop band, Protect Sheet dialog, Protect Workbook, Allow Edit Ranges, Workbook Statistics, Translate→native chat, notes and threaded comments.

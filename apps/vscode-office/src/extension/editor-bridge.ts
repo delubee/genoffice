@@ -198,8 +198,9 @@ export class WebviewCandidateBridge implements CandidateInterpreter {
     // Inline picture roots can approach the transfer limit when repeated as
     // next/forward/inverse. Execute their shared interpreter authoritatively
     // here; only the accepted root is projected to the view.
+    // Sheet passwords use Excel's 100,000-round hash: run it once, on the host.
     if (
-      intent.operations.some((op) => op.op === 'add_picture') ||
+      intent.operations.some((op) => op.op === 'add_picture' || op.op === 'protect_sheet') ||
       state.sheets.some((sheet) =>
         (sheet.features?.visuals as { kind?: string }[] | undefined)?.some(
           (v) => v.kind === 'image',

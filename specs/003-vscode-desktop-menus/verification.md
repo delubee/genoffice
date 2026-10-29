@@ -3472,3 +3472,17 @@ appearances and installed Linux/Windows VSIX. Not complete Data-tab parity.
 - Data/Insert/Pivot native set: 19 passing plus 1 Go To flake (Advanced Filter
   passes alone). Unit: gateway 331, session 257, editor 42, extension 61, desktop
   pivot/ribbon 194; CLI only the 4 failures present at HEAD.
+
+### View tab, Go To focus and sheet protection session (2026-10-29)
+
+- Native `Desktop View tab UI`: zoom 150%, Freeze Top Row, Right-to-Left and
+  gridlines as four revisions; display-only Formula Bar/cross highlight/Page
+  Break Preview with status and no revision; exact Undo/Redo; saved sheetView
+  zoomScale/rightToLeft/showGridLines and pane ySplit; reopened metadata.
+- Browser manual-intents View section ported to the shared band (freeze, zoom,
+  gridlines, right-to-left, formula bar).
+- Full native suite after the focus-boundary fix: 51 passing, 3 pre-existing
+  failures, no Go To flakes.
+- workbook-session `protect-sheet-save` (real sidecar): deterministic hash,
+  blocked edit, saved hashed sheetProtection with sort allowed, reopen requires
+  and verifies the password, unprotected save removes the element.

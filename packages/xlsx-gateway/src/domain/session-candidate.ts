@@ -83,6 +83,8 @@ import {
 } from './pivot-placement'
 import { growPivotDefinition, recomputePivotData } from './pivot-engine'
 import { workbookPivotAddSchema } from '../shared/workbook-protocol'
+import { DEFAULT_SHEET_PROTECTION_ALLOW } from '../gateway/xlsx-protection'
+import { hashSheetPassword, verifySheetPassword } from '../gateway/xlsx-protection-hash'
 import { MAX_GRID_COLUMNS, MAX_GRID_ROWS } from '../shared/grid-bounds'
 
 type TypedCell = z.infer<typeof cellRecordSchema>
@@ -937,7 +939,8 @@ export async function computeCandidateState(
       op.op === 'set_rows_hidden' ||
       op.op === 'set_cols_hidden' ||
       op.op === 'set_outline' ||
-      op.op === 'set_outline_settings'
+      op.op === 'set_outline_settings' ||
+      op.op === 'protect_sheet'
     ) {
       const features =
         featureEdits.get(op.sheetId) ??
@@ -1069,6 +1072,8 @@ export async function computeCandidateState(
         features.outlineEdits = JSON.parse(
           JSON.stringify([...((features.outlineEdits ?? []) as unknown[]), op]),
         )
+      } else if (op.op === 'protect_sheet') {
+        features.protectionEdits = await sheetProtectionEdit(features, op, intent.transactionId)
       } else if (op.op === 'set_page_setup') {
         const { op: _op, sheetId: _id, ...patch } = op
         const page = { ...((features.pageSetupEdits ?? {}) as Record<string, unknown>), ...patch }
@@ -1721,6 +1726,8 @@ export async function computeCandidateState(
         rows: size?.rows ?? sheet.gridRows ?? 1000,
         columns: size?.columns ?? sheet.gridColumns ?? 20,
         protected:
+          (featureEdits.get(sheet.id)?.protectionEdits as { protected: boolean } | undefined)
+            ?.protected ??
           current.sheets.find((item) => item.id === sheet.id)?.protected ??
           original?.protected ??
           false,
@@ -2321,4 +2328,79 @@ async function refreshSessionPivots(
     }
   }
   return stateChangeset(before, next, [...written.affected, ...edits.keys()])
+}
+
+type ProtectionEdit = {
+  protected: boolean
+  hasPassword: boolean
+  allow: import('../gateway/xlsx-protection').SheetProtectionAllow
+  password: import('../gateway/xlsx-protection-hash').SheetPasswordHash | null
+  verified: boolean
+}
+
+/** The sheet's effective protection: a session edit, else the source element. */
+export function sheetProtectionOf(features: Record<string, unknown> | undefined) {
+  const edit = features?.protectionEdits as ProtectionEdit | undefined
+  if (edit) return edit
+  const source = features?.sheetProtection as
+    | {
+        protected: boolean
+        hasPassword: boolean
+        allow?: ProtectionEdit['allow']
+        password?: ProtectionEdit['password']
+      }
+    | null
+    | undefined
+  return source
+    ? {
+        protected: source.protected,
+        hasPassword: source.hasPassword,
+        allow: { ...DEFAULT_SHEET_PROTECTION_ALLOW, ...source.allow },
+        password: source.password ?? null,
+        verified: false,
+      }
+    : null
+}
+
+/**
+ * Review → Protect/Unprotect Sheet. Unprotecting a password-protected sheet
+ * verifies the password; protecting hashes it with a salt derived from the
+ * transaction so the view candidate and host execution agree.
+ */
+async function sheetProtectionEdit(
+  features: Record<string, unknown>,
+  op: Extract<import('./workbook-dsl').WorkbookOperation, { op: 'protect_sheet' }>,
+  transactionId: string,
+): Promise<ProtectionEdit> {
+  if (!Object.hasOwn(features, 'sheetProtection') && !features.protectionEdits)
+    throw new Error('protection:not_indexed')
+  const current = sheetProtectionOf(features)
+  if (!op.protected && current?.protected && current.hasPassword) {
+    if (!op.password) throw new Error('protection:password_required')
+    if (!current.password) throw new Error('protection:password_unavailable')
+    if (!(await verifySheetPassword(op.password, current.password)))
+      throw new Error('protection:wrong_password')
+  }
+  let password: ProtectionEdit['password'] = null
+  if (op.protected && op.password) {
+    const digest = new Uint8Array(
+      await globalThis.crypto.subtle.digest(
+        'SHA-256',
+        new TextEncoder().encode(`${transactionId}:${op.sheetId}`),
+      ),
+    )
+    password = await hashSheetPassword(op.password, undefined, digest.slice(0, 16))
+  } else if (op.protected && current?.protected) password = current.password
+  return {
+    protected: op.protected,
+    hasPassword: password !== null,
+    allow: Object.fromEntries(
+      Object.entries(DEFAULT_SHEET_PROTECTION_ALLOW).map(([key, value]) => [
+        key,
+        (op.allow ?? current?.allow)?.[key as keyof ProtectionEdit['allow']] ?? value,
+      ]),
+    ) as ProtectionEdit['allow'],
+    password,
+    verified: !op.protected,
+  }
 }

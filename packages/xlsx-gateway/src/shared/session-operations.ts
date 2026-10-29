@@ -3,6 +3,7 @@ export const SESSION_OPERATION_NAMES = [
   'add_pivot',
   'refresh_pivot',
   'edit_pivot',
+  'protect_sheet',
   'set_cell',
   'paste_cells',
   'relocate_range',

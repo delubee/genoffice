@@ -327,8 +327,10 @@ export async function prepareCandidateMaterial(input: {
       continue
     }
     const protection = features!.sheetProtection
-    sheet.protected =
-      protection !== null && protection !== undefined && protection.protected !== false
+    const sessionProtection = sheet.features?.protectionEdits as { protected: boolean } | undefined
+    sheet.protected = sessionProtection
+      ? sessionProtection.protected
+      : protection !== null && protection !== undefined && protection.protected !== false
     if (!sheet.readOnly && !sheet.protected) writableSheetIds.push(sheet.id)
     if (!sheet.readOnly) viewWritableSheetIds.push(sheet.id)
     const { styles: _styles, sheet: _metadata, ...featureState } = features!

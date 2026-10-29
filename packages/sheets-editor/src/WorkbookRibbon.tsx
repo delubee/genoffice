@@ -109,17 +109,6 @@ export function WorkbookRibbon({
       : ''
   }
   const note = noteDrafts[noteIdentity()] ?? selectedNote
-  const features: Record<string, unknown> = runtime?.selectedFeatures ?? {}
-  const page = (features.pageSetupEdits ?? {}) as {
-    orientation?: 'portrait' | 'landscape'
-    paperSize?: number
-    margins?: 'normal' | 'wide' | 'narrow'
-    zoomScale?: number
-    showGridlines?: boolean
-    showHeadings?: boolean
-  }
-  const original = features.originalMetadata as
-    { zoomScale?: number; showGridLines?: boolean; showRowColHeaders?: boolean } | undefined
   const run = (action: () => Promise<unknown> | void) => {
     onError('')
     try {
@@ -160,9 +149,6 @@ export function WorkbookRibbon({
     }
   }
   const submit = (make: () => WorkbookOperation) => run(() => runtime!.enqueue([make()]))
-  const pageSetting = (
-    patch: Omit<Extract<WorkbookOperation, { op: 'set_page_setup' }>, 'op' | 'sheetId'>,
-  ) => submit(() => ({ op: 'set_page_setup', sheetId: selected().sheetId, ...patch }))
   const commitNote = (remove: boolean) =>
     run(async () => {
       const s = selected(),
@@ -202,6 +188,7 @@ export function WorkbookRibbon({
       : tab
   const [visualAnchor, setVisualAnchor] = useState<HTMLDivElement | null>(null)
   const [pageAnchor, setPageAnchor] = useState<HTMLDivElement | null>(null)
+  const [viewAnchor, setViewAnchor] = useState<HTMLDivElement | null>(null)
   const [chartAnchor, setChartAnchor] = useState<HTMLDivElement | null>(null)
   const panels: Record<Tab, ReactNode> = {
     chartDesign: <div ref={setChartAnchor} />,
@@ -445,77 +432,7 @@ export function WorkbookRibbon({
         </RibbonGroup>
       </>
     ),
-    view: (
-      <>
-        <RibbonGroup title={text.show}>
-          <label>
-            <input
-              type="checkbox"
-              checked={page.showGridlines ?? original?.showGridLines ?? true}
-              onChange={(event) => pageSetting({ showGridlines: event.target.checked })}
-            />
-            {text.gridlines}
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={page.showHeadings ?? original?.showRowColHeaders ?? true}
-              onChange={(event) => pageSetting({ showHeadings: event.target.checked })}
-            />
-            {text.headings}
-          </label>
-          <label>
-            {text.zoom}
-            <select
-              aria-label={text.zoom}
-              value={page.zoomScale ?? original?.zoomScale ?? 100}
-              onChange={(event) => pageSetting({ zoomScale: Number(event.target.value) })}
-            >
-              {[50, 75, 100, 125, 150, 200, 300, 400].map((zoom) => (
-                <option key={zoom} value={zoom}>
-                  {zoom}%
-                </option>
-              ))}
-            </select>
-          </label>
-        </RibbonGroup>
-        <RibbonGroup title={text.freezePanes}>
-          <button
-            onClick={() =>
-              submit(() => ({ op: 'set_freeze', sheetId: selected().sheetId, rows: 1, columns: 0 }))
-            }
-          >
-            {text.freezeTopRow}
-          </button>
-          <button
-            onClick={() =>
-              submit(() => ({ op: 'set_freeze', sheetId: selected().sheetId, rows: 0, columns: 1 }))
-            }
-          >
-            {text.freezeFirstColumn}
-          </button>
-          <button
-            onClick={() =>
-              submit(() => ({
-                op: 'set_freeze',
-                sheetId: selected().sheetId,
-                rows: selected().range.startRow,
-                columns: selected().range.startColumn,
-              }))
-            }
-          >
-            {text.freezeSelection}
-          </button>
-          <button
-            onClick={() =>
-              submit(() => ({ op: 'set_freeze', sheetId: selected().sheetId, rows: 0, columns: 0 }))
-            }
-          >
-            {text.unfreezePanes}
-          </button>
-        </RibbonGroup>
-      </>
-    ),
+    view: <div ref={setViewAnchor} />,
   }
   return (
     <div className="workbook-ribbon">
@@ -575,9 +492,11 @@ export function WorkbookRibbon({
                   ? 'Formulas'
                   : currentTab === 'pageLayout'
                     ? 'Page Layout'
-                    : currentTab === 'insert'
-                      ? 'Insert'
-                      : 'Home'
+                    : currentTab === 'view'
+                      ? 'View'
+                      : currentTab === 'insert'
+                        ? 'Insert'
+                        : 'Home'
         }
         ribbonContainer={
           currentTab === 'home'
@@ -586,13 +505,15 @@ export function WorkbookRibbon({
               ? formulaAnchor
               : currentTab === 'pageLayout'
                 ? pageAnchor
-                : currentTab === 'insert'
-                  ? insertAnchor
-                  : currentTab === 'chartDesign'
-                    ? chartAnchor
-                    : currentTab === 'shapeFormat' || currentTab === 'pictureFormat'
-                      ? visualAnchor
-                      : null
+                : currentTab === 'view'
+                  ? viewAnchor
+                  : currentTab === 'insert'
+                    ? insertAnchor
+                    : currentTab === 'chartDesign'
+                      ? chartAnchor
+                      : currentTab === 'shapeFormat' || currentTab === 'pictureFormat'
+                        ? visualAnchor
+                        : null
         }
       />
       {visibleTabs.map((key) => (
@@ -602,7 +523,7 @@ export function WorkbookRibbon({
           role="tabpanel"
           aria-labelledby={`ribbon-tab-${key}`}
           hidden={currentTab !== key}
-          className={`workbook-ribbon-panel ${['home', 'insert', 'pageLayout', 'formulas', 'chartDesign', 'shapeFormat', 'pictureFormat'].includes(key) ? 'workbook-desktop-panel' : 'workbook-toolbar'}`}
+          className={`workbook-ribbon-panel ${['home', 'insert', 'pageLayout', 'formulas', 'view', 'chartDesign', 'shapeFormat', 'pictureFormat'].includes(key) ? 'workbook-desktop-panel' : 'workbook-toolbar'}`}
         >
           {panels[key]}
         </div>
