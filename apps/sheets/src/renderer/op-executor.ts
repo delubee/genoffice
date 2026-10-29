@@ -571,6 +571,8 @@ async function executeOp(op: PlannedOp, run: OpRun): Promise<void> {
     throw new Error('unsupported_operation: subtotal requires a canonical workbook session')
   if (op.op === 'edit_pivot')
     throw new Error('unsupported_operation: edit_pivot requires a canonical workbook session')
+  if (op.op === 'edit_table')
+    throw new Error('unsupported_operation: edit_table requires a canonical workbook session')
   if (op.op === 'relocate_range')
     throw new Error('unsupported_operation: canonical range relocation')
   if (op.op === 'paste_cells') {

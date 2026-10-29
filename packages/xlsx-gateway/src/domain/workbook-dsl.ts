@@ -854,6 +854,33 @@ const protectSheetSchema = z.object({
   allow: sheetProtectionAllowSchema.optional(),
 })
 
+// Table Design: changes to the table currently named `table` on sheetId
+// (created this session or in the file). area/columnNames follow a resize or
+// header/totals toggle (header cells are written by preceding operations);
+// remove converts the table to a normal range.
+const editTableSchema = z.object({
+  op: z.literal('edit_table'),
+  sheetId: z.string().min(1),
+  table: z.string().min(1).max(255),
+  name: z
+    .string()
+    .regex(/^[\p{L}_\\][\p{L}\p{N}_.\\]{0,254}$/u)
+    .optional(),
+  area: cellRangeSchema.optional(),
+  style: z
+    .string()
+    .regex(/^TableStyle(?:Light|Medium|Dark)[1-9][0-9]?$/)
+    .optional(),
+  headerRow: z.boolean().optional(),
+  totalsRow: z.boolean().optional(),
+  bandedRows: z.boolean().optional(),
+  bandedColumns: z.boolean().optional(),
+  firstColumn: z.boolean().optional(),
+  lastColumn: z.boolean().optional(),
+  filterButton: z.boolean().optional(),
+  remove: z.literal(true).optional(),
+})
+
 // Review > Comments: the complete threaded comment at a cell (root text,
 // author, time, resolved flag and replies); null deletes the thread.
 const setThreadSchema = z.object({
@@ -1511,6 +1538,7 @@ export const workbookOperationSchema = z.discriminatedUnion('op', [
   protectWorkbookSchema,
   setProtectedRangesSchema,
   setThreadSchema,
+  editTableSchema,
   insertRowsSchema,
   deleteRowsSchema,
   insertColsSchema,
@@ -1669,6 +1697,7 @@ export type LayoutOperation =
   | z.infer<typeof protectWorkbookSchema>
   | z.infer<typeof setProtectedRangesSchema>
   | z.infer<typeof setThreadSchema>
+  | z.infer<typeof editTableSchema>
   | DeleteVisualOperation
   | DeleteTableOperation
   | AddSparklineOperation
@@ -1756,6 +1785,7 @@ const LAYOUT_OPS = new Set([
   'protect_workbook',
   'set_protected_ranges',
   'set_thread',
+  'edit_table',
   'delete_visual',
   'set_visual_anchor',
   'edit_visual',
@@ -2798,6 +2828,8 @@ export function layoutOpLabel(op: LayoutOperation): string {
       return op.text === null
         ? `Remove note at ${op.address}`
         : `Note at ${op.address}: "${op.text.length > 60 ? `${op.text.slice(0, 60)}…` : op.text}"`
+    case 'edit_table':
+      return op.remove ? `Convert table "${op.table}" to range` : `Edit table "${op.table}"`
     case 'set_thread':
       return op.thread ? `Comment at ${op.address}` : `Delete comment at ${op.address}`
     case 'protect_workbook':

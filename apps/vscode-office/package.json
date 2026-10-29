@@ -3268,6 +3268,40 @@
                     "properties": {
                       "op": {
                         "type": "string",
+                        "const": "add_table"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "range": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,6}(:[A-Z]{1,3}[1-9][0-9]{0,6})?$"
+                      },
+                      "name": {
+                        "type": "string",
+                        "pattern": "^[\\p{L}_\\\\][\\p{L}\\p{N}_.\\\\]{0,254}$"
+                      },
+                      "style": {
+                        "type": "string",
+                        "pattern": "^TableStyle(?:Light|Medium|Dark)[1-9][0-9]?$"
+                      },
+                      "bandedRows": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "range"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
                         "const": "add_pivot"
                       },
                       "sheetId": {
@@ -5427,6 +5461,67 @@
                       "sheetId",
                       "address",
                       "thread"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "edit_table"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "table": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255
+                      },
+                      "name": {
+                        "type": "string",
+                        "pattern": "^[\\p{L}_\\\\][\\p{L}\\p{N}_.\\\\]{0,254}$"
+                      },
+                      "area": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,6}(:[A-Z]{1,3}[1-9][0-9]{0,6})?$"
+                      },
+                      "style": {
+                        "type": "string",
+                        "pattern": "^TableStyle(?:Light|Medium|Dark)[1-9][0-9]?$"
+                      },
+                      "headerRow": {
+                        "type": "boolean"
+                      },
+                      "totalsRow": {
+                        "type": "boolean"
+                      },
+                      "bandedRows": {
+                        "type": "boolean"
+                      },
+                      "bandedColumns": {
+                        "type": "boolean"
+                      },
+                      "firstColumn": {
+                        "type": "boolean"
+                      },
+                      "lastColumn": {
+                        "type": "boolean"
+                      },
+                      "filterButton": {
+                        "type": "boolean"
+                      },
+                      "remove": {
+                        "type": "boolean",
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "table"
                     ],
                     "additionalProperties": false
                   },

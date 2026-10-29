@@ -24,6 +24,7 @@ import { normalizeLang } from '@genoffice/i18n'
 import { InsertFunctionFlow } from '../../../apps/sheets/src/renderer/InsertFunctionFlow'
 import { FunctionLibraryRibbon, SheetsRibbon } from '../../../apps/sheets/src/renderer/SheetsRibbon'
 import { GoToDialog } from '../../../apps/sheets/src/renderer/GoToDialog'
+import { TableRangeDialog } from '../../../apps/sheets/src/renderer/TableRangeDialog'
 import { IconsDialog } from '../../../apps/sheets/src/renderer/IconsDialog'
 import { EquationDialog } from '../../../apps/sheets/src/renderer/EquationDialog'
 import {
@@ -60,6 +61,7 @@ export function DesktopHomeRibbon({
     | 'Formulas'
     | 'Review'
     | 'View'
+    | 'Table Design'
     | 'Chart Design'
     | 'Shape Format'
     | 'Picture Format'
@@ -69,6 +71,7 @@ export function DesktopHomeRibbon({
   setModuleLang(lang)
   const [viewNotice, setViewNotice] = useState<string | null>(null)
   const [rendered, setRendered] = useState<'icons' | 'equation' | null>(null)
+  const [tableDialog, setTableDialog] = useState<'create' | 'resize' | null>(null)
   const [protection, setProtection] = useState<{
     mode: 'protect' | 'unprotect' | 'ranges'
     context: Awaited<ReturnType<NonNullable<typeof runtime>['protectionContext']>>
@@ -147,6 +150,26 @@ export function DesktopHomeRibbon({
     }
     if (value === 'insert-screenshot') {
       onError('Screen capture is not available in VS Code; insert the image with Pictures instead.')
+      return
+    }
+    if (value === 'format-as-table' || value.startsWith('format-as-table:')) {
+      void run(async () =>
+        setViewNotice(await runtime.formatAsTable(value.split(':')[1] || undefined)),
+      )
+      return
+    }
+    if (value === 'table-create-open' || value === 'table-resize-open') {
+      setTableDialog(value === 'table-create-open' ? 'create' : 'resize')
+      return
+    }
+    if (
+      value.startsWith('table-style:') ||
+      value.startsWith('table-option:') ||
+      value.startsWith('table-rename:') ||
+      value.startsWith('table-resize:') ||
+      value === 'table-convert-range'
+    ) {
+      void run(async () => setViewNotice(await runtime.tableCommand(value)))
       return
     }
     if (value === 'insert-checkbox') {
@@ -422,7 +445,7 @@ export function DesktopHomeRibbon({
                 }
               : null
           }
-          selectedTable={null}
+          selectedTable={runtime?.selectedTable ?? null}
           outlineSummary={{ below: true, right: true }}
           onCommand={command}
           onListNames={unused}
@@ -648,6 +671,31 @@ export function DesktopHomeRibbon({
           )}
           {runtime && <ThreadedCommentsPane getRuntime={() => runtime.univerRuntime as never} />}
           <ThreadHoverCard hover={runtime?.threadHover ?? null} />
+          {runtime && tableDialog === 'create' && (
+            <TableRangeDialog
+              title={t('appCreateTable')}
+              note={t('appCreateTableWhere')}
+              initialRange={runtime.ribbonTarget?.address ?? ''}
+              headersOption
+              onSubmit={(range, headers) =>
+                void run(async () => setViewNotice(await runtime.createTable(range, headers)))
+              }
+              onClose={() => setTableDialog(null)}
+            />
+          )}
+          {runtime && tableDialog === 'resize' && runtime.selectedTable && (
+            <TableRangeDialog
+              title={t('appResizeTable')}
+              note={t('appResizeTableNote')}
+              initialRange={runtime.selectedTable.rangeA1}
+              onSubmit={(range) =>
+                void run(async () =>
+                  setViewNotice(await runtime.tableCommand(`table-resize:${range}`)),
+                )
+              }
+              onClose={() => setTableDialog(null)}
+            />
+          )}
           {runtime && rendered === 'icons' && (
             <IconsDialog
               onInsert={(dataUrl, _size, name) =>

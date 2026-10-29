@@ -14,6 +14,23 @@ import noteEnUS from '@univerjs/preset-sheets-note/locales/en-US'
 import noteZhCN from '@univerjs/preset-sheets-note/locales/zh-CN'
 import noteZhTW from '@univerjs/preset-sheets-note/locales/zh-TW'
 import '@univerjs/preset-sheets-note/lib/index.css'
+import { UniverSheetsTablePreset } from '@univerjs/preset-sheets-table'
+import tableEnUS from '@univerjs/preset-sheets-table/locales/en-US'
+import tableZhCN from '@univerjs/preset-sheets-table/locales/zh-CN'
+import tableZhTW from '@univerjs/preset-sheets-table/locales/zh-TW'
+import '@univerjs/preset-sheets-table/lib/index.css'
+import {
+  DEFAULT_TABLE_STYLE,
+  TABLE_PALETTE_KEYS,
+  builtinTablePalette,
+  tableThemeJson,
+} from '../../../apps/sheets/src/renderer/table-styles'
+import type { SelectedTableRibbon } from '../../../apps/sheets/src/renderer/ribbon-model'
+import {
+  totalsFunctionFor,
+  uniqueColumnNames,
+} from '../../../apps/sheets/src/renderer/table-design'
+import { inferContinuousRegion } from '../../../apps/sheets/src/renderer/table-actions'
 import { SheetsNoteModel } from '@univerjs/sheets-note'
 import { SheetsNotePopupService } from '@univerjs/sheets-note-ui'
 import {
@@ -289,6 +306,7 @@ import type { PageSetupJournalState } from '../../../apps/sheets/src/renderer/ed
 import {
   filePivotsOfSheet,
   pivotSourceSheet,
+  sessionTablesOf,
   workbookStructureLocked,
 } from '@genoffice/xlsx-gateway/domain/session-candidate'
 import {
@@ -3406,6 +3424,320 @@ export class WorkbookRuntime implements EditorProjection {
     }
     throw new Error(`Unknown note command: ${command}`)
   }
+  /** File and session tables render through Univer's table plugin (filters, structured refs, theme). */
+  private async registerProjectedTables() {
+    const state = this.state,
+      workbook = this.runtime.univerAPI.getActiveWorkbook()
+    if (!state || !workbook) return
+    const themeColors = (state.features?.originalMetadata as { themeColors?: string[] } | undefined)
+      ?.themeColors
+    this.internal++
+    try {
+      for (const sheet of state.sheets) {
+        const worksheet = workbook.getSheetBySheetId(sheet.id) as unknown as {
+          getSubTableInfos?(): { id: string }[]
+          removeTable(id: string): Promise<boolean>
+          addTable(
+            name: string,
+            range: GridRange,
+            id: string,
+            options?: unknown,
+          ): Promise<boolean> | boolean
+          addTableTheme(id: string, theme: unknown): Promise<boolean>
+        } | null
+        if (!worksheet) continue
+        for (const existing of worksheet.getSubTableInfos?.() ?? [])
+          await Promise.resolve(worksheet.removeTable(existing.id)).catch(() => false)
+        for (const [index, table] of sessionTablesOf(sheet).entries()) {
+          // Univer requires a header row (as on the desktop).
+          if (!table.options.headerRow) continue
+          const id = `projected-table-${sheet.id}-${index}`
+          try {
+            await worksheet.addTable(
+              table.name,
+              { ...table.area, endRow: table.area.endRow - (table.options.totalsRow ? 1 : 0) },
+              id,
+              {
+                columns: table.columnNames.map((name, column) => ({
+                  id: `${id}-col-${column}`,
+                  displayName: name,
+                })),
+              },
+            )
+            const styled =
+              table.kind === 'session' || table.style !== table.file?.styleName
+                ? builtinTablePalette(table.style ?? DEFAULT_TABLE_STYLE, themeColors)
+                : Object.fromEntries(
+                    TABLE_PALETTE_KEYS.flatMap((key) =>
+                      table.file?.[key] === undefined ? [] : [[key, table.file[key]]],
+                    ),
+                  )
+            await worksheet.addTableTheme(
+              id,
+              tableThemeJson(`${id}-${state.stateId}`, styled, {
+                bandedRows: table.options.bandedRows,
+                bandedColumns: table.options.bandedColumns,
+                firstColumn: table.options.firstColumn,
+                lastColumn: table.options.lastColumn,
+              }),
+            )
+          } catch {
+            // Rendering is best effort; the canonical table is unaffected.
+          }
+        }
+      }
+    } finally {
+      this.internal--
+    }
+  }
+  /** Table Design echo for the table under the selection. */
+  get selectedTable(): SelectedTableRibbon | null {
+    const selected = this.selection,
+      sheet = this.state?.sheets.find((item) => item.id === selected?.sheetId)
+    if (!selected || !sheet) return null
+    const { startRow: row, startColumn: column } = selected.range
+    const table = sessionTablesOf(sheet).find(
+      (item) =>
+        row >= item.area.startRow &&
+        row <= item.area.endRow &&
+        column >= item.area.startColumn &&
+        column <= item.area.endColumn,
+    )
+    if (!table) return null
+    return {
+      key: `${sheet.id}:${table.kind}:${table.originalName}`,
+      name: table.name,
+      rangeA1: `${formatAddress(table.area.startRow, table.area.startColumn)}:${formatAddress(table.area.endRow, table.area.endColumn)}`,
+      style: table.style ?? null,
+      isFile: table.kind === 'file',
+      ...table.options,
+    }
+  }
+  /** Insert > Table / Format as Table: unique header names are written with the table. */
+  async createTable(range: string, hasHeaders: boolean, style = DEFAULT_TABLE_STYLE) {
+    if (!(await this.flushEditor())) throw new Error(t('appClipboardBusy'))
+    const target = this.ribbonTarget,
+      state = this.state
+    if (!target || !state) throw new Error(t('appTablesNeedFile'))
+    let area = parseRange(range)
+    const frozen = { stateId: state.stateId, revision: this.revision }
+    const width = area.endColumn - area.startColumn + 1
+    if (width > 1000) throw new Error(t('appTableTooWide'))
+    const operations: WorkbookOperation[] = []
+    if (!hasHeaders) {
+      // Excel adds a header row above the data when that row is free.
+      if (area.startRow === 0) throw new Error(t('appTableNoRoomForHeader'))
+      const above = (await this.host.read(
+        target.sheetId,
+        { ...area, startRow: area.startRow - 1, endRow: area.startRow - 1 },
+        frozen.stateId,
+      )) as { cells: ViewCell[] }
+      if (above.cells.some((cell) => cell.rawValue !== null || cell.formula))
+        throw new Error(t('appTableNoRoomForHeader'))
+      area = { ...area, startRow: area.startRow - 1 }
+    }
+    const header = (await this.host.read(
+      target.sheetId,
+      { ...area, endRow: area.startRow },
+      frozen.stateId,
+    )) as { cells: ViewCell[] }
+    const byAddress = new Map(header.cells.map((cell) => [cell.address, cell]))
+    const used = new Set<string>()
+    for (let index = 0; index < width; index++) {
+      const address = formatAddress(area.startRow, area.startColumn + index)
+      const cell = byAddress.get(address)
+      const raw = hasHeaders
+        ? String((cell?.formula ? cell.cachedValue : cell?.rawValue) ?? '')
+            .trim()
+            .slice(0, 255)
+        : ''
+      const base = raw.length === 0 ? `Column${index + 1}` : raw
+      let candidate = base
+      for (let suffix = 2; used.has(candidate.toLowerCase()); suffix++)
+        candidate = `${base}${suffix}`
+      used.add(candidate.toLowerCase())
+      if (candidate !== raw || cell?.formula)
+        operations.push({ op: 'set_cell', sheetId: target.sheetId, address, value: candidate })
+    }
+    operations.push({
+      op: 'add_table',
+      sheetId: target.sheetId,
+      range: `${formatAddress(area.startRow, area.startColumn)}:${formatAddress(area.endRow, area.endColumn)}`,
+      style,
+      bandedRows: true,
+    })
+    try {
+      await this.enqueue(operations, frozen, { failureInDialog: true })
+    } catch (error) {
+      throw new Error(tableErrorMessage(error), { cause: error })
+    }
+    return t('appTableCreated')
+  }
+  /** Header/totals row toggles: the desktop's cell writes plus the table area change. */
+  private async tableBandOperations(
+    table: SelectedTableRibbon,
+    key: 'headerRow' | 'totalsRow',
+    on: boolean,
+    stateId: string,
+  ): Promise<WorkbookOperation[]> {
+    const sheetId = this.ribbonTarget!.sheetId
+    const area = parseRange(table.rangeA1)
+    const width = area.endColumn - area.startColumn + 1
+    if (table[key] === on) return []
+    const rangeOf = (bounds: GridRange) =>
+      `${formatAddress(bounds.startRow, bounds.startColumn)}:${formatAddress(bounds.endRow, bounds.endColumn)}`
+    const free = async (row: number) => {
+      const read = (await this.host.read(
+        sheetId,
+        { ...area, startRow: row, endRow: row },
+        stateId,
+      )) as { cells: ViewCell[] }
+      return !read.cells.some((cell) => cell.rawValue !== null || cell.formula)
+    }
+    const base = { op: 'edit_table' as const, sheetId, table: table.name }
+    if (key === 'totalsRow') {
+      if (on) {
+        const row = area.endRow + 1
+        if (!(await free(row))) throw new Error(t('appTableTotalsRowBlocked'))
+        const dataStart = area.startRow + (table.headerRow ? 1 : 0)
+        const operations: WorkbookOperation[] = []
+        if (width > 1)
+          operations.push({
+            op: 'set_cell',
+            sheetId,
+            address: formatAddress(row, area.startColumn),
+            value: t('appTableTotalLabel'),
+          })
+        if (area.endRow >= dataStart) {
+          const column = (await this.host.read(
+            sheetId,
+            {
+              startRow: dataStart,
+              endRow: area.endRow,
+              startColumn: area.endColumn,
+              endColumn: area.endColumn,
+            },
+            stateId,
+          )) as { cells: ViewCell[] }
+          const values = column.cells.map((cell) =>
+            cell.formula ? cell.cachedValue : cell.rawValue,
+          )
+          operations.push({
+            op: 'set_formula',
+            sheetId,
+            address: formatAddress(row, area.endColumn),
+            formula: `=SUBTOTAL(${totalsFunctionFor(values)},${rangeOf({ ...area, startRow: dataStart, startColumn: area.endColumn })})`,
+          })
+        }
+        operations.push(
+          {
+            op: 'format_range',
+            sheetId,
+            range: rangeOf({ ...area, startRow: row, endRow: row }),
+            format: { bold: true },
+          },
+          { ...base, area: rangeOf({ ...area, endRow: row }), totalsRow: true },
+        )
+        return operations
+      }
+      const totals = { ...area, startRow: area.endRow }
+      return [
+        { op: 'clear_range', sheetId, range: rangeOf(totals) },
+        { op: 'format_range', sheetId, range: rangeOf(totals), format: { bold: false } },
+        { ...base, area: rangeOf({ ...area, endRow: area.endRow - 1 }), totalsRow: false },
+      ]
+    }
+    if (on) {
+      const row = area.startRow - 1
+      if (row < 0 || !(await free(row))) throw new Error(t('appTableHeaderRowBlocked'))
+      const sheet = this.state!.sheets.find((item) => item.id === sheetId)!
+      const current = sessionTablesOf(sheet).find((item) => item.name === table.name)
+      const names = uniqueColumnNames(
+        Array.from({ length: width }, (_, index) => current?.columnNames[index] ?? ''),
+      )
+      return [
+        {
+          op: 'set_range',
+          sheetId,
+          start: formatAddress(row, area.startColumn),
+          values: [names],
+        },
+        { ...base, area: rangeOf({ ...area, startRow: row }), headerRow: true },
+      ]
+    }
+    return [
+      { op: 'clear_range', sheetId, range: rangeOf({ ...area, endRow: area.startRow }) },
+      { ...base, area: rangeOf({ ...area, startRow: area.startRow + 1 }), headerRow: false },
+    ]
+  }
+  /** Insert > Table / Home > Format as Table: a single cell expands to its current region. */
+  async formatAsTable(style = DEFAULT_TABLE_STYLE) {
+    const target = this.ribbonTarget
+    const worksheet = this.runtime.univerAPI.getActiveWorkbook()?.getActiveSheet()
+    if (!target || !worksheet) throw new Error(t('appTableSelectRange'))
+    let bounds = parseRange(target.address)
+    if (bounds.startRow === bounds.endRow && bounds.startColumn === bounds.endColumn) {
+      const inferred = inferContinuousRegion(
+        worksheet as unknown as Parameters<typeof inferContinuousRegion>[0],
+        bounds.startRow,
+        bounds.startColumn,
+      )
+      if (inferred) bounds = inferred
+    }
+    return this.createTable(
+      `${formatAddress(bounds.startRow, bounds.startColumn)}:${formatAddress(bounds.endRow, bounds.endColumn)}`,
+      true,
+      style,
+    )
+  }
+  /** Table Design commands on the selected table. */
+  async tableCommand(command: string): Promise<string | null> {
+    if (!(await this.flushEditor())) throw new Error(t('appClipboardBusy'))
+    const table = this.selectedTable,
+      target = this.ribbonTarget,
+      state = this.state
+    if (!table || !target || !state) return null
+    const frozen = { stateId: state.stateId, revision: this.revision }
+    const base = { op: 'edit_table' as const, sheetId: target.sheetId, table: table.name }
+    let operations: WorkbookOperation[]
+    let message: string | null = null
+    if (command.startsWith('table-style:'))
+      operations = [{ ...base, style: command.slice('table-style:'.length) }]
+    else if (command.startsWith('table-rename:')) {
+      const name = command.slice('table-rename:'.length).trim()
+      if (name === table.name) return null
+      operations = [{ ...base, name }]
+    } else if (command === 'table-convert-range') {
+      operations = [{ ...base, remove: true }]
+      message = t('appTableConverted')
+    } else if (command.startsWith('table-resize:')) {
+      operations = [{ ...base, area: command.slice('table-resize:'.length).toUpperCase() }]
+      message = t('appTableResized')
+    } else if (command.startsWith('table-option:')) {
+      const [, key = '', value = ''] = command.split(':')
+      if (key === 'headerRow' || key === 'totalsRow') {
+        operations = await this.tableBandOperations(table, key, value === '1', frozen.stateId)
+        if (!operations.length) return null
+        try {
+          await this.enqueue(operations, frozen, { failureInDialog: true })
+        } catch (error) {
+          throw new Error(tableErrorMessage(error), { cause: error })
+        }
+        return null
+      }
+      if (
+        !['bandedRows', 'bandedColumns', 'firstColumn', 'lastColumn', 'filterButton'].includes(key)
+      )
+        throw new Error(`Unknown table option: ${key}`)
+      operations = [{ ...base, [key]: value === '1' }]
+    } else throw new Error(`Unknown Table Design command: ${command}`)
+    try {
+      await this.enqueue(operations, frozen, { failureInDialog: true })
+    } catch (error) {
+      throw new Error(tableErrorMessage(error), { cause: error })
+    }
+    return message
+  }
   /** Insert > Icons / Equation: the rendered PNG becomes a canonical picture at the selection. */
   async insertRenderedPicture(dataUrl: string, fileName: string) {
     if (!(await this.flushEditor())) throw new Error('Finish editing before inserting a picture.')
@@ -3626,9 +3958,9 @@ export class WorkbookRuntime implements EditorProjection {
           ? LocaleType.ZH_CN
           : LocaleType.EN_US,
       locales: {
-        [LocaleType.EN_US]: { ...enUS, ...filterEnUS, ...sortEnUS, ...noteEnUS },
-        [LocaleType.ZH_CN]: { ...zhCN, ...filterZhCN, ...sortZhCN, ...noteZhCN },
-        [LocaleType.ZH_TW]: { ...zhTW, ...filterZhTW, ...sortZhTW, ...noteZhTW },
+        [LocaleType.EN_US]: { ...enUS, ...filterEnUS, ...sortEnUS, ...noteEnUS, ...tableEnUS },
+        [LocaleType.ZH_CN]: { ...zhCN, ...filterZhCN, ...sortZhCN, ...noteZhCN, ...tableZhCN },
+        [LocaleType.ZH_TW]: { ...zhTW, ...filterZhTW, ...sortZhTW, ...noteZhTW, ...tableZhTW },
       },
       darkMode: this.darkTheme(),
       presets: [
@@ -3645,6 +3977,7 @@ export class WorkbookRuntime implements EditorProjection {
         UniverSheetsFilterPreset(),
         UniverSheetsSortPreset(),
         UniverSheetsNotePreset(),
+        UniverSheetsTablePreset(),
       ],
     })
     const gutterHost = container.parentElement
@@ -4471,6 +4804,7 @@ export class WorkbookRuntime implements EditorProjection {
       this.findReplace.contextChanged()
       this.applyProjectedThreads()
       this.applyProjectedNotes()
+      await this.registerProjectedTables()
       this.refreshViewOverlays()
       this.changed()
     } finally {
@@ -7109,4 +7443,28 @@ export class WorkbookRuntime implements EditorProjection {
     // Univer owns a nested React root; release it after a parent React cleanup.
     queueMicrotask(() => this.runtime.univer.dispose())
   }
+}
+
+function tableErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error)
+  const match = /table:(\w+)(?::(\{[^}]*\}))?/.exec(message)
+  const key = match
+    ? (
+        {
+          needsRows: 'appTableNeedsRows',
+          tooWide: 'appTableTooWide',
+          overlap: 'appTableOverlapsSession',
+          nameUsed: 'appTableNameUsed',
+          addedSheet: 'appTablesNeedFile',
+        } as const
+      )[match[1] as 'needsRows']
+    : undefined
+  if (!key) return message
+  let params: Record<string, string>
+  try {
+    params = match?.[2] ? (JSON.parse(match[2]) as Record<string, string>) : {}
+  } catch {
+    params = {}
+  }
+  return t(key, { name: '', ...params })
 }

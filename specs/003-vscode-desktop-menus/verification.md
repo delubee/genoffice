@@ -3512,3 +3512,13 @@ appearances and installed Linux/Windows VSIX. Not complete Data-tab parity.
 - Browser suite 132/132 after the focus-boundary refinement; full native run
   54 passing with only the 3 pre-existing failures (before comments/icons).
 - docx-engine math.ts strict-index fixes (no behavior change): 1905 tests pass.
+
+### Tables and Table Design (2026-10-29)
+
+- workbook-session `table-save` (real sidecar): add with style, rename/restyle/
+  column stripes, convert to range across three save/reopen cycles.
+- Native `Desktop Tables UI`: Insert Table, Banded Columns, Total Row (SUBTOTAL 109) and rename as four revisions; exact Undo/Redo; saved table part with
+  displayName/ref/totalsRowCount/showColumnStripes; reopened file table converts
+  to range.
+- Shared extractions: `table-banding.ts` (desktop loader banding helpers) and
+  `TableRangeDialog.tsx`.

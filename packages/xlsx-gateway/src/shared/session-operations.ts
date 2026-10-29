@@ -7,6 +7,8 @@ export const SESSION_OPERATION_NAMES = [
   'protect_workbook',
   'set_protected_ranges',
   'set_thread',
+  'add_table',
+  'edit_table',
   'set_cell',
   'paste_cells',
   'relocate_range',

@@ -25,7 +25,7 @@ import { SortDialog } from '../../../apps/sheets/src/renderer/SortDialog'
 import type { ConsolidateConfig } from '../../../apps/sheets/src/renderer/consolidate'
 
 const tabs = ['home', 'insert', 'pageLayout', 'formulas', 'data', 'review', 'view'] as const
-type Tab = (typeof tabs)[number] | 'chartDesign' | 'shapeFormat' | 'pictureFormat'
+type Tab = (typeof tabs)[number] | 'tableDesign' | 'chartDesign' | 'shapeFormat' | 'pictureFormat'
 export function RibbonGroup({ title, children }: { title: string; children: ReactNode }) {
   return (
     <fieldset className="workbook-ribbon-group">
@@ -52,6 +52,7 @@ export function WorkbookRibbon({
   const shapeKind = runtime?.shapeRibbonTarget?.kind
   const visibleTabs: Tab[] = [
     ...tabs,
+    ...(runtime?.selectedTable ? ['tableDesign' as const] : []),
     ...(hasChart ? ['chartDesign' as const] : []),
     ...(shapeKind === 'shape'
       ? ['shapeFormat' as const]
@@ -172,15 +173,18 @@ export function WorkbookRibbon({
         return next
       })
     })
+  const hasTable = !!runtime?.selectedTable
   useEffect(() => {
     if (
+      (!hasTable && tab === 'tableDesign') ||
       (!hasChart && tab === 'chartDesign') ||
       (tab === 'shapeFormat' && shapeKind !== 'shape') ||
       (tab === 'pictureFormat' && shapeKind !== 'image')
     )
       setTab('home')
-  }, [hasChart, shapeKind, tab])
+  }, [hasChart, hasTable, shapeKind, tab])
   const currentTab =
+    (tab === 'tableDesign' && !hasTable) ||
     (tab === 'chartDesign' && !hasChart) ||
     (tab === 'shapeFormat' && shapeKind !== 'shape') ||
     (tab === 'pictureFormat' && shapeKind !== 'image')
@@ -190,6 +194,7 @@ export function WorkbookRibbon({
   const [pageAnchor, setPageAnchor] = useState<HTMLDivElement | null>(null)
   const [viewAnchor, setViewAnchor] = useState<HTMLDivElement | null>(null)
   const [reviewAnchor, setReviewAnchor] = useState<HTMLDivElement | null>(null)
+  const [tableAnchor, setTableAnchor] = useState<HTMLDivElement | null>(null)
   const [chartAnchor, setChartAnchor] = useState<HTMLDivElement | null>(null)
   const panels: Record<Tab, ReactNode> = {
     chartDesign: <div ref={setChartAnchor} />,
@@ -214,6 +219,7 @@ export function WorkbookRibbon({
       </>
     ),
     pageLayout: <div ref={setPageAnchor} />,
+    tableDesign: <div ref={setTableAnchor} />,
     formulas: (
       <>
         <div ref={setFormulaAnchor} />
@@ -478,7 +484,9 @@ export function WorkbookRibbon({
                 )
               : key === 'chartDesign'
                 ? tFor(normalizeLang(locale ?? navigator.language), 'appTabChartDesign')
-                : text[key]}
+                : key === 'tableDesign'
+                  ? tFor(normalizeLang(locale ?? navigator.language), 'appTabTableDesign')
+                  : text[key]}
           </button>
         ))}
       </div>
@@ -503,9 +511,11 @@ export function WorkbookRibbon({
                       ? 'View'
                       : currentTab === 'review'
                         ? 'Review'
-                        : currentTab === 'insert'
-                          ? 'Insert'
-                          : 'Home'
+                        : currentTab === 'tableDesign'
+                          ? 'Table Design'
+                          : currentTab === 'insert'
+                            ? 'Insert'
+                            : 'Home'
         }
         ribbonContainer={
           currentTab === 'home'
@@ -518,13 +528,15 @@ export function WorkbookRibbon({
                   ? viewAnchor
                   : currentTab === 'review'
                     ? reviewAnchor
-                    : currentTab === 'insert'
-                      ? insertAnchor
-                      : currentTab === 'chartDesign'
-                        ? chartAnchor
-                        : currentTab === 'shapeFormat' || currentTab === 'pictureFormat'
-                          ? visualAnchor
-                          : null
+                    : currentTab === 'tableDesign'
+                      ? tableAnchor
+                      : currentTab === 'insert'
+                        ? insertAnchor
+                        : currentTab === 'chartDesign'
+                          ? chartAnchor
+                          : currentTab === 'shapeFormat' || currentTab === 'pictureFormat'
+                            ? visualAnchor
+                            : null
         }
       />
       {visibleTabs.map((key) => (
@@ -534,7 +546,7 @@ export function WorkbookRibbon({
           role="tabpanel"
           aria-labelledby={`ribbon-tab-${key}`}
           hidden={currentTab !== key}
-          className={`workbook-ribbon-panel ${['home', 'insert', 'pageLayout', 'formulas', 'review', 'view', 'chartDesign', 'shapeFormat', 'pictureFormat'].includes(key) ? 'workbook-desktop-panel' : 'workbook-toolbar'}`}
+          className={`workbook-ribbon-panel ${['home', 'insert', 'pageLayout', 'formulas', 'review', 'view', 'tableDesign', 'chartDesign', 'shapeFormat', 'pictureFormat'].includes(key) ? 'workbook-desktop-panel' : 'workbook-toolbar'}`}
         >
           {panels[key]}
         </div>

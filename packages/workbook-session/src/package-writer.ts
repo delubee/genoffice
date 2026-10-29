@@ -3,8 +3,14 @@ import type { PivotRefreshUpdate } from '@genoffice/xlsx-gateway/gateway/xlsx-pi
 import type {
   SheetProtectedRangesState,
   SheetProtectionState,
+  SheetTableAddition,
+  SheetTableEdit,
 } from '@genoffice/xlsx-gateway/gateway/xlsx-gateway'
-import type { WorkbookPivotAdd } from '@genoffice/xlsx-gateway/shared/workbook-protocol'
+import type {
+  WorkbookPivotAdd,
+  WorkbookTableAdd,
+  WorkbookTableEdit,
+} from '@genoffice/xlsx-gateway/shared/workbook-protocol'
 import {
   visibilityEditsSchema,
   visibilityStructuralOp,
@@ -664,6 +670,37 @@ export class SessionPackageWriter implements PackageWriter {
           throw new WorkbookError('invalid_document', 'A new PivotTable lost its worksheet.')
         return { ...pivot, sheetName: owner.name, sourceSheetName: origin.name }
       })
+      // Tables pin final coordinates and names too: their own stage after
+      // every structural and sheet stage (header cells were written above).
+      const tableAdditions: SheetTableAddition[] = [],
+        tableEdits: SheetTableEdit[] = []
+      for (const sheet of state.sheets) {
+        for (const add of (sheet.features?.tableAdditions ?? []) as WorkbookTableAdd[]) {
+          const {
+            sheetId: _sheet,
+            headerRow,
+            totalsRow,
+            firstColumn,
+            lastColumn,
+            bandedColumns,
+            filterButton,
+            ...rest
+          } = add
+          tableAdditions.push({
+            ...rest,
+            sheetName: sheet.name,
+            options: { headerRow, totalsRow, firstColumn, lastColumn, bandedColumns, filterButton },
+          })
+        }
+        for (const edit of Object.values(
+          (sheet.features?.tableEdits ?? {}) as Record<string, WorkbookTableEdit>,
+        )) {
+          const { sheetId: _sheet, ...rest } = edit
+          tableEdits.push({ ...rest, sheetName: sheet.name })
+        }
+      }
+      if (tableAdditions.length || tableEdits.length)
+        await writeStage({ edits: [], tableAdditions, tableEdits })
       for (let start = 0; start < pivots.length; start += 20)
         await writeStage({ edits: [], pivotAdditions: pivots.slice(start, start + 20) })
       assertNotCancelled(signal)

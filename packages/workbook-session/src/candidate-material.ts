@@ -2,6 +2,7 @@ import {
   filePivotsOfSheet,
   pivotSourceSheet,
   sessionPivotAdditions,
+  sessionTablesOf,
 } from '@genoffice/xlsx-gateway/domain/session-candidate'
 import { chartSelectionReferences } from '@genoffice/xlsx-gateway/domain/chart-series-selection'
 import {
@@ -86,6 +87,16 @@ export async function prepareCandidateMaterial(input: {
       }
       if (op.op === 'add_chart') addRange(op.sheetId, op.dataRange)
       if (op.op === 'add_pivot') addRange(op.sheetId, op.sourceRange)
+      if (op.op === 'edit_table') {
+        if (op.area) addRange(op.sheetId, op.area)
+        const sheet = state.sheets.find((item) => item.id === op.sheetId)
+        const table = sheet && sessionTablesOf(sheet).find((item) => item.name === op.table)
+        if (table)
+          addRange(
+            op.sheetId,
+            `${formatAddress(table.area.startRow, table.area.startColumn)}:${formatAddress(table.area.endRow, table.area.endColumn)}`,
+          )
+      }
       if (op.op === 'edit_pivot') {
         const sheet = state.sheets.find((item) => item.id === op.sheetId)
         if (sheet) {

@@ -82,7 +82,11 @@ import {
   pivotSourceGrid,
 } from './pivot-placement'
 import { growPivotDefinition, recomputePivotData } from './pivot-engine'
-import { workbookPivotAddSchema } from '../shared/workbook-protocol'
+import {
+  workbookPivotAddSchema,
+  workbookTableAddSchema,
+  workbookTableEditSchema,
+} from '../shared/workbook-protocol'
 import { DEFAULT_SHEET_PROTECTION_ALLOW } from '../gateway/xlsx-protection'
 import { hashSheetPassword, verifySheetPassword } from '../gateway/xlsx-protection-hash'
 import { MAX_GRID_COLUMNS, MAX_GRID_ROWS } from '../shared/grid-bounds'
@@ -391,6 +395,15 @@ export async function computeCandidateState(
     workbookStructureLocked(current.features)
   )
     throw new Error('protected_workbook_structure')
+  if (
+    intent.operations.some((op) => changingCoordinates.has(op.op)) &&
+    current.sheets.some(
+      (sheet) =>
+        (sheet.features?.tableAdditions as unknown[] | undefined)?.length ||
+        sheet.features?.tableEdits,
+    )
+  )
+    throw new Error('unsupported_structural_feature: session_table')
   // A pending PivotTable pins its source and output coordinates and sheet names.
   const pendingPivots = sessionPivotAdditions(current)
   if (pendingPivots.length) {
@@ -952,7 +965,9 @@ export async function computeCandidateState(
       op.op === 'set_outline_settings' ||
       op.op === 'protect_sheet' ||
       op.op === 'set_protected_ranges' ||
-      op.op === 'set_thread'
+      op.op === 'set_thread' ||
+      op.op === 'add_table' ||
+      op.op === 'edit_table'
     ) {
       const features =
         featureEdits.get(op.sheetId) ??
@@ -1084,6 +1099,151 @@ export async function computeCandidateState(
         features.outlineEdits = JSON.parse(
           JSON.stringify([...((features.outlineEdits ?? []) as unknown[]), op]),
         )
+      } else if (op.op === 'add_table' || op.op === 'edit_table') {
+        const owner = current.sheets.find((sheet) => sheet.id === op.sheetId)!
+        if (!owner.originalSheetId) throw new Error('table:addedSheet')
+        const tables = (sheetId: string) => {
+          const sheet = current.sheets.find((item) => item.id === sheetId)!
+          return sessionTablesOf(
+            sheet.id === op.sheetId
+              ? { ...sheet, features }
+              : {
+                  ...sheet,
+                  features: featureEdits.get(sheet.id) ?? sheet.features,
+                },
+          )
+        }
+        const cells = book.sheets.find((sheet) => sheet.id === op.sheetId)!.cells
+        const headerNames = (area: TableArea) => {
+          const names: string[] = []
+          for (let column = area.startColumn; column <= area.endColumn; column++) {
+            const cell = cells[formatAddress(area.startRow, column)]
+            const value = cell?.formula ? null : (cell?.rawValue ?? cell?.value)
+            const text = value === null || value === undefined ? '' : String(value).trim()
+            if (!text || names.some((name) => name.toLowerCase() === text.toLowerCase()))
+              throw new Error('table:headers')
+            names.push(text.slice(0, 255))
+          }
+          return names
+        }
+        const allNames = (except?: string) => [
+          ...current.sheets.map((sheet) => sheet.name.toLowerCase()),
+          ...current.sheets.flatMap((sheet) =>
+            tables(sheet.id)
+              .filter((table) => table.name !== except || sheet.id !== op.sheetId)
+              .map((table) => table.name.toLowerCase()),
+          ),
+        ]
+        const overlaps = (area: TableArea, except?: string) =>
+          tables(op.sheetId).some(
+            (table) =>
+              table.name !== except &&
+              !(
+                area.endRow < table.area.startRow ||
+                table.area.endRow < area.startRow ||
+                area.endColumn < table.area.startColumn ||
+                table.area.endColumn < area.startColumn
+              ),
+          )
+        if (op.op === 'add_table') {
+          const area = parseRange(op.range)
+          if (area.endRow <= area.startRow) throw new Error('table:needsRows')
+          if (area.endColumn - area.startColumn + 1 > 1000) throw new Error('table:tooWide')
+          if (overlaps(area)) throw new Error('table:overlap')
+          const taken = allNames()
+          let name = op.name
+          if (name === undefined) {
+            let index = 1
+            while (taken.includes(`table${index}`)) index++
+            name = `Table${index}`
+          } else if (taken.includes(name.toLowerCase()))
+            throw new Error(`table:nameUsed:${JSON.stringify({ name })}`)
+          features.tableAdditions = [
+            ...((features.tableAdditions ?? []) as unknown[]),
+            JSON.parse(
+              JSON.stringify(
+                workbookTableAddSchema.parse({
+                  sheetId: op.sheetId,
+                  area,
+                  name,
+                  columnNames: headerNames(area),
+                  ...(op.style === undefined ? {} : { style: op.style }),
+                  bandedRows: op.bandedRows ?? true,
+                }),
+              ),
+            ),
+          ]
+        } else {
+          const table = tables(op.sheetId).find((item) => item.name === op.table)
+          if (!table) throw new Error(`table:notFound:${JSON.stringify({ name: op.table })}`)
+          if (op.name !== undefined && op.name !== table.name) {
+            if (allNames(table.name).includes(op.name.toLowerCase()))
+              throw new Error(`table:nameUsed:${JSON.stringify({ name: op.name })}`)
+          }
+          const area = op.area ? parseRange(op.area) : undefined
+          if (area && overlaps(area, table.name)) throw new Error('table:overlap')
+          const headerRow = op.headerRow ?? table.options.headerRow
+          const columnNames =
+            area && headerRow
+              ? headerNames(area)
+              : area
+                ? Array.from(
+                    { length: area.endColumn - area.startColumn + 1 },
+                    (_, index) =>
+                      table.columnNames[area.startColumn + index - table.area.startColumn] ??
+                      `Column${index + 1}`,
+                  )
+                : op.headerRow === true
+                  ? headerNames({ ...table.area })
+                  : undefined
+          const patch = {
+            ...(op.name === undefined ? {} : { name: op.name }),
+            ...(area ? { area } : {}),
+            ...(columnNames ? { columnNames } : {}),
+            ...(op.style === undefined ? {} : { style: op.style }),
+            ...Object.fromEntries(
+              (
+                [
+                  'headerRow',
+                  'totalsRow',
+                  'bandedRows',
+                  'bandedColumns',
+                  'firstColumn',
+                  'lastColumn',
+                  'filterButton',
+                ] as const
+              ).flatMap((key) => (op[key] === undefined ? [] : [[key, op[key]]])),
+            ),
+          }
+          if (table.kind === 'session') {
+            const additions = (features.tableAdditions ?? []) as { name: string }[]
+            features.tableAdditions = op.remove
+              ? additions.filter((item) => item.name !== table.name)
+              : additions.map((item) =>
+                  item.name === table.name
+                    ? JSON.parse(
+                        JSON.stringify(workbookTableAddSchema.parse({ ...item, ...patch })),
+                      )
+                    : item,
+                )
+          } else {
+            const edits = (features.tableEdits ?? {}) as Record<string, Record<string, unknown>>
+            features.tableEdits = {
+              ...edits,
+              [table.originalName]: JSON.parse(
+                JSON.stringify(
+                  workbookTableEditSchema.parse({
+                    ...edits[table.originalName],
+                    sheetId: op.sheetId,
+                    tableName: table.originalName,
+                    ...patch,
+                    ...(op.remove ? { remove: true } : {}),
+                  }),
+                ),
+              ),
+            }
+          }
+        }
       } else if (op.op === 'set_thread') {
         features.threadEdits = {
           ...((features.threadEdits ?? {}) as Record<string, unknown>),
@@ -2435,4 +2595,83 @@ export function workbookStructureLocked(features: Record<string, unknown> | unde
   const original = (features?.originalMetadata as Record<string, unknown> | undefined)
     ?.workbookProtection as { lockStructure?: boolean } | undefined
   return original?.lockStructure === true
+}
+
+type TableArea = { startRow: number; endRow: number; startColumn: number; endColumn: number }
+export interface SessionTable {
+  readonly kind: 'session' | 'file'
+  /// Current name (after renames).
+  readonly name: string
+  /// File tables: the name the save locates the part by.
+  readonly originalName: string
+  readonly area: TableArea
+  readonly columnNames: readonly string[]
+  readonly style: string | undefined
+  readonly options: {
+    headerRow: boolean
+    totalsRow: boolean
+    bandedRows: boolean
+    bandedColumns: boolean
+    firstColumn: boolean
+    lastColumn: boolean
+    filterButton: boolean
+  }
+  /// File table metadata (palette etc.) for projection.
+  readonly file?: Record<string, unknown>
+}
+
+/** The sheet's current tables: file tables (with session edits) and tables created this session. */
+export function sessionTablesOf(sheet: { features?: unknown }): SessionTable[] {
+  const features = (sheet.features ?? {}) as {
+    originalMetadata?: { tables?: Record<string, unknown>[] }
+    tableEdits?: Record<string, Record<string, unknown>>
+    tableAdditions?: import('../shared/workbook-protocol').WorkbookTableAdd[]
+  }
+  const result: SessionTable[] = []
+  for (const table of features.originalMetadata?.tables ?? []) {
+    const originalName = String(table.name ?? '')
+    if (!originalName) continue
+    const edit = features.tableEdits?.[originalName] ?? {}
+    if (edit.remove) continue
+    const range = table.range as TableArea
+    result.push({
+      kind: 'file',
+      name: String(edit.name ?? originalName),
+      originalName,
+      area: (edit.area as TableArea | undefined) ?? range,
+      columnNames:
+        (edit.columnNames as string[] | undefined) ?? (table.columns as string[] | undefined) ?? [],
+      style: (edit.style as string | undefined) ?? (table.styleName as string | undefined),
+      options: {
+        headerRow: (edit.headerRow as boolean | undefined) ?? Number(table.headerRowCount ?? 1) > 0,
+        totalsRow: (edit.totalsRow as boolean | undefined) ?? Number(table.totalsRowCount ?? 0) > 0,
+        bandedRows: (edit.bandedRows as boolean | undefined) ?? table.showRowStripes === true,
+        bandedColumns:
+          (edit.bandedColumns as boolean | undefined) ?? table.showColumnStripes === true,
+        firstColumn: (edit.firstColumn as boolean | undefined) ?? false,
+        lastColumn: (edit.lastColumn as boolean | undefined) ?? false,
+        filterButton: (edit.filterButton as boolean | undefined) ?? true,
+      },
+      file: table,
+    })
+  }
+  for (const add of features.tableAdditions ?? [])
+    result.push({
+      kind: 'session',
+      name: add.name,
+      originalName: add.name,
+      area: add.area,
+      columnNames: add.columnNames,
+      style: add.style,
+      options: {
+        headerRow: add.headerRow ?? true,
+        totalsRow: add.totalsRow ?? false,
+        bandedRows: add.bandedRows,
+        bandedColumns: add.bandedColumns ?? false,
+        firstColumn: add.firstColumn ?? false,
+        lastColumn: add.lastColumn ?? false,
+        filterButton: add.filterButton ?? true,
+      },
+    })
+  return result
 }
