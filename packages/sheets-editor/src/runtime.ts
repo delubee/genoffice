@@ -260,6 +260,25 @@ import {
   pickCsvFile,
 } from '../../../apps/sheets/src/renderer/csv-import-model'
 import { decodeCsvBuffer } from '@genoffice/xlsx-gateway/gateway/csv-import'
+import {
+  PIVOT_SOURCE_COL_LIMIT,
+  PIVOT_SOURCE_ROW_LIMIT,
+} from '@genoffice/xlsx-gateway/domain/pivot-layout'
+import {
+  isNumericPivotColumn,
+  pivotSourceGrid,
+} from '@genoffice/xlsx-gateway/domain/pivot-placement'
+import {
+  defaultPivotModel,
+  modelToConfig,
+  validatePivotModel,
+  type PivotField,
+} from '../../../apps/sheets/src/renderer/pivot-field-model'
+import {
+  pivotConfigToOpParts,
+  pivotErrorMessage,
+} from '../../../apps/sheets/src/renderer/pivot-op-parts'
+import type { PivotCreateRequest } from '../../../apps/sheets/src/renderer/PivotDialog'
 import { fullRowSpans, fullColumnSpans } from '../../../apps/sheets/src/renderer/autofit-selection'
 import { dimensionIntents } from './dimension-intents'
 import {
@@ -2412,7 +2431,12 @@ export class WorkbookRuntime implements EditorProjection {
     if (!selected) return false
     const features = this.selectedFeatures
     const original = features.originalMetadata as { pivotRanges?: GridRange[] } | undefined
-    const ranges = (features.pivotRanges ?? original?.pivotRanges ?? []) as GridRange[]
+    const ranges = [
+      ...((original?.pivotRanges ?? []) as GridRange[]),
+      ...((features.pivotAdditions ?? []) as { location: GridRange }[]).map(
+        (pivot) => pivot.location,
+      ),
+    ]
     return ranges.some(
       (range) =>
         selected.range.startRow >= range.startRow &&
@@ -5057,14 +5081,126 @@ export class WorkbookRuntime implements EditorProjection {
     else await this.enqueueStaged(stages, frozen)
     return { rows, columns, cell: formatAddress(origin.row, origin.column) }
   }
+  /** Insert/Data → PivotTable: source fields of the selection, frozen for the dialog. */
+  async pivotCreateContext() {
+    if (!(await this.flushEditor())) throw new Error('Finish editing before creating a PivotTable.')
+    const target = this.ribbonTarget,
+      state = this.state
+    if (!target || !state) throw new Error(t('appSelectCellFirst'))
+    const bounds = parseRange(target.address)
+    const frozen = { stateId: state.stateId, revision: this.revision }
+    const context = { sheetId: target.sheetId, sourceRange: target.address, frozen }
+    const rows = bounds.endRow - bounds.startRow + 1,
+      columns = Math.min(PIVOT_SOURCE_COL_LIMIT, bounds.endColumn - bounds.startColumn + 1)
+    if (rows < 2) return { ...context, fields: [] as PivotField[] }
+    if (rows > PIVOT_SOURCE_ROW_LIMIT) throw new Error(t('appPivotSourceRowLimit'))
+    const cells = new Map<string, ViewCell>()
+    const step = Math.max(1, Math.floor(2000 / columns))
+    for (let row = bounds.startRow; row <= bounds.endRow; row += step) {
+      const page = (await this.host.read(
+        target.sheetId,
+        {
+          startRow: row,
+          endRow: Math.min(bounds.endRow, row + step - 1),
+          startColumn: bounds.startColumn,
+          endColumn: bounds.startColumn + columns - 1,
+        },
+        frozen.stateId,
+      )) as { cells: ViewCell[] }
+      if (
+        this.closed ||
+        this.state?.stateId !== frozen.stateId ||
+        this.revision !== frozen.revision
+      )
+        throw new Error('The document changed while reading the PivotTable source. Try again.')
+      for (const cell of page.cells) cells.set(cell.address, cell)
+    }
+    const sourceCell = (row: number, column: number) => {
+      const cell = cells.get(formatAddress(row, column))
+      return {
+        value: ((cell?.formula ? cell.cachedValue : cell?.rawValue) ?? null) as
+          string | number | boolean | null,
+        pattern: cell?.numberFormat ?? cell?.style?.numberFormat,
+        static1904: state.dateSystem === '1904' && !cell?.formula,
+      }
+    }
+    const header = pivotSourceGrid([
+      Array.from({ length: columns }, (_, offset) =>
+        sourceCell(bounds.startRow, bounds.startColumn + offset),
+      ),
+    ])[0]!
+    const fields: PivotField[] = header.map((value, offset) => {
+      const column = bounds.startColumn + offset
+      const values = []
+      for (let row = bounds.startRow + 1; row <= bounds.endRow; row++)
+        values.push(sourceCell(row, column))
+      return {
+        label:
+          value === null || value === ''
+            ? t('appColumnLabel', { col: columnLabel(column) })
+            : String(value).trim(),
+        colIndex: column,
+        numeric: isNumericPivotColumn(values),
+      }
+    })
+    return { ...context, fields }
+  }
+  /** Create PivotTable with Excel's default placement; returns a dialog message or null. */
+  async createPivot(
+    request: PivotCreateRequest,
+    context: Awaited<ReturnType<WorkbookRuntime['pivotCreateContext']>>,
+  ) {
+    const model = defaultPivotModel(context.fields)
+    if (validatePivotModel(model) !== null) return t('dlgPivotErrNeedValue')
+    const parts = pivotConfigToOpParts(
+      modelToConfig(model, request.sourceRange, request.targetCell),
+      context.fields,
+    )
+    if (typeof parts === 'string') return parts
+    try {
+      await this.enqueue(
+        [
+          {
+            op: 'add_pivot',
+            sheetId: context.sheetId,
+            sourceRange: request.sourceRange,
+            targetCell: request.targetCell || 'A1',
+            ...parts,
+            subtotalLabel: t('appPivotSubtotal'),
+          },
+        ],
+        context.frozen,
+        { failureInDialog: true },
+      )
+    } catch (error) {
+      return pivotErrorMessage(error)
+    }
+    return null
+  }
+  /** Data → Refresh: the selected sheet's PivotTables, as on the desktop (synchronous ribbon contract). */
+  refreshPivotSync() {
+    const target = this.ribbonTarget
+    if (!target) throw new Error(t('appNoActiveSheet'))
+    const sheet = this.state?.sheets.find((item) => item.id === target.sheetId)
+    const features = (sheet?.features ?? {}) as {
+      pivotAdditions?: unknown[]
+      originalMetadata?: { pivotRanges?: unknown[] }
+    }
+    if (!features.pivotAdditions?.length && !features.originalMetadata?.pivotRanges?.length)
+      throw new Error(t('appCurrentSheetNoPivot'))
+    throw new Error('Refreshing PivotTables is not available in VS Code yet.')
+  }
   /** Data → Refresh All: the workbook's pivot tables, as on the desktop. */
   async refreshAll() {
     const hasPivots = this.state?.sheets.some((sheet) => {
       const features = (sheet.features ?? {}) as {
-        pivotRanges?: unknown[]
+        pivotAdditions?: unknown[]
         originalMetadata?: { pivotRanges?: unknown[] }
       }
-      return (features.pivotRanges ?? features.originalMetadata?.pivotRanges ?? []).length > 0
+      return (
+        (features.pivotAdditions?.length ?? 0) > 0 ||
+        (features.originalMetadata?.pivotRanges?.length ?? 0) > 0
+      )
     })
     if (!hasPivots) throw new Error(t('appWorkbookNoPivot'))
     throw new Error('Refreshing PivotTables is not available in VS Code yet.')

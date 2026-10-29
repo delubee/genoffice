@@ -590,3 +590,14 @@ Native suite baseline findings (2026-10-29, VS Code 1.109.5, full `--label minim
 
 - [ ] `Workbook native shortcuts UI`, `Product workspace skill commands` (expects packaged skill 0.1.0, finds 0.2.0) and `Product worksheet dimensions` (91 vs 104 px) fail in isolation at checkpoint 29ceb04c as well; pre-existing, not caused by the Get Data work.
 - [ ] Column Header Filter, Advanced Filter and the bulk CSV test pass alone but failed in the full run (notification toasts/chat pane covering the webview, Go To left disabled, timeouts); harden suite isolation.
+
+PivotTable create follow-up (2026-10-29):
+
+- [x] Add session `add_pivot` with desktop default placement, shared layout and source labels, overlap/name checks, bounded private write stages and one history entry.
+- [x] Persist session pivots as native pivot parts through a final package-writer stage; refuse coordinate/sheet changes that would desync a pending pivot.
+- [x] Mount the shared Data PivotTable group and Insert PivotTable button with the actual desktop dialog (async, retained draft on rejection); verify native create/history/save/reopen.
+- [ ] Refresh / Refresh All recompute for session and file pivots through the shared pivot engine.
+- [ ] Edit PivotTable with the desktop PivotTable Fields pane (relayout of session and file pivots).
+- [ ] Slicers, timelines and PivotChart.
+- [ ] `Desktop Insert Link UI` fails in isolation at HEAD fc726c60 as well (Go To stays disabled); pre-existing.
+- [ ] CLI: `mcp.test.ts` schema budget (96,298 > 94,208 bytes at HEAD), sidecar `info`, missing generated fixture and Homebrew install tests fail at HEAD; pre-existing.

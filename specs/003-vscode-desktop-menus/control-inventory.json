@@ -90,7 +90,7 @@
     {
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "sha256": "5f9bf3f2d0a6a2fe1f7e80ff1d96f15627e6a649e49296f8f46182b7405c0f73"
+      "sha256": "c9508789f727f5b58f278013e630f1fa79b5aa60c4dfc0be881f7d8fb3c9fff1"
     },
     {
       "document": "Sheets",
@@ -13815,69 +13815,36 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1214:11:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1213:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1214,
-      "endLine": 1220,
+      "line": 1213,
+      "endLine": 1217,
       "kind": "actionable-element",
-      "element": "RibbonButton",
-      "labels": [
-        "label={t('appPivotTable')}"
-      ],
+      "element": "PivotTableRibbonGroup",
+      "labels": [],
       "actions": [
         {
-          "name": "onClick",
-          "expression": "{() => onCommand('pivot-open')}"
+          "name": "onCommand",
+          "expression": "{onCommand}"
+        },
+        {
+          "name": "onRefreshPivot",
+          "expression": "{onRefreshPivot}"
+        },
+        {
+          "name": "onIsSelectionInPivot",
+          "expression": "{onIsSelectionInPivot}"
         }
       ],
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1219:28:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1218:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1219,
-      "endLine": 1219,
-      "kind": "command-dispatch",
-      "expression": "onCommand('pivot-open')",
-      "dynamic": false
-    },
-    {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1221:11:actionable-element",
-      "document": "Sheets",
-      "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1221,
-      "endLine": 1230,
-      "kind": "actionable-element",
-      "element": "RibbonButton",
-      "labels": [
-        "label={t('appRefresh')}"
-      ],
-      "actions": [
-        {
-          "name": "onClick",
-          "expression": "{() => {\n              const err = onRefreshPivot()\n              if (err) onCommand(`error:${err}`)\n            }}"
-        }
-      ],
-      "constraints": []
-    },
-    {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1228:24:command-dispatch",
-      "document": "Sheets",
-      "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1228,
-      "endLine": 1228,
-      "kind": "command-dispatch",
-      "expression": "onCommand(`error:${err}`)",
-      "dynamic": true
-    },
-    {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1232:9:actionable-element",
-      "document": "Sheets",
-      "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1232,
-      "endLine": 1232,
+      "line": 1218,
+      "endLine": 1218,
       "kind": "actionable-element",
       "element": "GetDataRibbonGroup",
       "labels": [],
@@ -13890,11 +13857,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1233:9:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1219:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1233,
-      "endLine": 1233,
+      "line": 1219,
+      "endLine": 1219,
       "kind": "actionable-element",
       "element": "SortFilterRibbonGroup",
       "labels": [],
@@ -13907,11 +13874,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1234:9:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1220:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1234,
-      "endLine": 1234,
+      "line": 1220,
+      "endLine": 1220,
       "kind": "actionable-element",
       "element": "DataToolsRibbonGroup",
       "labels": [],
@@ -13924,11 +13891,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1235:9:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1221:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1235,
-      "endLine": 1235,
+      "line": 1221,
+      "endLine": 1221,
       "kind": "actionable-element",
       "element": "ForecastRibbonGroup",
       "labels": [],
@@ -13941,11 +13908,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1236:9:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1222:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1236,
-      "endLine": 1236,
+      "line": 1222,
+      "endLine": 1222,
       "kind": "actionable-element",
       "element": "OutlineRibbonGroup",
       "labels": [],
@@ -13958,11 +13925,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1245:11:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1231:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1245,
-      "endLine": 1254,
+      "line": 1231,
+      "endLine": 1240,
       "kind": "actionable-element",
       "element": "RibbonButton",
       "labels": [
@@ -13977,21 +13944,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1252:57:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1238:57:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1252,
-      "endLine": 1252,
+      "line": 1238,
+      "endLine": 1238,
       "kind": "command-dispatch",
       "expression": "onCommand('toggle-page-break-preview')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1255:11:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1241:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1255,
-      "endLine": 1264,
+      "line": 1241,
+      "endLine": 1250,
       "kind": "actionable-element",
       "element": "RibbonButton",
       "labels": [
@@ -14006,21 +13973,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1262:57:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1248:57:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1262,
-      "endLine": 1262,
+      "line": 1248,
+      "endLine": 1248,
       "kind": "command-dispatch",
       "expression": "onCommand('toggle-page-break-preview')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1268:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1254:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1268,
-      "endLine": 1272,
+      "line": 1254,
+      "endLine": 1258,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -14035,21 +14002,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1271:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1257:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1271,
-      "endLine": 1271,
+      "line": 1257,
+      "endLine": 1257,
       "kind": "command-dispatch",
       "expression": "onCommand('toggle-gridlines')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1276:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1262:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1276,
-      "endLine": 1280,
+      "line": 1262,
+      "endLine": 1266,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -14064,21 +14031,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1279:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1265:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1279,
-      "endLine": 1279,
+      "line": 1265,
+      "endLine": 1265,
       "kind": "command-dispatch",
       "expression": "onCommand('toggle-formula-bar')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1284:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1270:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1284,
-      "endLine": 1288,
+      "line": 1270,
+      "endLine": 1274,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -14093,21 +14060,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1287:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1273:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1287,
-      "endLine": 1287,
+      "line": 1273,
+      "endLine": 1273,
       "kind": "command-dispatch",
       "expression": "onCommand('toggle-headings')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1292:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1278:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1292,
-      "endLine": 1296,
+      "line": 1278,
+      "endLine": 1282,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -14122,21 +14089,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1295:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1281:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1295,
-      "endLine": 1295,
+      "line": 1281,
+      "endLine": 1281,
       "kind": "command-dispatch",
       "expression": "onCommand('toggle-right-to-left')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1300:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1286:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1300,
-      "endLine": 1304,
+      "line": 1286,
+      "endLine": 1290,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -14151,96 +14118,96 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1303:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1289:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1303,
-      "endLine": 1303,
+      "line": 1289,
+      "endLine": 1289,
       "kind": "command-dispatch",
       "expression": "onCommand('toggle-cross-highlight')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1311:12:menu-helper-call",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1297:12:menu-helper-call",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1311,
-      "endLine": 1318,
+      "line": 1297,
+      "endLine": 1304,
       "kind": "menu-helper-call",
       "expression": "largeMenu(t('appZoomLabel'), '🔍', t('appZoomSheetTitle'), [\n            { value: 'zoom:50', label: '50%' },\n            { value: 'zoom:75', label: '75%' },\n            { value: 'zoom:100', label: '100%' },\n            { value: 'zoom:125', label: '125%' },\n            { value: 'zoom:150', label: '150%' },\n            { value: 'zoom:200', label: '200%' },\n          ])"
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1312:13:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1298:13:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1312,
-      "endLine": 1312,
+      "line": 1298,
+      "endLine": 1298,
       "kind": "menu-option-definition",
       "value": "'zoom:50'",
       "label": "'50%'",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1313:13:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1299:13:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1313,
-      "endLine": 1313,
+      "line": 1299,
+      "endLine": 1299,
       "kind": "menu-option-definition",
       "value": "'zoom:75'",
       "label": "'75%'",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1314:13:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1300:13:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1314,
-      "endLine": 1314,
+      "line": 1300,
+      "endLine": 1300,
       "kind": "menu-option-definition",
       "value": "'zoom:100'",
       "label": "'100%'",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1315:13:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1301:13:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1315,
-      "endLine": 1315,
+      "line": 1301,
+      "endLine": 1301,
       "kind": "menu-option-definition",
       "value": "'zoom:125'",
       "label": "'125%'",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1316:13:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1302:13:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1316,
-      "endLine": 1316,
+      "line": 1302,
+      "endLine": 1302,
       "kind": "menu-option-definition",
       "value": "'zoom:150'",
       "label": "'150%'",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1317:13:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1303:13:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1317,
-      "endLine": 1317,
+      "line": 1303,
+      "endLine": 1303,
       "kind": "menu-option-definition",
       "value": "'zoom:200'",
       "label": "'200%'",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1319:11:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1305:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1319,
-      "endLine": 1325,
+      "line": 1305,
+      "endLine": 1311,
       "kind": "actionable-element",
       "element": "RibbonButton",
       "labels": [
@@ -14255,21 +14222,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1324:28:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1310:28:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1324,
-      "endLine": 1324,
+      "line": 1310,
+      "endLine": 1310,
       "kind": "command-dispatch",
       "expression": "onCommand('zoom-reset')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1326:11:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1312:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1326,
-      "endLine": 1332,
+      "line": 1312,
+      "endLine": 1318,
       "kind": "actionable-element",
       "element": "RibbonButton",
       "labels": [
@@ -14284,74 +14251,74 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1331:28:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1317:28:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1331,
-      "endLine": 1331,
+      "line": 1317,
+      "endLine": 1317,
       "kind": "command-dispatch",
       "expression": "onCommand('zoom-to-selection')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1335:12:menu-helper-call",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1321:12:menu-helper-call",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1335,
-      "endLine": 1340,
+      "line": 1321,
+      "endLine": 1326,
       "kind": "menu-helper-call",
       "expression": "largeMenu(t('appFreezePanes'), '❄', t('appFreezeTitle'), [\n            { value: 'freeze-here', label: t('appFreezeAtSelection') },\n            { value: 'freeze-top-row', label: t('appFreezeTopRow') },\n            { value: 'freeze-first-col', label: t('appFreezeFirstCol') },\n            { value: 'unfreeze', label: t('appUnfreeze') },\n          ])"
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1336:13:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1322:13:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1336,
-      "endLine": 1336,
+      "line": 1322,
+      "endLine": 1322,
       "kind": "menu-option-definition",
       "value": "'freeze-here'",
       "label": "t('appFreezeAtSelection')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1337:13:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1323:13:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1337,
-      "endLine": 1337,
+      "line": 1323,
+      "endLine": 1323,
       "kind": "menu-option-definition",
       "value": "'freeze-top-row'",
       "label": "t('appFreezeTopRow')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1338:13:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1324:13:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1338,
-      "endLine": 1338,
+      "line": 1324,
+      "endLine": 1324,
       "kind": "menu-option-definition",
       "value": "'freeze-first-col'",
       "label": "t('appFreezeFirstCol')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1339:13:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1325:13:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1339,
-      "endLine": 1339,
+      "line": 1325,
+      "endLine": 1325,
       "kind": "menu-option-definition",
       "value": "'unfreeze'",
       "label": "t('appUnfreeze')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1350:11:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1336:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1350,
-      "endLine": 1356,
+      "line": 1336,
+      "endLine": 1342,
       "kind": "actionable-element",
       "element": "RibbonButton",
       "labels": [
@@ -14366,21 +14333,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1355:28:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1341:28:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1355,
-      "endLine": 1355,
+      "line": 1341,
+      "endLine": 1341,
       "kind": "command-dispatch",
       "expression": "onCommand('workbook-statistics')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1367:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1353:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1367,
-      "endLine": 1375,
+      "line": 1353,
+      "endLine": 1361,
       "kind": "actionable-element",
       "element": "MenuSelect",
       "labels": [
@@ -14395,22 +14362,22 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1370:63:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1356:63:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1370,
-      "endLine": 1373,
+      "line": 1356,
+      "endLine": 1359,
       "kind": "menu-option-definition",
       "value": "language",
       "label": "language",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1379:11:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1365:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1379,
-      "endLine": 1385,
+      "line": 1365,
+      "endLine": 1371,
       "kind": "actionable-element",
       "element": "RibbonButton",
       "labels": [
@@ -14425,21 +14392,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1384:28:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1370:28:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1384,
-      "endLine": 1384,
+      "line": 1370,
+      "endLine": 1370,
       "kind": "command-dispatch",
       "expression": "onCommand('comment-new')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1386:11:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1372:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1386,
-      "endLine": 1392,
+      "line": 1372,
+      "endLine": 1378,
       "kind": "actionable-element",
       "element": "RibbonButton",
       "labels": [
@@ -14454,21 +14421,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1391:28:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1377:28:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1391,
-      "endLine": 1391,
+      "line": 1377,
+      "endLine": 1377,
       "kind": "command-dispatch",
       "expression": "onCommand('comment-delete')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1394:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1380:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1394,
-      "endLine": 1398,
+      "line": 1380,
+      "endLine": 1384,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -14483,21 +14450,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1397:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1383:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1397,
-      "endLine": 1397,
+      "line": 1383,
+      "endLine": 1383,
       "kind": "command-dispatch",
       "expression": "onCommand('comment-prev')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1402:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1388:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1402,
-      "endLine": 1406,
+      "line": 1388,
+      "endLine": 1392,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -14512,21 +14479,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1405:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1391:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1405,
-      "endLine": 1405,
+      "line": 1391,
+      "endLine": 1391,
       "kind": "command-dispatch",
       "expression": "onCommand('comment-next')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1410:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1396:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1410,
-      "endLine": 1414,
+      "line": 1396,
+      "endLine": 1400,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -14541,85 +14508,85 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1413:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1399:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1413,
-      "endLine": 1413,
+      "line": 1399,
+      "endLine": 1399,
       "kind": "command-dispatch",
       "expression": "onCommand('comments-pane-toggle')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1421:12:menu-helper-call",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1407:12:menu-helper-call",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1421,
-      "endLine": 1427,
+      "line": 1407,
+      "endLine": 1413,
       "kind": "menu-helper-call",
       "expression": "largeMenu(t('appGroupNotes'), '🗒', t('appNotesDetail'), [\n            { value: 'note-open', label: t('appNewNote') },\n            { value: 'note-show-toggle', label: t('appShowHideNote') },\n            { value: 'note-show-all', label: t('appShowAllNotes') },\n            { value: 'notes-convert', label: t('appConvertToNotes') },\n            { value: 'note-pictures-pane-toggle', label: t('appNotePicturesToggle') },\n          ])"
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1422:13:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1408:13:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1422,
-      "endLine": 1422,
+      "line": 1408,
+      "endLine": 1408,
       "kind": "menu-option-definition",
       "value": "'note-open'",
       "label": "t('appNewNote')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1423:13:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1409:13:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1423,
-      "endLine": 1423,
+      "line": 1409,
+      "endLine": 1409,
       "kind": "menu-option-definition",
       "value": "'note-show-toggle'",
       "label": "t('appShowHideNote')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1424:13:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1410:13:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1424,
-      "endLine": 1424,
+      "line": 1410,
+      "endLine": 1410,
       "kind": "menu-option-definition",
       "value": "'note-show-all'",
       "label": "t('appShowAllNotes')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1425:13:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1411:13:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1425,
-      "endLine": 1425,
+      "line": 1411,
+      "endLine": 1411,
       "kind": "menu-option-definition",
       "value": "'notes-convert'",
       "label": "t('appConvertToNotes')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1426:13:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1412:13:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1426,
-      "endLine": 1426,
+      "line": 1412,
+      "endLine": 1412,
       "kind": "menu-option-definition",
       "value": "'note-pictures-pane-toggle'",
       "label": "t('appNotePicturesToggle')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1430:11:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1416:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1430,
-      "endLine": 1436,
+      "line": 1416,
+      "endLine": 1422,
       "kind": "actionable-element",
       "element": "RibbonButton",
       "labels": [
@@ -14634,21 +14601,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1435:28:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1421:28:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1435,
-      "endLine": 1435,
+      "line": 1421,
+      "endLine": 1421,
       "kind": "command-dispatch",
       "expression": "onCommand('sheet-protect')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1437:11:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1423:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1437,
-      "endLine": 1443,
+      "line": 1423,
+      "endLine": 1429,
       "kind": "actionable-element",
       "element": "RibbonButton",
       "labels": [
@@ -14663,21 +14630,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1442:28:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1428:28:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1442,
-      "endLine": 1442,
+      "line": 1428,
+      "endLine": 1428,
       "kind": "command-dispatch",
       "expression": "onCommand('workbook-protect')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1444:11:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1430:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1444,
-      "endLine": 1450,
+      "line": 1430,
+      "endLine": 1436,
       "kind": "actionable-element",
       "element": "RibbonButton",
       "labels": [
@@ -14692,43 +14659,43 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1449:28:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1435:28:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1449,
-      "endLine": 1449,
+      "line": 1435,
+      "endLine": 1435,
       "kind": "command-dispatch",
       "expression": "onCommand('allow-edit-ranges-open')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1461:43:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1447:43:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1461,
-      "endLine": 1461,
+      "line": 1447,
+      "endLine": 1447,
       "kind": "menu-option-definition",
       "value": "family",
       "label": "family",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1462:50:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1448:50:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1462,
-      "endLine": 1466,
+      "line": 1448,
+      "endLine": 1452,
       "kind": "menu-option-definition",
       "value": "family",
       "label": "family",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1474:9:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1460:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1474,
-      "endLine": 1478,
+      "line": 1460,
+      "endLine": 1464,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -14743,11 +14710,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1486:9:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1472:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1486,
-      "endLine": 1491,
+      "line": 1472,
+      "endLine": 1477,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -14764,11 +14731,11 @@
       ]
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1515:9:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1501:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1515,
-      "endLine": 1520,
+      "line": 1501,
+      "endLine": 1506,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -14785,11 +14752,11 @@
       ]
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1545:9:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1531:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1545,
-      "endLine": 1549,
+      "line": 1531,
+      "endLine": 1535,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -14804,96 +14771,96 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1548:26:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1534:26:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1548,
-      "endLine": 1548,
+      "line": 1534,
+      "endLine": 1534,
       "kind": "command-dispatch",
       "expression": "onCommand('paste')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1557:10:menu-helper-call",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1543:10:menu-helper-call",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1557,
-      "endLine": 1564,
+      "line": 1543,
+      "endLine": 1550,
       "kind": "menu-helper-call",
       "expression": "largeMenu(t('appPasteSpecial'), '📑', t('appPasteSpecialTitle'), [\n          { value: 'paste-special:value', label: t('appPasteValuesOnly') },\n          { value: 'paste-special:formula', label: t('appPasteFormulasOnly') },\n          { value: 'paste-special:format', label: t('appPasteFormattingOnly') },\n          { value: 'paste-special:col-width', label: t('appPasteColWidths') },\n          { value: 'paste-special:besides-border', label: t('appPasteExceptBorders') },\n          { value: PASTE_SPECIAL_OPEN_SHELL_COMMAND, label: t('appPasteSpecialDialog') },\n        ])"
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1558:11:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1544:11:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1558,
-      "endLine": 1558,
+      "line": 1544,
+      "endLine": 1544,
       "kind": "menu-option-definition",
       "value": "'paste-special:value'",
       "label": "t('appPasteValuesOnly')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1559:11:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1545:11:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1559,
-      "endLine": 1559,
+      "line": 1545,
+      "endLine": 1545,
       "kind": "menu-option-definition",
       "value": "'paste-special:formula'",
       "label": "t('appPasteFormulasOnly')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1560:11:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1546:11:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1560,
-      "endLine": 1560,
+      "line": 1546,
+      "endLine": 1546,
       "kind": "menu-option-definition",
       "value": "'paste-special:format'",
       "label": "t('appPasteFormattingOnly')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1561:11:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1547:11:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1561,
-      "endLine": 1561,
+      "line": 1547,
+      "endLine": 1547,
       "kind": "menu-option-definition",
       "value": "'paste-special:col-width'",
       "label": "t('appPasteColWidths')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1562:11:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1548:11:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1562,
-      "endLine": 1562,
+      "line": 1548,
+      "endLine": 1548,
       "kind": "menu-option-definition",
       "value": "'paste-special:besides-border'",
       "label": "t('appPasteExceptBorders')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1563:11:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1549:11:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1563,
-      "endLine": 1563,
+      "line": 1549,
+      "endLine": 1549,
       "kind": "menu-option-definition",
       "value": "PASTE_SPECIAL_OPEN_SHELL_COMMAND",
       "label": "t('appPasteSpecialDialog')",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1566:11:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1552:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1566,
-      "endLine": 1570,
+      "line": 1552,
+      "endLine": 1556,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -14909,21 +14876,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1569:28:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1555:28:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1569,
-      "endLine": 1569,
+      "line": 1555,
+      "endLine": 1555,
       "kind": "command-dispatch",
       "expression": "onCommand('cut')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1573:11:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1559:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1573,
-      "endLine": 1577,
+      "line": 1559,
+      "endLine": 1563,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -14939,21 +14906,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1576:28:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1562:28:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1576,
-      "endLine": 1576,
+      "line": 1562,
+      "endLine": 1562,
       "kind": "command-dispatch",
       "expression": "onCommand('copy')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1580:11:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1566:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1580,
-      "endLine": 1588,
+      "line": 1566,
+      "endLine": 1574,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -14969,21 +14936,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1586:15:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1572:15:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1586,
-      "endLine": 1586,
+      "line": 1572,
+      "endLine": 1572,
       "kind": "command-dispatch",
       "expression": "onCommand(event.detail >= 2 ? 'format-painter:dblclick' : 'format-painter')",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1596:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1582:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1596,
-      "endLine": 1605,
+      "line": 1582,
+      "endLine": 1591,
       "kind": "actionable-element",
       "element": "EditableMenuSelect",
       "labels": [
@@ -15005,31 +14972,31 @@
       ]
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1603:34:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1589:34:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1603,
-      "endLine": 1603,
+      "line": 1589,
+      "endLine": 1589,
       "kind": "command-dispatch",
       "expression": "onCommand(`font-family:${value}`)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1604:33:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1590:33:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1604,
-      "endLine": 1604,
+      "line": 1590,
+      "endLine": 1590,
       "kind": "command-dispatch",
       "expression": "onCommand(`font-family:${text}`)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1606:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1592:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1606,
-      "endLine": 1619,
+      "line": 1592,
+      "endLine": 1605,
       "kind": "actionable-element",
       "element": "EditableMenuSelect",
       "labels": [
@@ -15047,42 +15014,42 @@
       ]
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1611:51:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1597:51:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1611,
-      "endLine": 1611,
+      "line": 1597,
+      "endLine": 1597,
       "kind": "menu-option-definition",
       "value": "String(size)",
       "label": "String(size)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1612:34:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1598:34:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1612,
-      "endLine": 1612,
+      "line": 1598,
+      "endLine": 1598,
       "kind": "command-dispatch",
       "expression": "onCommand(`font-size:${value}`)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1617:19:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1603:19:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1617,
-      "endLine": 1617,
+      "line": 1603,
+      "endLine": 1603,
       "kind": "command-dispatch",
       "expression": "onCommand(`font-size:${size}`)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1620:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1606:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1620,
-      "endLine": 1624,
+      "line": 1606,
+      "endLine": 1610,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -15098,21 +15065,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1623:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1609:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1623,
-      "endLine": 1623,
+      "line": 1609,
+      "endLine": 1609,
       "kind": "command-dispatch",
       "expression": "onCommand(`font-size:${stepFontSize(echoSize, 1)}`)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1627:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1613:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1627,
-      "endLine": 1631,
+      "line": 1613,
+      "endLine": 1617,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -15128,21 +15095,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1630:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1616:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1630,
-      "endLine": 1630,
+      "line": 1616,
+      "endLine": 1616,
       "kind": "command-dispatch",
       "expression": "onCommand(`font-size:${stepFontSize(echoSize, -1)}`)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1636:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1622:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1636,
-      "endLine": 1640,
+      "line": 1622,
+      "endLine": 1626,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -15157,21 +15124,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1639:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1625:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1639,
-      "endLine": 1639,
+      "line": 1625,
+      "endLine": 1625,
       "kind": "command-dispatch",
       "expression": "onCommand('bold')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1643:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1629:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1643,
-      "endLine": 1647,
+      "line": 1629,
+      "endLine": 1633,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -15186,21 +15153,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1646:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1632:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1646,
-      "endLine": 1646,
+      "line": 1632,
+      "endLine": 1632,
       "kind": "command-dispatch",
       "expression": "onCommand('italic')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1650:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1636:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1650,
-      "endLine": 1654,
+      "line": 1636,
+      "endLine": 1640,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -15215,21 +15182,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1653:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1639:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1653,
-      "endLine": 1653,
+      "line": 1639,
+      "endLine": 1639,
       "kind": "command-dispatch",
       "expression": "onCommand('underline')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1657:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1643:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1657,
-      "endLine": 1660,
+      "line": 1643,
+      "endLine": 1646,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -15244,21 +15211,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1659:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1645:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1659,
-      "endLine": 1659,
+      "line": 1645,
+      "endLine": 1645,
       "kind": "command-dispatch",
       "expression": "onCommand('underline:double')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1663:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1649:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1663,
-      "endLine": 1667,
+      "line": 1649,
+      "endLine": 1653,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -15273,21 +15240,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1666:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1652:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1666,
-      "endLine": 1666,
+      "line": 1652,
+      "endLine": 1652,
       "kind": "command-dispatch",
       "expression": "onCommand('strike')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1670:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1656:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1670,
-      "endLine": 1675,
+      "line": 1656,
+      "endLine": 1661,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -15303,21 +15270,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1674:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1660:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1674,
-      "endLine": 1674,
+      "line": 1660,
+      "endLine": 1660,
       "kind": "command-dispatch",
       "expression": "onCommand('superscript')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1678:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1664:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1678,
-      "endLine": 1683,
+      "line": 1664,
+      "endLine": 1669,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -15333,21 +15300,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1682:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1668:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1682,
-      "endLine": 1682,
+      "line": 1668,
+      "endLine": 1668,
       "kind": "command-dispatch",
       "expression": "onCommand('subscript')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1686:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1672:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1686,
-      "endLine": 1701,
+      "line": 1672,
+      "endLine": 1687,
       "kind": "actionable-element",
       "element": "ColorDropdown",
       "labels": [
@@ -15365,21 +15332,21 @@
       ]
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1699:17:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1685:17:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1699,
-      "endLine": 1699,
+      "line": 1685,
+      "endLine": 1685,
       "kind": "command-dispatch",
       "expression": "onCommand(hex ? `font-color:${hex}` : 'font-color:auto')",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1702:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1688:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1702,
-      "endLine": 1718,
+      "line": 1688,
+      "endLine": 1704,
       "kind": "actionable-element",
       "element": "ColorDropdown",
       "labels": [
@@ -15397,21 +15364,21 @@
       ]
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1716:17:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1702:17:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1716,
-      "endLine": 1716,
+      "line": 1702,
+      "endLine": 1702,
       "kind": "command-dispatch",
       "expression": "onCommand(hex ? `fill:${hex}` : 'fill:none')",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1719:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1705:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1719,
-      "endLine": 1743,
+      "line": 1705,
+      "endLine": 1729,
       "kind": "actionable-element",
       "element": "MenuSelect",
       "labels": [
@@ -15427,109 +15394,109 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1729:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1715:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1729,
-      "endLine": 1729,
+      "line": 1715,
+      "endLine": 1715,
       "kind": "menu-option-definition",
       "value": "'all'",
       "label": "t('appBorderAll')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1730:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1716:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1730,
-      "endLine": 1730,
+      "line": 1716,
+      "endLine": 1716,
       "kind": "menu-option-definition",
       "value": "'outer'",
       "label": "t('appBorderOuter')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1731:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1717:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1731,
-      "endLine": 1735,
+      "line": 1717,
+      "endLine": 1721,
       "kind": "menu-option-definition",
       "value": "'thick-outer'",
       "label": "t('appBorderThickOuter')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1736:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1722:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1736,
-      "endLine": 1736,
+      "line": 1722,
+      "endLine": 1722,
       "kind": "menu-option-definition",
       "value": "'top'",
       "label": "t('appBorderTop')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1737:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1723:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1737,
-      "endLine": 1737,
+      "line": 1723,
+      "endLine": 1723,
       "kind": "menu-option-definition",
       "value": "'bottom'",
       "label": "t('appBorderBottom')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1738:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1724:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1738,
-      "endLine": 1738,
+      "line": 1724,
+      "endLine": 1724,
       "kind": "menu-option-definition",
       "value": "'left'",
       "label": "t('appBorderLeft')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1739:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1725:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1739,
-      "endLine": 1739,
+      "line": 1725,
+      "endLine": 1725,
       "kind": "menu-option-definition",
       "value": "'right'",
       "label": "t('appBorderRight')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1740:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1726:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1740,
-      "endLine": 1740,
+      "line": 1726,
+      "endLine": 1726,
       "kind": "menu-option-definition",
       "value": "'none'",
       "label": "t('appBorderNone')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1742:34:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1728:34:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1742,
-      "endLine": 1742,
+      "line": 1728,
+      "endLine": 1728,
       "kind": "command-dispatch",
       "expression": "onCommand(`border:${value}:${borderColor}`)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1744:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1730:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1744,
-      "endLine": 1757,
+      "line": 1730,
+      "endLine": 1743,
       "kind": "actionable-element",
       "element": "ColorDropdown",
       "labels": [
@@ -15547,11 +15514,11 @@
       ]
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1764:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1750:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1764,
-      "endLine": 1768,
+      "line": 1750,
+      "endLine": 1754,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -15567,21 +15534,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1767:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1753:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1767,
-      "endLine": 1767,
+      "line": 1753,
+      "endLine": 1753,
       "kind": "command-dispatch",
       "expression": "onCommand('valign:top')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1771:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1757:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1771,
-      "endLine": 1775,
+      "line": 1757,
+      "endLine": 1761,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -15597,21 +15564,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1774:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1760:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1774,
-      "endLine": 1774,
+      "line": 1760,
+      "endLine": 1760,
       "kind": "command-dispatch",
       "expression": "onCommand('valign:middle')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1778:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1764:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1778,
-      "endLine": 1782,
+      "line": 1764,
+      "endLine": 1768,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -15627,21 +15594,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1781:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1767:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1781,
-      "endLine": 1781,
+      "line": 1767,
+      "endLine": 1767,
       "kind": "command-dispatch",
       "expression": "onCommand('valign:bottom')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1785:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1771:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1785,
-      "endLine": 1790,
+      "line": 1771,
+      "endLine": 1776,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -15657,21 +15624,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1789:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1775:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1789,
-      "endLine": 1789,
+      "line": 1775,
+      "endLine": 1775,
       "kind": "command-dispatch",
       "expression": "onCommand('wrap')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1793:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1779:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1793,
-      "endLine": 1807,
+      "line": 1779,
+      "endLine": 1793,
       "kind": "actionable-element",
       "element": "MenuSelect",
       "labels": [
@@ -15687,87 +15654,87 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1799:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1785:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1799,
-      "endLine": 1799,
+      "line": 1785,
+      "endLine": 1785,
       "kind": "menu-option-definition",
       "value": "'45'",
       "label": "t('appAngleCcw')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1800:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1786:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1800,
-      "endLine": 1800,
+      "line": 1786,
+      "endLine": 1786,
       "kind": "menu-option-definition",
       "value": "'-45'",
       "label": "t('appAngleCw')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1801:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1787:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1801,
-      "endLine": 1801,
+      "line": 1787,
+      "endLine": 1787,
       "kind": "menu-option-definition",
       "value": "'vertical'",
       "label": "t('appVerticalText')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1802:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1788:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1802,
-      "endLine": 1802,
+      "line": 1788,
+      "endLine": 1788,
       "kind": "menu-option-definition",
       "value": "'90'",
       "label": "t('appRotateUp')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1803:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1789:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1803,
-      "endLine": 1803,
+      "line": 1789,
+      "endLine": 1789,
       "kind": "menu-option-definition",
       "value": "'-90'",
       "label": "t('appRotateDown')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1804:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1790:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1804,
-      "endLine": 1804,
+      "line": 1790,
+      "endLine": 1790,
       "kind": "menu-option-definition",
       "value": "'0'",
       "label": "t('appClearRotation')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1806:34:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1792:34:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1806,
-      "endLine": 1806,
+      "line": 1792,
+      "endLine": 1792,
       "kind": "command-dispatch",
       "expression": "onCommand(`rotate:${value}`)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1810:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1796:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1810,
-      "endLine": 1814,
+      "line": 1796,
+      "endLine": 1800,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -15783,21 +15750,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1813:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1799:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1813,
-      "endLine": 1813,
+      "line": 1799,
+      "endLine": 1799,
       "kind": "command-dispatch",
       "expression": "onCommand('align:left')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1817:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1803:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1817,
-      "endLine": 1821,
+      "line": 1803,
+      "endLine": 1807,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -15813,21 +15780,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1820:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1806:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1820,
-      "endLine": 1820,
+      "line": 1806,
+      "endLine": 1806,
       "kind": "command-dispatch",
       "expression": "onCommand('align:center')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1824:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1810:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1824,
-      "endLine": 1828,
+      "line": 1810,
+      "endLine": 1814,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -15843,21 +15810,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1827:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1813:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1827,
-      "endLine": 1827,
+      "line": 1813,
+      "endLine": 1813,
       "kind": "command-dispatch",
       "expression": "onCommand('align:right')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1831:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1817:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1831,
-      "endLine": 1836,
+      "line": 1817,
+      "endLine": 1822,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -15875,21 +15842,21 @@
       ]
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1835:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1821:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1835,
-      "endLine": 1835,
+      "line": 1821,
+      "endLine": 1821,
       "kind": "command-dispatch",
       "expression": "onCommand('indent-step:-1')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1839:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1825:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1839,
-      "endLine": 1844,
+      "line": 1825,
+      "endLine": 1830,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -15907,21 +15874,21 @@
       ]
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1843:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1829:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1843,
-      "endLine": 1843,
+      "line": 1829,
+      "endLine": 1829,
       "kind": "command-dispatch",
       "expression": "onCommand('indent-step:1')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1847:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1833:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1847,
-      "endLine": 1863,
+      "line": 1833,
+      "endLine": 1849,
       "kind": "actionable-element",
       "element": "MenuSelect",
       "labels": [
@@ -15937,65 +15904,65 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1857:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1843:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1857,
-      "endLine": 1857,
+      "line": 1843,
+      "endLine": 1843,
       "kind": "menu-option-definition",
       "value": "'center'",
       "label": "t('appMergeCenter')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1858:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1844:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1858,
-      "endLine": 1858,
+      "line": 1844,
+      "endLine": 1844,
       "kind": "menu-option-definition",
       "value": "'across'",
       "label": "t('appMergeAcross')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1859:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1845:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1859,
-      "endLine": 1859,
+      "line": 1845,
+      "endLine": 1845,
       "kind": "menu-option-definition",
       "value": "'cells'",
       "label": "t('appMergeCells')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1860:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1846:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1860,
-      "endLine": 1860,
+      "line": 1846,
+      "endLine": 1846,
       "kind": "menu-option-definition",
       "value": "'unmerge'",
       "label": "t('appUnmergeCells')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1862:34:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1848:34:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1862,
-      "endLine": 1862,
+      "line": 1848,
+      "endLine": 1848,
       "kind": "command-dispatch",
       "expression": "onCommand(`merge:${value}`)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1869:11:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1855:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1869,
-      "endLine": 1869,
+      "line": 1855,
+      "endLine": 1855,
       "kind": "actionable-element",
       "element": "NumberFormatSelect",
       "labels": [],
@@ -16008,11 +15975,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1871:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1857:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1871,
-      "endLine": 1875,
+      "line": 1857,
+      "endLine": 1861,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -16028,21 +15995,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1874:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1860:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1874,
-      "endLine": 1874,
+      "line": 1860,
+      "endLine": 1860,
       "kind": "command-dispatch",
       "expression": "onCommand(`format:${accountingStyle(RIBBON_CURRENCY_SYMBOL)}`)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1878:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1864:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1878,
-      "endLine": 1882,
+      "line": 1864,
+      "endLine": 1868,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -16058,21 +16025,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1881:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1867:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1881,
-      "endLine": 1881,
+      "line": 1867,
+      "endLine": 1867,
       "kind": "command-dispatch",
       "expression": "onCommand(`format:${PERCENT_STYLE}`)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1885:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1871:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1885,
-      "endLine": 1889,
+      "line": 1871,
+      "endLine": 1875,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -16088,21 +16055,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1888:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1874:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1888,
-      "endLine": 1888,
+      "line": 1874,
+      "endLine": 1874,
       "kind": "command-dispatch",
       "expression": "onCommand(`format:${COMMA_STYLE}`)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1892:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1878:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1892,
-      "endLine": 1896,
+      "line": 1878,
+      "endLine": 1882,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -16118,21 +16085,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1895:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1881:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1895,
-      "endLine": 1895,
+      "line": 1881,
+      "endLine": 1881,
       "kind": "command-dispatch",
       "expression": "onCommand('decimal-inc')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1899:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1885:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1899,
-      "endLine": 1903,
+      "line": 1885,
+      "endLine": 1889,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -16148,21 +16115,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1902:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1888:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1902,
-      "endLine": 1902,
+      "line": 1888,
+      "endLine": 1888,
       "kind": "command-dispatch",
       "expression": "onCommand('decimal-dec')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1911:11:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1897:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1911,
-      "endLine": 1915,
+      "line": 1897,
+      "endLine": 1901,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -16177,21 +16144,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1914:28:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1900:28:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1914,
-      "endLine": 1914,
+      "line": 1900,
+      "endLine": 1900,
       "kind": "command-dispatch",
       "expression": "onCommand('cf-open')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1924:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1910:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1924,
-      "endLine": 1936,
+      "line": 1910,
+      "endLine": 1922,
       "kind": "actionable-element",
       "element": "MenuSelect",
       "labels": [
@@ -16206,87 +16173,87 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1928:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1914:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1928,
-      "endLine": 1928,
+      "line": 1914,
+      "endLine": 1914,
       "kind": "menu-option-definition",
       "value": "'TableStyleLight1'",
       "label": "t('appTableStyleLight1')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1929:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1915:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1929,
-      "endLine": 1929,
+      "line": 1915,
+      "endLine": 1915,
       "kind": "menu-option-definition",
       "value": "'TableStyleLight9'",
       "label": "t('appTableStyleLight9')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1930:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1916:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1930,
-      "endLine": 1930,
+      "line": 1916,
+      "endLine": 1916,
       "kind": "menu-option-definition",
       "value": "'TableStyleMedium2'",
       "label": "t('appTableStyleMedium2')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1931:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1917:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1931,
-      "endLine": 1931,
+      "line": 1917,
+      "endLine": 1917,
       "kind": "menu-option-definition",
       "value": "'TableStyleMedium4'",
       "label": "t('appTableStyleMedium4')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1932:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1918:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1932,
-      "endLine": 1932,
+      "line": 1918,
+      "endLine": 1918,
       "kind": "menu-option-definition",
       "value": "'TableStyleMedium7'",
       "label": "t('appTableStyleMedium7')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1933:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1919:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1933,
-      "endLine": 1933,
+      "line": 1919,
+      "endLine": 1919,
       "kind": "menu-option-definition",
       "value": "'TableStyleDark2'",
       "label": "t('appTableStyleDark2')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1935:34:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1921:34:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1935,
-      "endLine": 1935,
+      "line": 1921,
+      "endLine": 1921,
       "kind": "command-dispatch",
       "expression": "onCommand(`format-as-table:${value}`)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1942:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1928:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1942,
-      "endLine": 1962,
+      "line": 1928,
+      "endLine": 1948,
       "kind": "actionable-element",
       "element": "MenuSelect",
       "labels": [
@@ -16301,175 +16268,175 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1946:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1932:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1946,
-      "endLine": 1946,
+      "line": 1932,
+      "endLine": 1932,
       "kind": "menu-option-definition",
       "value": "'good'",
       "label": "t('appStyleGood')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1947:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1933:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1947,
-      "endLine": 1947,
+      "line": 1933,
+      "endLine": 1933,
       "kind": "menu-option-definition",
       "value": "'bad'",
       "label": "t('appStyleBad')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1948:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1934:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1948,
-      "endLine": 1948,
+      "line": 1934,
+      "endLine": 1934,
       "kind": "menu-option-definition",
       "value": "'neutral'",
       "label": "t('appStyleNeutral')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1949:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1935:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1949,
-      "endLine": 1949,
+      "line": 1935,
+      "endLine": 1935,
       "kind": "menu-option-definition",
       "value": "'input'",
       "label": "t('appStyleInput')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1950:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1936:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1950,
-      "endLine": 1950,
+      "line": 1936,
+      "endLine": 1936,
       "kind": "menu-option-definition",
       "value": "'output'",
       "label": "t('appStyleOutput')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1951:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1937:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1951,
-      "endLine": 1951,
+      "line": 1937,
+      "endLine": 1937,
       "kind": "menu-option-definition",
       "value": "'calculation'",
       "label": "t('appStyleCalculation')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1952:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1938:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1952,
-      "endLine": 1952,
+      "line": 1938,
+      "endLine": 1938,
       "kind": "menu-option-definition",
       "value": "'warning-text'",
       "label": "t('appStyleWarningText')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1953:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1939:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1953,
-      "endLine": 1953,
+      "line": 1939,
+      "endLine": 1939,
       "kind": "menu-option-definition",
       "value": "'title'",
       "label": "t('appTitle')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1954:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1940:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1954,
-      "endLine": 1954,
+      "line": 1940,
+      "endLine": 1940,
       "kind": "menu-option-definition",
       "value": "'heading-1'",
       "label": "t('appStyleHeading1')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1955:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1941:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1955,
-      "endLine": 1955,
+      "line": 1941,
+      "endLine": 1941,
       "kind": "menu-option-definition",
       "value": "'heading-2'",
       "label": "t('appStyleHeading2')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1956:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1942:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1956,
-      "endLine": 1956,
+      "line": 1942,
+      "endLine": 1942,
       "kind": "menu-option-definition",
       "value": "'total'",
       "label": "t('appStyleTotal')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1957:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1943:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1957,
-      "endLine": 1957,
+      "line": 1943,
+      "endLine": 1943,
       "kind": "menu-option-definition",
       "value": "'accent1-20'",
       "label": "t('appStyleAccent120')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1958:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1944:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1958,
-      "endLine": 1958,
+      "line": 1944,
+      "endLine": 1944,
       "kind": "menu-option-definition",
       "value": "'accent1-40'",
       "label": "t('appStyleAccent140')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1959:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1945:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1959,
-      "endLine": 1959,
+      "line": 1945,
+      "endLine": 1945,
       "kind": "menu-option-definition",
       "value": "'accent1'",
       "label": "t('appStyleAccent1')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1961:34:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1947:34:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1961,
-      "endLine": 1961,
+      "line": 1947,
+      "endLine": 1947,
       "kind": "command-dispatch",
       "expression": "onCommand(`cell-style:${value}`)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1968:11:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1954:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1968,
-      "endLine": 1973,
+      "line": 1954,
+      "endLine": 1959,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -16484,21 +16451,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1972:28:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1958:28:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1972,
-      "endLine": 1972,
+      "line": 1958,
+      "endLine": 1958,
       "kind": "command-dispatch",
       "expression": "onCommand('format-cells')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1979:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1965:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1979,
-      "endLine": 1983,
+      "line": 1965,
+      "endLine": 1969,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -16514,21 +16481,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1982:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1968:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1982,
-      "endLine": 1982,
+      "line": 1968,
+      "endLine": 1968,
       "kind": "command-dispatch",
       "expression": "onCommand('insert-row-here')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1986:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1972:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1986,
-      "endLine": 1990,
+      "line": 1972,
+      "endLine": 1976,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -16544,21 +16511,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1989:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1975:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1989,
-      "endLine": 1989,
+      "line": 1975,
+      "endLine": 1975,
       "kind": "command-dispatch",
       "expression": "onCommand('delete-row-here')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1993:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1979:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1993,
-      "endLine": 1997,
+      "line": 1979,
+      "endLine": 1983,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -16574,21 +16541,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1996:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1982:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 1996,
-      "endLine": 1996,
+      "line": 1982,
+      "endLine": 1982,
       "kind": "command-dispatch",
       "expression": "onCommand('insert-col-here')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2000:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1986:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2000,
-      "endLine": 2004,
+      "line": 1986,
+      "endLine": 1990,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -16604,21 +16571,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2003:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1989:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2003,
-      "endLine": 2003,
+      "line": 1989,
+      "endLine": 1989,
       "kind": "command-dispatch",
       "expression": "onCommand('delete-col-here')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2007:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1993:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2007,
-      "endLine": 2012,
+      "line": 1993,
+      "endLine": 1998,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -16634,21 +16601,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2011:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:1997:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2011,
-      "endLine": 2011,
+      "line": 1997,
+      "endLine": 1997,
       "kind": "command-dispatch",
       "expression": "onCommand('insert-cells')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2015:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2001:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2015,
-      "endLine": 2020,
+      "line": 2001,
+      "endLine": 2006,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -16664,21 +16631,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2019:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2005:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2019,
-      "endLine": 2019,
+      "line": 2005,
+      "endLine": 2005,
       "kind": "command-dispatch",
       "expression": "onCommand('delete-cells')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2023:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2009:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2023,
-      "endLine": 2039,
+      "line": 2009,
+      "endLine": 2025,
       "kind": "actionable-element",
       "element": "MenuSelect",
       "labels": [
@@ -16694,65 +16661,65 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2033:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2019:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2033,
-      "endLine": 2033,
+      "line": 2019,
+      "endLine": 2019,
       "kind": "menu-option-definition",
       "value": "'row-height-open'",
       "label": "`${t('appRowHeight')}…`",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2034:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2020:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2034,
-      "endLine": 2034,
+      "line": 2020,
+      "endLine": 2020,
       "kind": "menu-option-definition",
       "value": "'autofit-row-height'",
       "label": "t('appAutoFitRowHeight')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2035:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2021:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2035,
-      "endLine": 2035,
+      "line": 2021,
+      "endLine": 2021,
       "kind": "menu-option-definition",
       "value": "'col-width-open'",
       "label": "`${t('appColWidth')}…`",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2036:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2022:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2036,
-      "endLine": 2036,
+      "line": 2022,
+      "endLine": 2022,
       "kind": "menu-option-definition",
       "value": "'autofit-col-width'",
       "label": "t('appAutoFitColWidth')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2038:34:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2024:34:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2038,
-      "endLine": 2038,
+      "line": 2024,
+      "endLine": 2024,
       "kind": "command-dispatch",
       "expression": "onCommand(value)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2046:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2032:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2046,
-      "endLine": 2057,
+      "line": 2032,
+      "endLine": 2043,
       "kind": "actionable-element",
       "element": "MenuSelect",
       "labels": [
@@ -16768,21 +16735,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2056:34:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2042:34:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2056,
-      "endLine": 2056,
+      "line": 2042,
+      "endLine": 2042,
       "kind": "command-dispatch",
       "expression": "onCommand(`autofn:${value}`)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2058:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2044:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2058,
-      "endLine": 2076,
+      "line": 2044,
+      "endLine": 2062,
       "kind": "actionable-element",
       "element": "MenuSelect",
       "labels": [
@@ -16798,87 +16765,87 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2068:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2054:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2068,
-      "endLine": 2068,
+      "line": 2054,
+      "endLine": 2054,
       "kind": "menu-option-definition",
       "value": "'sort:asc'",
       "label": "t('appSortAToZ')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2069:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2055:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2069,
-      "endLine": 2069,
+      "line": 2055,
+      "endLine": 2055,
       "kind": "menu-option-definition",
       "value": "'sort:desc'",
       "label": "t('appSortZToA')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2070:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2056:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2070,
-      "endLine": 2070,
+      "line": 2056,
+      "endLine": 2056,
       "kind": "menu-option-definition",
       "value": "'sort-custom-open'",
       "label": "t('appCustomSort')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2071:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2057:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2071,
-      "endLine": 2071,
+      "line": 2057,
+      "endLine": 2057,
       "kind": "menu-option-definition",
       "value": "'filter-toggle'",
       "label": "t('appFilter')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2072:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2058:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2072,
-      "endLine": 2072,
+      "line": 2058,
+      "endLine": 2058,
       "kind": "menu-option-definition",
       "value": "'filter-clear'",
       "label": "t('appClearFilterTitle')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2073:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2059:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2073,
-      "endLine": 2073,
+      "line": 2059,
+      "endLine": 2059,
       "kind": "menu-option-definition",
       "value": "'filter-reapply'",
       "label": "t('appReapplyTitle')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2075:34:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2061:34:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2075,
-      "endLine": 2075,
+      "line": 2061,
+      "endLine": 2061,
       "kind": "command-dispatch",
       "expression": "onCommand(value)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2077:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2063:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2077,
-      "endLine": 2095,
+      "line": 2063,
+      "endLine": 2081,
       "kind": "actionable-element",
       "element": "MenuSelect",
       "labels": [
@@ -16894,87 +16861,87 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2087:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2073:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2087,
-      "endLine": 2087,
+      "line": 2073,
+      "endLine": 2073,
       "kind": "menu-option-definition",
       "value": "'fill-down'",
       "label": "t('appFillDown')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2088:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2074:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2088,
-      "endLine": 2088,
+      "line": 2074,
+      "endLine": 2074,
       "kind": "menu-option-definition",
       "value": "'fill-right'",
       "label": "t('appFillRight')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2089:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2075:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2089,
-      "endLine": 2089,
+      "line": 2075,
+      "endLine": 2075,
       "kind": "menu-option-definition",
       "value": "'fill-up'",
       "label": "t('appFillUp')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2090:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2076:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2090,
-      "endLine": 2090,
+      "line": 2076,
+      "endLine": 2076,
       "kind": "menu-option-definition",
       "value": "'fill-left'",
       "label": "t('appFillLeft')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2091:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2077:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2091,
-      "endLine": 2091,
+      "line": 2077,
+      "endLine": 2077,
       "kind": "menu-option-definition",
       "value": "'fill-series-open'",
       "label": "t('appFillSeries')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2092:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2078:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2092,
-      "endLine": 2092,
+      "line": 2078,
+      "endLine": 2078,
       "kind": "menu-option-definition",
       "value": "'flash-fill'",
       "label": "t('appFlashFill')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2094:34:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2080:34:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2094,
-      "endLine": 2094,
+      "line": 2080,
+      "endLine": 2080,
       "kind": "command-dispatch",
       "expression": "onCommand(value)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2096:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2082:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2096,
-      "endLine": 2113,
+      "line": 2082,
+      "endLine": 2099,
       "kind": "actionable-element",
       "element": "MenuSelect",
       "labels": [
@@ -16990,76 +16957,76 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2106:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2092:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2106,
-      "endLine": 2106,
+      "line": 2092,
+      "endLine": 2092,
       "kind": "menu-option-definition",
       "value": "'all'",
       "label": "t('appClearAll')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2107:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2093:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2107,
-      "endLine": 2107,
+      "line": 2093,
+      "endLine": 2093,
       "kind": "menu-option-definition",
       "value": "'formats'",
       "label": "t('appClearFormats')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2108:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2094:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2108,
-      "endLine": 2108,
+      "line": 2094,
+      "endLine": 2094,
       "kind": "menu-option-definition",
       "value": "'contents'",
       "label": "t('appClearContents')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2109:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2095:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2109,
-      "endLine": 2109,
+      "line": 2095,
+      "endLine": 2095,
       "kind": "menu-option-definition",
       "value": "'comments'",
       "label": "t('appClearComments')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2110:17:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2096:17:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2110,
-      "endLine": 2110,
+      "line": 2096,
+      "endLine": 2096,
       "kind": "menu-option-definition",
       "value": "'hyperlinks'",
       "label": "t('appClearHyperlinks')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2112:34:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2098:34:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2112,
-      "endLine": 2112,
+      "line": 2098,
+      "endLine": 2098,
       "kind": "command-dispatch",
       "expression": "onCommand(`clear-${value}`)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2116:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2102:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2116,
-      "endLine": 2120,
+      "line": 2102,
+      "endLine": 2106,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -17074,21 +17041,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2119:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2105:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2119,
-      "endLine": 2119,
+      "line": 2105,
+      "endLine": 2105,
       "kind": "command-dispatch",
       "expression": "onCommand('find')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2123:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2109:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2123,
-      "endLine": 2127,
+      "line": 2109,
+      "endLine": 2113,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -17103,21 +17070,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2126:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2112:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2126,
-      "endLine": 2126,
+      "line": 2112,
+      "endLine": 2112,
       "kind": "command-dispatch",
       "expression": "onCommand('replace')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2130:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2116:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2130,
-      "endLine": 2134,
+      "line": 2116,
+      "endLine": 2120,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -17132,76 +17099,76 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2133:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2119:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2133,
-      "endLine": 2133,
+      "line": 2119,
+      "endLine": 2119,
       "kind": "command-dispatch",
       "expression": "onCommand('goto-open')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2146:5:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2132:5:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2146,
-      "endLine": 2146,
+      "line": 2132,
+      "endLine": 2132,
       "kind": "menu-option-definition",
       "value": "'SUM'",
       "label": "t('appFnSum')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2147:5:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2133:5:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2147,
-      "endLine": 2147,
+      "line": 2133,
+      "endLine": 2133,
       "kind": "menu-option-definition",
       "value": "'AVERAGE'",
       "label": "t('appFnAverage')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2148:5:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2134:5:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2148,
-      "endLine": 2148,
+      "line": 2134,
+      "endLine": 2134,
       "kind": "menu-option-definition",
       "value": "'COUNT'",
       "label": "t('appFnCountNumbers')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2149:5:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2135:5:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2149,
-      "endLine": 2149,
+      "line": 2135,
+      "endLine": 2135,
       "kind": "menu-option-definition",
       "value": "'MAX'",
       "label": "t('appFnMax')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2150:5:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2136:5:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2150,
-      "endLine": 2150,
+      "line": 2136,
+      "endLine": 2136,
       "kind": "menu-option-definition",
       "value": "'MIN'",
       "label": "t('appFnMin')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2239:7:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2225:7:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2239,
-      "endLine": 2248,
+      "line": 2225,
+      "endLine": 2234,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -17219,11 +17186,11 @@
       ]
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2259:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2245:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2259,
-      "endLine": 2269,
+      "line": 2245,
+      "endLine": 2255,
       "kind": "actionable-element",
       "element": "button",
       "labels": [],
@@ -17236,11 +17203,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2303:7:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2289:7:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2303,
-      "endLine": 2310,
+      "line": 2289,
+      "endLine": 2296,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -17255,11 +17222,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2318:19:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2304:19:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2318,
-      "endLine": 2328,
+      "line": 2304,
+      "endLine": 2314,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -17275,11 +17242,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2386:9:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2372:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2386,
-      "endLine": 2404,
+      "line": 2372,
+      "endLine": 2390,
       "kind": "actionable-element",
       "element": "input",
       "labels": [
@@ -17308,11 +17275,11 @@
       ]
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2405:9:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2391:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2405,
-      "endLine": 2415,
+      "line": 2391,
+      "endLine": 2401,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -17327,11 +17294,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2422:13:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2408:13:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2422,
-      "endLine": 2433,
+      "line": 2408,
+      "endLine": 2419,
       "kind": "actionable-element",
       "element": "button",
       "labels": [],
@@ -17344,11 +17311,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2457:5:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2443:5:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2457,
-      "endLine": 2471,
+      "line": 2443,
+      "endLine": 2457,
       "kind": "actionable-element",
       "element": "MenuSelect",
       "labels": [
@@ -17366,32 +17333,32 @@
       ]
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2463:60:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2449:60:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2463,
-      "endLine": 2466,
+      "line": 2449,
+      "endLine": 2452,
       "kind": "menu-option-definition",
       "value": "category.label",
       "label": "localized(category.label)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2469:23:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2455:23:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2469,
-      "endLine": 2469,
+      "line": 2455,
+      "endLine": 2455,
       "kind": "command-dispatch",
       "expression": "onCommand(`format:${category.pattern}`)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2499:7:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2485:7:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2499,
-      "endLine": 2499,
+      "line": 2485,
+      "endLine": 2485,
       "kind": "actionable-element",
       "element": "MenuSelect",
       "labels": [
@@ -17408,11 +17375,69 @@
       ]
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2514:9:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2503:7:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2514,
-      "endLine": 2518,
+      "line": 2503,
+      "endLine": 2509,
+      "kind": "actionable-element",
+      "element": "RibbonButton",
+      "labels": [
+        "label={t('appPivotTable')}"
+      ],
+      "actions": [
+        {
+          "name": "onClick",
+          "expression": "{() => onCommand('pivot-open')}"
+        }
+      ],
+      "constraints": []
+    },
+    {
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2508:24:command-dispatch",
+      "document": "Sheets",
+      "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
+      "line": 2508,
+      "endLine": 2508,
+      "kind": "command-dispatch",
+      "expression": "onCommand('pivot-open')",
+      "dynamic": false
+    },
+    {
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2510:7:actionable-element",
+      "document": "Sheets",
+      "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
+      "line": 2510,
+      "endLine": 2519,
+      "kind": "actionable-element",
+      "element": "RibbonButton",
+      "labels": [
+        "label={t('appRefresh')}"
+      ],
+      "actions": [
+        {
+          "name": "onClick",
+          "expression": "{() => {\n          const err = onRefreshPivot()\n          if (err) onCommand(`error:${err}`)\n        }}"
+        }
+      ],
+      "constraints": []
+    },
+    {
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2517:20:command-dispatch",
+      "document": "Sheets",
+      "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
+      "line": 2517,
+      "endLine": 2517,
+      "kind": "command-dispatch",
+      "expression": "onCommand(`error:${err}`)",
+      "dynamic": true
+    },
+    {
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2534:9:actionable-element",
+      "document": "Sheets",
+      "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
+      "line": 2534,
+      "endLine": 2538,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -17427,21 +17452,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2517:26:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2537:26:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2517,
-      "endLine": 2517,
+      "line": 2537,
+      "endLine": 2537,
       "kind": "command-dispatch",
       "expression": "onCommand('import-csv')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2522:9:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2542:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2522,
-      "endLine": 2526,
+      "line": 2542,
+      "endLine": 2546,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -17456,21 +17481,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2525:26:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2545:26:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2525,
-      "endLine": 2525,
+      "line": 2545,
+      "endLine": 2545,
       "kind": "command-dispatch",
       "expression": "onCommand('merge-workbooks')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2530:9:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2550:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2530,
-      "endLine": 2534,
+      "line": 2550,
+      "endLine": 2554,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -17485,21 +17510,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2533:26:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2553:26:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2533,
-      "endLine": 2533,
+      "line": 2553,
+      "endLine": 2553,
       "kind": "command-dispatch",
       "expression": "onCommand('refresh-all')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2552:7:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2572:7:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2552,
-      "endLine": 2558,
+      "line": 2572,
+      "endLine": 2578,
       "kind": "actionable-element",
       "element": "LargeRibbonMenu",
       "labels": [
@@ -17515,100 +17540,14 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2557:19:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2577:19:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2557,
-      "endLine": 2557,
+      "line": 2577,
+      "endLine": 2577,
       "kind": "menu-option-definition",
       "value": "'goal-seek-open'",
       "label": "t('appGoalSeek')",
-      "dynamic": false
-    },
-    {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2574:7:actionable-element",
-      "document": "Sheets",
-      "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2574,
-      "endLine": 2593,
-      "kind": "actionable-element",
-      "element": "LargeRibbonMenu",
-      "labels": [
-        "label={t('appOutlineGroup')}",
-        "title={t('appOutlineGroupTitle')}"
-      ],
-      "actions": [
-        {
-          "name": "onCommand",
-          "expression": "{onCommand}"
-        }
-      ],
-      "constraints": []
-    },
-    {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2580:11:menu-option-definition",
-      "document": "Sheets",
-      "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2580,
-      "endLine": 2580,
-      "kind": "menu-option-definition",
-      "value": "'outline-group:rows'",
-      "label": "t('appGroupRows')",
-      "dynamic": false
-    },
-    {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2581:11:menu-option-definition",
-      "document": "Sheets",
-      "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2581,
-      "endLine": 2581,
-      "kind": "menu-option-definition",
-      "value": "'outline-group:cols'",
-      "label": "t('appGroupCols')",
-      "dynamic": false
-    },
-    {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2582:11:menu-option-definition",
-      "document": "Sheets",
-      "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2582,
-      "endLine": 2582,
-      "kind": "menu-option-definition",
-      "value": "'outline-hide-detail:rows'",
-      "label": "t('appHideDetailRows')",
-      "dynamic": false
-    },
-    {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2583:11:menu-option-definition",
-      "document": "Sheets",
-      "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2583,
-      "endLine": 2583,
-      "kind": "menu-option-definition",
-      "value": "'outline-hide-detail:cols'",
-      "label": "t('appHideDetailCols')",
-      "dynamic": false
-    },
-    {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2584:11:menu-option-definition",
-      "document": "Sheets",
-      "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2584,
-      "endLine": 2587,
-      "kind": "menu-option-definition",
-      "value": "'outline-summary-below'",
-      "label": "`${outlineSummary.below ? '✓ ' : ''}${t('appOutlineSummaryBelow')}`",
-      "dynamic": false
-    },
-    {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2588:11:menu-option-definition",
-      "document": "Sheets",
-      "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2588,
-      "endLine": 2591,
-      "kind": "menu-option-definition",
-      "value": "'outline-summary-right'",
-      "label": "`${outlineSummary.right ? '✓ ' : ''}${t('appOutlineSummaryRight')}`",
       "dynamic": false
     },
     {
@@ -17616,12 +17555,12 @@
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
       "line": 2594,
-      "endLine": 2606,
+      "endLine": 2613,
       "kind": "actionable-element",
       "element": "LargeRibbonMenu",
       "labels": [
-        "label={t('appOutlineUngroup')}",
-        "title={t('appOutlineUngroupTitle')}"
+        "label={t('appOutlineGroup')}",
+        "title={t('appOutlineGroupTitle')}"
       ],
       "actions": [
         {
@@ -17638,8 +17577,8 @@
       "line": 2600,
       "endLine": 2600,
       "kind": "menu-option-definition",
-      "value": "'outline-ungroup:rows'",
-      "label": "t('appUngroupRows')",
+      "value": "'outline-group:rows'",
+      "label": "t('appGroupRows')",
       "dynamic": false
     },
     {
@@ -17649,8 +17588,8 @@
       "line": 2601,
       "endLine": 2601,
       "kind": "menu-option-definition",
-      "value": "'outline-ungroup:cols'",
-      "label": "t('appUngroupCols')",
+      "value": "'outline-group:cols'",
+      "label": "t('appGroupCols')",
       "dynamic": false
     },
     {
@@ -17660,8 +17599,8 @@
       "line": 2602,
       "endLine": 2602,
       "kind": "menu-option-definition",
-      "value": "'outline-show-detail:rows'",
-      "label": "t('appShowDetailRows')",
+      "value": "'outline-hide-detail:rows'",
+      "label": "t('appHideDetailRows')",
       "dynamic": false
     },
     {
@@ -17671,8 +17610,8 @@
       "line": 2603,
       "endLine": 2603,
       "kind": "menu-option-definition",
-      "value": "'outline-show-detail:cols'",
-      "label": "t('appShowDetailCols')",
+      "value": "'outline-hide-detail:cols'",
+      "label": "t('appHideDetailCols')",
       "dynamic": false
     },
     {
@@ -17680,18 +17619,104 @@
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
       "line": 2604,
-      "endLine": 2604,
+      "endLine": 2607,
+      "kind": "menu-option-definition",
+      "value": "'outline-summary-below'",
+      "label": "`${outlineSummary.below ? '✓ ' : ''}${t('appOutlineSummaryBelow')}`",
+      "dynamic": false
+    },
+    {
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2608:11:menu-option-definition",
+      "document": "Sheets",
+      "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
+      "line": 2608,
+      "endLine": 2611,
+      "kind": "menu-option-definition",
+      "value": "'outline-summary-right'",
+      "label": "`${outlineSummary.right ? '✓ ' : ''}${t('appOutlineSummaryRight')}`",
+      "dynamic": false
+    },
+    {
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2614:7:actionable-element",
+      "document": "Sheets",
+      "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
+      "line": 2614,
+      "endLine": 2626,
+      "kind": "actionable-element",
+      "element": "LargeRibbonMenu",
+      "labels": [
+        "label={t('appOutlineUngroup')}",
+        "title={t('appOutlineUngroupTitle')}"
+      ],
+      "actions": [
+        {
+          "name": "onCommand",
+          "expression": "{onCommand}"
+        }
+      ],
+      "constraints": []
+    },
+    {
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2620:11:menu-option-definition",
+      "document": "Sheets",
+      "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
+      "line": 2620,
+      "endLine": 2620,
+      "kind": "menu-option-definition",
+      "value": "'outline-ungroup:rows'",
+      "label": "t('appUngroupRows')",
+      "dynamic": false
+    },
+    {
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2621:11:menu-option-definition",
+      "document": "Sheets",
+      "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
+      "line": 2621,
+      "endLine": 2621,
+      "kind": "menu-option-definition",
+      "value": "'outline-ungroup:cols'",
+      "label": "t('appUngroupCols')",
+      "dynamic": false
+    },
+    {
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2622:11:menu-option-definition",
+      "document": "Sheets",
+      "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
+      "line": 2622,
+      "endLine": 2622,
+      "kind": "menu-option-definition",
+      "value": "'outline-show-detail:rows'",
+      "label": "t('appShowDetailRows')",
+      "dynamic": false
+    },
+    {
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2623:11:menu-option-definition",
+      "document": "Sheets",
+      "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
+      "line": 2623,
+      "endLine": 2623,
+      "kind": "menu-option-definition",
+      "value": "'outline-show-detail:cols'",
+      "label": "t('appShowDetailCols')",
+      "dynamic": false
+    },
+    {
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2624:11:menu-option-definition",
+      "document": "Sheets",
+      "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
+      "line": 2624,
+      "endLine": 2624,
       "kind": "menu-option-definition",
       "value": "'outline-clear'",
       "label": "t('appClearOutline')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2607:7:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2627:7:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2607,
-      "endLine": 2613,
+      "line": 2627,
+      "endLine": 2633,
       "kind": "actionable-element",
       "element": "RibbonButton",
       "labels": [
@@ -17706,21 +17731,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2612:24:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2632:24:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2612,
-      "endLine": 2612,
+      "line": 2632,
+      "endLine": 2632,
       "kind": "command-dispatch",
       "expression": "onCommand('subtotal-open')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2627:7:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2647:7:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2627,
-      "endLine": 2638,
+      "line": 2647,
+      "endLine": 2658,
       "kind": "actionable-element",
       "element": "LargeRibbonMenu",
       "labels": [
@@ -17736,55 +17761,55 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2633:11:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2653:11:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2633,
-      "endLine": 2633,
+      "line": 2653,
+      "endLine": 2653,
       "kind": "menu-option-definition",
       "value": "'text-to-columns:2'",
       "label": "t('appSplitByComma')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2634:11:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2654:11:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2634,
-      "endLine": 2634,
+      "line": 2654,
+      "endLine": 2654,
       "kind": "menu-option-definition",
       "value": "'text-to-columns:4'",
       "label": "t('appSplitBySemicolon')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2635:11:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2655:11:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2635,
-      "endLine": 2635,
+      "line": 2655,
+      "endLine": 2655,
       "kind": "menu-option-definition",
       "value": "'text-to-columns:8'",
       "label": "t('appSplitBySpace')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2636:11:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2656:11:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2636,
-      "endLine": 2636,
+      "line": 2656,
+      "endLine": 2656,
       "kind": "menu-option-definition",
       "value": "'text-to-columns:1'",
       "label": "t('appSplitByTab')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2639:7:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2659:7:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2639,
-      "endLine": 2645,
+      "line": 2659,
+      "endLine": 2665,
       "kind": "actionable-element",
       "element": "RibbonButton",
       "labels": [
@@ -17799,21 +17824,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2644:24:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2664:24:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2644,
-      "endLine": 2644,
+      "line": 2664,
+      "endLine": 2664,
       "kind": "command-dispatch",
       "expression": "onCommand('flash-fill')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2646:7:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2666:7:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2646,
-      "endLine": 2652,
+      "line": 2666,
+      "endLine": 2672,
       "kind": "actionable-element",
       "element": "RibbonButton",
       "labels": [
@@ -17828,21 +17853,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2651:24:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2671:24:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2651,
-      "endLine": 2651,
+      "line": 2671,
+      "endLine": 2671,
       "kind": "command-dispatch",
       "expression": "onCommand('remove-duplicates-open')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2653:7:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2673:7:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2653,
-      "endLine": 2660,
+      "line": 2673,
+      "endLine": 2680,
       "kind": "actionable-element",
       "element": "RibbonButton",
       "labels": [
@@ -17857,21 +17882,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2659:24:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2679:24:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2659,
-      "endLine": 2659,
+      "line": 2679,
+      "endLine": 2679,
       "kind": "command-dispatch",
       "expression": "onCommand('dv-open')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2661:7:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2681:7:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2661,
-      "endLine": 2667,
+      "line": 2681,
+      "endLine": 2687,
       "kind": "actionable-element",
       "element": "RibbonButton",
       "labels": [
@@ -17886,21 +17911,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2666:24:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2686:24:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2666,
-      "endLine": 2666,
+      "line": 2686,
+      "endLine": 2686,
       "kind": "command-dispatch",
       "expression": "onCommand('consolidate-open')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2681:7:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2701:7:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2681,
-      "endLine": 2691,
+      "line": 2701,
+      "endLine": 2711,
       "kind": "actionable-element",
       "element": "LargeRibbonMenu",
       "labels": [
@@ -17916,44 +17941,44 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2687:11:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2707:11:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2687,
-      "endLine": 2687,
+      "line": 2707,
+      "endLine": 2707,
       "kind": "menu-option-definition",
       "value": "'sort:asc'",
       "label": "t('appSortAToZ')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2688:11:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2708:11:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2688,
-      "endLine": 2688,
+      "line": 2708,
+      "endLine": 2708,
       "kind": "menu-option-definition",
       "value": "'sort:desc'",
       "label": "t('appSortZToA')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2689:11:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2709:11:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2689,
-      "endLine": 2689,
+      "line": 2709,
+      "endLine": 2709,
       "kind": "menu-option-definition",
       "value": "'sort-custom-open'",
       "label": "t('appCustomSort')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2692:7:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2712:7:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2692,
-      "endLine": 2698,
+      "line": 2712,
+      "endLine": 2718,
       "kind": "actionable-element",
       "element": "RibbonButton",
       "labels": [
@@ -17968,21 +17993,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2697:24:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2717:24:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2697,
-      "endLine": 2697,
+      "line": 2717,
+      "endLine": 2717,
       "kind": "command-dispatch",
       "expression": "onCommand('filter-toggle')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2700:9:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2720:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2700,
-      "endLine": 2704,
+      "line": 2720,
+      "endLine": 2724,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -17997,21 +18022,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2703:26:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2723:26:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2703,
-      "endLine": 2703,
+      "line": 2723,
+      "endLine": 2723,
       "kind": "command-dispatch",
       "expression": "onCommand('filter-clear')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2708:9:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2728:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2708,
-      "endLine": 2712,
+      "line": 2728,
+      "endLine": 2732,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -18026,21 +18051,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2711:26:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2731:26:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2711,
-      "endLine": 2711,
+      "line": 2731,
+      "endLine": 2731,
       "kind": "command-dispatch",
       "expression": "onCommand('filter-reapply')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2716:9:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2736:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2716,
-      "endLine": 2720,
+      "line": 2736,
+      "endLine": 2740,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -18055,21 +18080,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2719:26:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2739:26:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2719,
-      "endLine": 2719,
+      "line": 2739,
+      "endLine": 2739,
       "kind": "command-dispatch",
       "expression": "onCommand('filter-advanced')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2771:5:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2791:5:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2771,
-      "endLine": 2777,
+      "line": 2791,
+      "endLine": 2797,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -18086,11 +18111,11 @@
       ]
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2813:7:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2833:7:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2813,
-      "endLine": 2813,
+      "line": 2833,
+      "endLine": 2833,
       "kind": "actionable-element",
       "element": "FunctionLibraryGroup",
       "labels": [],
@@ -18103,11 +18128,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2814:24:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2834:24:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2814,
-      "endLine": 2814,
+      "line": 2834,
+      "endLine": 2834,
       "kind": "actionable-element",
       "element": "DefinedNamesGroup",
       "labels": [],
@@ -18120,11 +18145,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2815:20:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2835:20:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2815,
-      "endLine": 2815,
+      "line": 2835,
+      "endLine": 2835,
       "kind": "actionable-element",
       "element": "FormulaAuditingGroup",
       "labels": [],
@@ -18137,11 +18162,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2816:7:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2836:7:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2816,
-      "endLine": 2816,
+      "line": 2836,
+      "endLine": 2836,
       "kind": "actionable-element",
       "element": "CalculationGroup",
       "labels": [],
@@ -18154,11 +18179,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2839:9:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2859:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2839,
-      "endLine": 2847,
+      "line": 2859,
+      "endLine": 2867,
       "kind": "actionable-element",
       "element": "MenuSelect",
       "labels": [
@@ -18173,33 +18198,33 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2843:13:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2863:13:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2843,
-      "endLine": 2843,
+      "line": 2863,
+      "endLine": 2863,
       "kind": "menu-option-definition",
       "value": "'calc-mode:auto'",
       "label": "t('appCalcAuto') + (calcManual ? '' : ' ✓')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2844:13:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2864:13:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2844,
-      "endLine": 2844,
+      "line": 2864,
+      "endLine": 2864,
       "kind": "menu-option-definition",
       "value": "'calc-mode:manual'",
       "label": "t('appCalcManual') + (calcManual ? ' ✓' : '')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2850:9:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2870:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2850,
-      "endLine": 2854,
+      "line": 2870,
+      "endLine": 2874,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -18214,21 +18239,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2853:26:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2873:26:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2853,
-      "endLine": 2853,
+      "line": 2873,
+      "endLine": 2873,
       "kind": "command-dispatch",
       "expression": "onCommand('calculate-now')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2858:9:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2878:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2858,
-      "endLine": 2862,
+      "line": 2878,
+      "endLine": 2882,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -18243,21 +18268,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2861:26:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2881:26:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2861,
-      "endLine": 2861,
+      "line": 2881,
+      "endLine": 2881,
       "kind": "command-dispatch",
       "expression": "onCommand('calculate-sheet')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2877:5:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2897:5:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2877,
-      "endLine": 2884,
+      "line": 2897,
+      "endLine": 2904,
       "kind": "actionable-element",
       "element": "RibbonButton",
       "labels": [
@@ -18272,21 +18297,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2883:22:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2903:22:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2883,
-      "endLine": 2883,
+      "line": 2903,
+      "endLine": 2903,
       "kind": "command-dispatch",
       "expression": "onCommand(`insert-function-open:${category}`)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2888:7:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2908:7:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2888,
-      "endLine": 2894,
+      "line": 2908,
+      "endLine": 2914,
       "kind": "actionable-element",
       "element": "RibbonButton",
       "labels": [
@@ -18301,21 +18326,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2893:24:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2913:24:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2893,
-      "endLine": 2893,
+      "line": 2913,
+      "endLine": 2913,
       "kind": "command-dispatch",
       "expression": "onCommand('insert-function-open')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2903:9:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2923:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2903,
-      "endLine": 2908,
+      "line": 2923,
+      "endLine": 2928,
       "kind": "actionable-element",
       "element": "MenuSelect",
       "labels": [
@@ -18330,21 +18355,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2907:30:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2927:30:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2907,
-      "endLine": 2907,
+      "line": 2927,
+      "endLine": 2927,
       "kind": "command-dispatch",
       "expression": "onCommand(`autofn:${value}`)",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2932:7:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2952:7:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2932,
-      "endLine": 2938,
+      "line": 2952,
+      "endLine": 2958,
       "kind": "actionable-element",
       "element": "RibbonButton",
       "labels": [
@@ -18359,21 +18384,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2937:24:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2957:24:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2937,
-      "endLine": 2937,
+      "line": 2957,
+      "endLine": 2957,
       "kind": "command-dispatch",
       "expression": "onCommand('name-manager-open')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2940:9:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2960:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2940,
-      "endLine": 2944,
+      "line": 2960,
+      "endLine": 2964,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -18388,21 +18413,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2943:26:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2963:26:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2943,
-      "endLine": 2943,
+      "line": 2963,
+      "endLine": 2963,
       "kind": "command-dispatch",
       "expression": "onCommand('name-manager-open')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2953:11:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2973:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2953,
-      "endLine": 2962,
+      "line": 2973,
+      "endLine": 2982,
       "kind": "actionable-element",
       "element": "MenuSelect",
       "labels": [
@@ -18417,33 +18442,33 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2958:47:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2978:47:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2958,
-      "endLine": 2958,
+      "line": 2978,
+      "endLine": 2978,
       "kind": "menu-option-definition",
       "value": "`use-in-formula:${name}`",
       "label": "name",
       "dynamic": true
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2959:20:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2979:20:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2959,
-      "endLine": 2959,
+      "line": 2979,
+      "endLine": 2979,
       "kind": "menu-option-definition",
       "value": "'name-manager-open'",
       "label": "t('appNoNamesYet')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2968:11:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2988:11:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2968,
-      "endLine": 2976,
+      "line": 2988,
+      "endLine": 2996,
       "kind": "actionable-element",
       "element": "MenuSelect",
       "labels": [
@@ -18458,33 +18483,33 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2972:15:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2992:15:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2972,
-      "endLine": 2972,
+      "line": 2992,
+      "endLine": 2992,
       "kind": "menu-option-definition",
       "value": "'create-names:top'",
       "label": "t('appCreateNamesTopRow')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2973:15:menu-option-definition",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2993:15:menu-option-definition",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2973,
-      "endLine": 2973,
+      "line": 2993,
+      "endLine": 2993,
       "kind": "menu-option-definition",
       "value": "'create-names:left'",
       "label": "t('appCreateNamesLeftCol')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2988:9:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:3008:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2988,
-      "endLine": 2992,
+      "line": 3008,
+      "endLine": 3012,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -18499,21 +18524,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2991:26:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:3011:26:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2991,
-      "endLine": 2991,
+      "line": 3011,
+      "endLine": 3011,
       "kind": "command-dispatch",
       "expression": "onCommand('trace-precedents')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2996:9:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:3016:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2996,
-      "endLine": 3000,
+      "line": 3016,
+      "endLine": 3020,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -18528,21 +18553,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:2999:26:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:3019:26:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 2999,
-      "endLine": 2999,
+      "line": 3019,
+      "endLine": 3019,
       "kind": "command-dispatch",
       "expression": "onCommand('trace-dependents')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:3004:9:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:3024:9:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 3004,
-      "endLine": 3008,
+      "line": 3024,
+      "endLine": 3028,
       "kind": "actionable-element",
       "element": "button",
       "labels": [
@@ -18557,21 +18582,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:3007:26:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:3027:26:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 3007,
-      "endLine": 3007,
+      "line": 3027,
+      "endLine": 3027,
       "kind": "command-dispatch",
       "expression": "onCommand('remove-arrows')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:3013:7:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:3033:7:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 3013,
-      "endLine": 3019,
+      "line": 3033,
+      "endLine": 3039,
       "kind": "actionable-element",
       "element": "RibbonButton",
       "labels": [
@@ -18586,21 +18611,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:3018:24:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:3038:24:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 3018,
-      "endLine": 3018,
+      "line": 3038,
+      "endLine": 3038,
       "kind": "command-dispatch",
       "expression": "onCommand('toggle-show-formulas')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:3020:7:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:3040:7:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 3020,
-      "endLine": 3026,
+      "line": 3040,
+      "endLine": 3046,
       "kind": "actionable-element",
       "element": "RibbonButton",
       "labels": [
@@ -18615,21 +18640,21 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:3025:24:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:3045:24:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 3025,
-      "endLine": 3025,
+      "line": 3045,
+      "endLine": 3045,
       "kind": "command-dispatch",
       "expression": "onCommand('error-checking')",
       "dynamic": false
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:3027:7:actionable-element",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:3047:7:actionable-element",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 3027,
-      "endLine": 3033,
+      "line": 3047,
+      "endLine": 3053,
       "kind": "actionable-element",
       "element": "RibbonButton",
       "labels": [
@@ -18644,11 +18669,11 @@
       "constraints": []
     },
     {
-      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:3032:24:command-dispatch",
+      "id": "apps/sheets/src/renderer/SheetsRibbon.tsx:3052:24:command-dispatch",
       "document": "Sheets",
       "file": "apps/sheets/src/renderer/SheetsRibbon.tsx",
-      "line": 3032,
-      "endLine": 3032,
+      "line": 3052,
+      "endLine": 3052,
       "kind": "command-dispatch",
       "expression": "onCommand('watch-window')",
       "dynamic": false

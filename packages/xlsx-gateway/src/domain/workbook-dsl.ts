@@ -774,6 +774,8 @@ const addPivotSchema = z.object({
     )
     .max(8)
     .optional(),
+  /** Caption for subtotal rows/columns in the baked output; default "Subtotal" */
+  subtotalLabel: z.string().min(1).max(64).optional(),
   /** pivot table name; default Pivot1, Pivot2, … */
   name: z
     .string()

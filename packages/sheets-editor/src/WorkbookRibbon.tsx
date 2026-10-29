@@ -3,6 +3,7 @@ import {
   DataToolsRibbonGroup,
   ForecastRibbonGroup,
   GetDataRibbonGroup,
+  PivotTableRibbonGroup,
   OutlineRibbonGroup,
   SortFilterRibbonGroup,
 } from '../../../apps/sheets/src/renderer/SheetsRibbon'
@@ -18,6 +19,7 @@ import type { WorkbookRuntime } from './runtime'
 import { editorText } from './i18n'
 import { DesktopHomeRibbon } from './DesktopHomeRibbon'
 import { DataValidationDialog } from './DataValidationDialog'
+import { usePivotCreate } from './PivotCreate'
 import { ConsolidateDialog } from '../../../apps/sheets/src/renderer/ConsolidateDialog'
 import { SortDialog } from '../../../apps/sheets/src/renderer/SortDialog'
 import type { ConsolidateConfig } from '../../../apps/sheets/src/renderer/consolidate'
@@ -72,6 +74,7 @@ export function WorkbookRibbon({
     ReturnType<WorkbookRuntime['removeDuplicatesContext']>
   > | null>(null)
   const [dedupeNotice, setDedupeNotice] = useState<number | null>(null)
+  const pivot = usePivotCreate(runtime, locale, onError)
   const [dataNotice, setDataNotice] = useState<{
     key: 'appCsvImported' | 'appMergeWorkbooksDone' | 'appOpenCanceled'
     params: Record<string, string | number>
@@ -258,6 +261,22 @@ export function WorkbookRibbon({
       <>
         <LocaleScope lang={normalizeLang(locale ?? navigator.language)}>
           <div className="ribbon workbook-shared-sort-filter" data-ribbon-body="">
+            <PivotTableRibbonGroup
+              onCommand={(command) => {
+                if (command === 'pivot-open') pivot.open()
+                else if (command.startsWith('error:')) onError(command.slice('error:'.length))
+                else onError(`Unknown PivotTable command: ${command}`)
+              }}
+              onRefreshPivot={() => {
+                try {
+                  runtime?.refreshPivotSync()
+                  return null
+                } catch (error) {
+                  return error instanceof Error ? error.message : String(error)
+                }
+              }}
+              onIsSelectionInPivot={() => runtime?.selectionInPivot ?? false}
+            />
             <GetDataRibbonGroup
               onCommand={(command) => {
                 if (command === 'import-csv')
@@ -590,6 +609,7 @@ export function WorkbookRibbon({
           )}
         </p>
       )}
+      {pivot.dialog}
       {dataNotice && (
         <p role="status">
           {tFor(normalizeLang(locale ?? navigator.language), dataNotice.key, dataNotice.params)}

@@ -1,3 +1,4 @@
+import { sessionPivotAdditions } from '@genoffice/xlsx-gateway/domain/session-candidate'
 import {
   visibilityEditsSchema,
   visibilityStructuralOp,
@@ -569,6 +570,17 @@ export class SessionPackageWriter implements PackageWriter {
       }
       for (let start = 50; start < visualAdditions.length; start += 50)
         await writeStage({ edits: [], visualAdditions: visualAdditions.slice(start, start + 50) })
+      // New PivotTables pin final coordinates and names, so they follow every
+      // structural and sheet stage in a stage of their own.
+      const pivots = sessionPivotAdditions(state).map(({ sheetId, sourceSheetId, ...pivot }) => {
+        const owner = state.sheets.find((sheet) => sheet.id === sheetId),
+          origin = state.sheets.find((sheet) => sheet.id === sourceSheetId)
+        if (!owner || !origin)
+          throw new WorkbookError('invalid_document', 'A new PivotTable lost its worksheet.')
+        return { ...pivot, sheetName: owner.name, sourceSheetName: origin.name }
+      })
+      for (let start = 0; start < pivots.length; start += 20)
+        await writeStage({ edits: [], pivotAdditions: pivots.slice(start, start + 20) })
       assertNotCancelled(signal)
       if ((await hashFile(originalPath)) !== originalHash)
         throw new WorkbookError(

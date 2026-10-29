@@ -721,7 +721,10 @@ export async function buildGatewayPayloads(input: GatewayBuildInput): Promise<Ga
         }
         let layout
         try {
-          layout = buildPivotLayout(grid, op)
+          layout = buildPivotLayout(grid, op, {
+            subtotal: op.subtotalLabel ?? 'Subtotal',
+            grandTotal: 'Grand Total',
+          })
         } catch (err) {
           if (err instanceof PivotLayoutError) reject(i, op.op, err.message)
           throw err

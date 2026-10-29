@@ -1210,25 +1210,11 @@ export function SheetsRibbon({
   if (activeTab === 'Data') {
     return (
       <div className="ribbon" data-ribbon-body="">
-        <RibbonGroup label={t('appPivotTable')}>
-          <RibbonButton
-            large
-            label={t('appPivotTable')}
-            detail={t('appOoxmlPivot')}
-            symbol="⊞"
-            onClick={() => onCommand('pivot-open')}
-          />
-          <RibbonButton
-            large
-            label={t('appRefresh')}
-            detail={onIsSelectionInPivot() ? t('appRefreshHintIn') : t('appRefreshHintOut')}
-            symbol="⟳"
-            onClick={() => {
-              const err = onRefreshPivot()
-              if (err) onCommand(`error:${err}`)
-            }}
-          />
-        </RibbonGroup>
+        <PivotTableRibbonGroup
+          onCommand={onCommand}
+          onRefreshPivot={onRefreshPivot}
+          onIsSelectionInPivot={onIsSelectionInPivot}
+        />
         <GetDataRibbonGroup onCommand={onCommand} />
         <SortFilterRibbonGroup onCommand={onCommand} />
         <DataToolsRibbonGroup onCommand={onCommand} />
@@ -2498,6 +2484,40 @@ function LargeRibbonMenu({
       </span>
       <MenuSelect cover label={label} options={options} onPick={onCommand} disabled={disabled} />
     </div>
+  )
+}
+
+/** Shared desktop Data → PivotTable entries (create, refresh the selected pivot). */
+export function PivotTableRibbonGroup({
+  onCommand,
+  onRefreshPivot,
+  onIsSelectionInPivot,
+}: {
+  readonly onCommand: (command: string) => void
+  readonly onRefreshPivot: () => string | null
+  readonly onIsSelectionInPivot: () => boolean
+}): React.JSX.Element {
+  const { t } = useI18n()
+  return (
+    <RibbonGroup label={t('appPivotTable')}>
+      <RibbonButton
+        large
+        label={t('appPivotTable')}
+        detail={t('appOoxmlPivot')}
+        symbol="⊞"
+        onClick={() => onCommand('pivot-open')}
+      />
+      <RibbonButton
+        large
+        label={t('appRefresh')}
+        detail={onIsSelectionInPivot() ? t('appRefreshHintIn') : t('appRefreshHintOut')}
+        symbol="⟳"
+        onClick={() => {
+          const err = onRefreshPivot()
+          if (err) onCommand(`error:${err}`)
+        }}
+      />
+    </RibbonGroup>
   )
 }
 

@@ -80,6 +80,7 @@ export async function prepareCandidateMaterial(input: {
         )
       }
       if (op.op === 'add_chart') addRange(op.sheetId, op.dataRange)
+      if (op.op === 'add_pivot') addRange(op.sheetId, op.sourceRange)
       if ('source' in op && typeof op.source === 'string')
         addRange(
           'sourceSheetId' in op && op.sourceSheetId ? op.sourceSheetId : op.sheetId,

@@ -3426,3 +3426,18 @@ appearances and installed Linux/Windows VSIX. Not complete Data-tab parity.
 - Unit: xlsx-gateway 331, workbook-session 255, sheets-editor 42,
   vscode-office 61, desktop merge/csv 7; typechecks, lint and production build
   with boundary checks pass.
+
+### Session PivotTable create (2026-10-29)
+
+- workbook-session `pivot-save` (real sidecar): baked Region/Sum of Amount/Grand
+  Total output, pending pivot blocks insert_rows and overlapping pivots, saved
+  pivotTable/pivotCacheDefinition parts, custom XML preserved, reopened file
+  reports the pivot range and value 32.5.
+- Native VS Code 1.109.5 `Desktop PivotTable create UI`: Refresh no-pivot
+  message; Insert → PivotTable opens the desktop dialog with C3:E7; an
+  overlapping destination is refused in the dialog without a revision; G3
+  creates one revision; exact Undo/Redo; saved pivot parts and sentinel; an
+  independent reopen reports the native pivot range and baked values.
+- Data/Insert native regression set: 18 passing; Insert Link fails identically
+  at HEAD. Unit: gateway 331, session 256, editor 42, extension 61, desktop
+  pivot/ribbon 194; lint/theme/typechecks/build and regenerated tool schemas.

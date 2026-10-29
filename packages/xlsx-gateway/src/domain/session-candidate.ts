@@ -24,6 +24,7 @@ import { InMemoryWorkbookAdapter } from './in-memory-workbook'
 import {
   formatAddress,
   parseAddress,
+  rangeCellCount,
   parseRange,
   columnIndex,
   rangeAddresses,
@@ -64,6 +65,18 @@ import { copySessionRange } from './session-range-copy'
 import { measureNormalFontMdw, type NormalFontDescriptor } from './normal-font-metrics'
 import { SESSION_OPERATION_NAMES, hasMixedSessionOperations } from '../shared/session-operations'
 import { assertMergeOperation, updateSessionMerges, sessionMerges } from './session-merges'
+import {
+  PIVOT_SOURCE_COL_LIMIT,
+  PIVOT_SOURCE_ROW_LIMIT,
+  PivotLayoutError,
+  areasOverlap,
+  buildPivotLayout,
+  pivotOutputArea,
+  type PivotLayout,
+} from './pivot-layout'
+import { pivotBlockMatrix, pivotPageRows, pivotSourceGrid } from './pivot-placement'
+import { workbookPivotAddSchema } from '../shared/workbook-protocol'
+import { MAX_GRID_COLUMNS, MAX_GRID_ROWS } from '../shared/grid-bounds'
 
 type TypedCell = z.infer<typeof cellRecordSchema>
 export interface CandidateMaterial {
@@ -335,6 +348,12 @@ export async function computeCandidateState(
     }
     return stateChangeset(before, stage.nextState, affected)
   }
+  const pivotOp = intent.operations.find((op) => op.op === 'add_pivot')
+  if (pivotOp) {
+    if (intent.operations.length !== 1)
+      throw new Error('A PivotTable must be created in a standalone transaction.')
+    return addSessionPivot(before, current, intent, pivotOp, material, options)
+  }
   let workbookFeatures = structuredClone(current.features ?? {})
   const workbookMetadata = current.features?.originalMetadata as Record<string, unknown> | undefined
   if (
@@ -342,6 +361,20 @@ export async function computeCandidateState(
     (workbookMetadata?.workbookProtection as { lockStructure?: boolean } | undefined)?.lockStructure
   )
     throw new Error('protected_workbook_structure')
+  // A pending PivotTable pins its source and output coordinates and sheet names.
+  const pendingPivots = sessionPivotAdditions(current)
+  if (pendingPivots.length) {
+    if (intent.operations.some((op) => changingCoordinates.has(op.op)))
+      throw new Error('unsupported_structural_feature: session_pivot')
+    for (const op of intent.operations)
+      if (
+        (op.op === 'delete_sheet' || op.op === 'rename_sheet') &&
+        pendingPivots.some(
+          (pivot) => pivot.sheetId === op.sheetId || pivot.sourceSheetId === op.sheetId,
+        )
+      )
+        throw new Error('unsupported_structural_feature: session_pivot')
+  }
   if (intent.operations.some((op) => changingCoordinates.has(op.op))) {
     if (current.sheets.some((sheet) => !material.completeSheetIds.includes(sheet.id)))
       throw new Error('incomplete_structural_material')
@@ -1685,4 +1718,186 @@ export async function computeCandidateState(
       ? ('pending' as const)
       : changes.calculationState,
   }
+}
+
+type PivotArea = { startRow: number; endRow: number; startColumn: number; endColumn: number }
+
+/** Pending session pivots, by target sheet (written as native parts on save). */
+export function sessionPivotAdditions(state: { sheets: readonly { features?: unknown }[] }) {
+  return state.sheets.flatMap(
+    (sheet) =>
+      ((sheet.features as { pivotAdditions?: unknown[] } | undefined)?.pivotAdditions ??
+        []) as import('../shared/workbook-protocol').WorkbookPivotAdd[],
+  )
+}
+
+/**
+ * Create PivotTable: bakes the computed block like the desktop and records the
+ * native definition for the package writer. Private write stages stay within
+ * the ordinary batch; only the final root is published.
+ */
+async function addSessionPivot(
+  before: Parameters<typeof stateChangeset>[0],
+  current: ReturnType<typeof workbookStateSchema.parse>,
+  intent: ReturnType<typeof transactionInputSchema.parse>,
+  op: Extract<import('./workbook-dsl').WorkbookOperation, { op: 'add_pivot' }>,
+  material: CandidateMaterial,
+  options: Parameters<typeof computeCandidateState>[3],
+) {
+  const targetId = op.targetSheetId ?? op.sheetId
+  const sourceSheet = current.sheets.find((sheet) => sheet.id === op.sheetId),
+    targetSheet = current.sheets.find((sheet) => sheet.id === targetId)
+  if (!sourceSheet || !targetSheet) throw new Error('unknown_sheet')
+  if (!sourceSheet.originalSheetId || !targetSheet.originalSheetId)
+    throw new Error('pivot_layout:onAddedSheet')
+  const source = parseRange(op.sourceRange)
+  const sourceRows = source.endRow - source.startRow + 1,
+    sourceColumns = source.endColumn - source.startColumn + 1
+  if (sourceRows < 2) throw new Error('pivot_layout:sourceNeedsRows')
+  if (sourceRows > PIVOT_SOURCE_ROW_LIMIT) throw new Error('pivot_layout:sourceRowLimit')
+  if (sourceColumns > PIVOT_SOURCE_COL_LIMIT) throw new Error('pivot_layout:sourceColLimit')
+  if (!material.completeSheetIds.includes(sourceSheet.id) && sourceRows * sourceColumns > 200_000)
+    throw new Error('incomplete_pivot_source')
+  const cells = []
+  for (let row = source.startRow; row <= source.endRow; row++) {
+    const line = []
+    for (let column = source.startColumn; column <= source.endColumn; column++) {
+      const cell = sourceSheet.cells[formatAddress(row, column)]
+      if (
+        cell?.formula &&
+        (cell.calculationState !== 'ready' || !Object.hasOwn(cell, 'cachedValue'))
+      )
+        throw new Error('Wait for PivotTable source formulas to finish calculating, then retry.')
+      const value = cell?.formula ? cell.cachedValue : cell?.rawValue
+      if (cell?.kind === 'error' || (cell?.formula && cell.calculationState === 'error'))
+        throw new Error('pivot_layout:sourceError')
+      line.push({
+        value: (value ?? null) as string | number | boolean | null,
+        pattern: cell?.numberFormat ?? cell?.style?.numberFormat,
+        static1904: current.dateSystem === '1904' && !cell?.formula,
+      })
+    }
+    cells.push(line)
+  }
+  const grid = pivotSourceGrid(
+    cells,
+    op.values.filter((value) => value.formula === undefined).map((value) => value.field),
+  )
+  let layout: PivotLayout
+  try {
+    layout = buildPivotLayout(grid, op, {
+      subtotal: op.subtotalLabel ?? 'Subtotal',
+      grandTotal: 'Grand Total',
+    })
+  } catch (error) {
+    if (error instanceof PivotLayoutError)
+      throw new Error(`pivot_layout:${error.code}:${JSON.stringify(error.params)}`, {
+        cause: error,
+      })
+    throw error
+  }
+  const matrix = pivotBlockMatrix(layout),
+    pageRows = pivotPageRows(layout.definition.pageFieldIndices?.length ?? 0)
+  const blockAnchor = parseAddress(op.targetCell)
+  const location = pivotOutputArea(
+    { row: blockAnchor.row + pageRows, column: blockAnchor.column },
+    layout,
+  )
+  const block: PivotArea = { ...location, startRow: blockAnchor.row }
+  if (block.endRow >= MAX_GRID_ROWS || block.endColumn >= MAX_GRID_COLUMNS)
+    throw new Error('The PivotTable would extend past the worksheet grid.')
+  if (matrix.length * layout.width > 50_000)
+    throw new Error('The PivotTable output exceeds 50,000 cells.')
+  if (targetId === op.sheetId && areasOverlap(block, source))
+    throw new Error('pivot_layout:overlapSource')
+  const originalPivots = ((
+    targetSheet.features?.originalMetadata as { pivotRanges?: PivotArea[] } | undefined
+  )?.pivotRanges ?? []) as PivotArea[]
+  if (originalPivots.some((area) => areasOverlap(block, area)))
+    throw new Error('pivot_layout:overlapExisting')
+  const pending = sessionPivotAdditions(current)
+  for (const pivot of pending)
+    if (pivot.sheetId === targetId && areasOverlap(block, pivot.location))
+      throw new Error(`pivot_layout:overlapSession:${JSON.stringify({ name: pivot.name })}`)
+  let name = op.name
+  if (name === undefined) {
+    const taken = new Set(pending.map((pivot) => pivot.name.toLowerCase()))
+    let index = pending.length + 1
+    while (taken.has(`pivot${index}`)) index++
+    name = `Pivot${index}`
+  } else if (pending.some((pivot) => pivot.name.toLowerCase() === name!.toLowerCase()))
+    throw new Error(`pivot_layout:nameUsed:${JSON.stringify({ name })}`)
+  const writes: import('./workbook-dsl').WorkbookOperation[] = []
+  for (let column = 0; column < layout.width; column += 100) {
+    const width = Math.min(100, layout.width - column),
+      band = Math.max(1, Math.min(500, Math.floor(2000 / width)))
+    for (let row = 0; row < matrix.length; row += band)
+      writes.push({
+        op: 'set_range',
+        sheetId: targetId,
+        start: formatAddress(blockAnchor.row + row, blockAnchor.column + column),
+        values: matrix.slice(row, row + band).map((line) => line.slice(column, column + width)),
+      })
+  }
+  // Value columns' numFmt covers the data rows only (no header, no grand total).
+  const dataRows = layout.height - 2
+  for (const { columnOffset, format } of layout.numberFormats)
+    for (let row = 1; row <= dataRows; row += 2000)
+      writes.push({
+        op: 'format_range',
+        sheetId: targetId,
+        range: `${formatAddress(location.startRow + row, location.startColumn + columnOffset)}:${formatAddress(location.startRow + Math.min(dataRows, row + 1999), location.startColumn + columnOffset)}`,
+        format: { numberFormat: format },
+      })
+  let state = current
+  const affected: string[] = []
+  // Each stage is an ordinary batch: at most 2,000 written cells.
+  let stageOps: import('./workbook-dsl').WorkbookOperation[] = [],
+    budget = 0
+  const flush = async () => {
+    if (!stageOps.length) return
+    const stage = await computeCandidateState(
+      state,
+      { ...intent, operations: stageOps },
+      { ...material, state },
+      options,
+    )
+    affected.push(...stage.affectedTargets)
+    state = stage.nextState
+    stageOps = []
+    budget = 0
+  }
+  for (const write of writes) {
+    const cells =
+      write.op === 'set_range'
+        ? write.values.length * write.values[0]!.length
+        : write.op === 'format_range'
+          ? rangeCellCount(parseRange(write.range))
+          : 1
+    if (budget + cells > 2000) await flush()
+    stageOps.push(write)
+    budget += cells
+  }
+  await flush()
+  const addition = workbookPivotAddSchema.parse({
+    sheetId: targetId,
+    sourceSheetId: op.sheetId,
+    sourceArea: source,
+    location,
+    name,
+    ...layout.definition,
+  })
+  const next = structuredClone(state)
+  const target = next.sheets.find((sheet) => sheet.id === targetId)!
+  target.features = {
+    ...target.features,
+    pivotAdditions: [
+      ...(((target.features?.pivotAdditions ?? []) as unknown[]) ?? []),
+      JSON.parse(JSON.stringify(addition)),
+    ],
+  }
+  affected.push(
+    `${targetId}!${formatAddress(block.startRow, block.startColumn)}:${formatAddress(block.endRow, block.endColumn)}`,
+  )
+  return stateChangeset(before, next, affected)
 }
