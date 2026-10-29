@@ -20,6 +20,8 @@ export interface WorkbookSource {
   readBaseRange(sessionId: string, sheetId: string, range: string): Promise<unknown>
   readFeatures(sessionId: string, sheetId: string): Promise<unknown>
   archiveManifest(path: string): Promise<unknown>
+  /** One package part as text (pivot definitions); hosts without it skip those features. */
+  readArchiveText?(path: string, entry: string): Promise<string>
   close(sessionId: string): Promise<void>
 }
 

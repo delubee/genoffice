@@ -3441,3 +3441,18 @@ appearances and installed Linux/Windows VSIX. Not complete Data-tab parity.
 - Data/Insert native regression set: 18 passing; Insert Link fails identically
   at HEAD. Unit: gateway 331, session 256, editor 42, extension 61, desktop
   pivot/ribbon 194; lint/theme/typechecks/build and regenerated tool schemas.
+
+### File PivotTable refresh (2026-10-29)
+
+- workbook-session `pivot-refresh` (real sidecar): file pivot definitions load at
+  open; an edited source value recomputes in place; a new member inside the
+  source grows the output by one row; growth into occupied cells is refused;
+  saved cache has refreshOnLoad, the pivot location is E2:F7 and a reopened
+  file reports the grown range and grand total.
+- Native VS Code 1.109.5 `Desktop PivotTable create UI` extended: after reopen,
+  Data → Refresh shows "Refreshed 1 PivotTable(s)", one revision with recomputed
+  North 23 and a new West row (G3:H8, grand total 40), exact Undo/Redo, saved
+  refreshOnLoad and location, and a second independent reopen with the grown
+  pivot range.
+- Data/Insert native set: 19 passing. Unit: gateway 331, session 257, editor 42,
+  extension 61, desktop pivot/ribbon 194. CLI: only the 4 failures present at HEAD.

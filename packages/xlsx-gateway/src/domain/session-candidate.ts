@@ -74,7 +74,14 @@ import {
   pivotOutputArea,
   type PivotLayout,
 } from './pivot-layout'
-import { pivotBlockMatrix, pivotPageRows, pivotSourceGrid } from './pivot-placement'
+import {
+  PivotGrowError,
+  grownPivotBlock,
+  pivotBlockMatrix,
+  pivotPageRows,
+  pivotSourceGrid,
+} from './pivot-placement'
+import { growPivotDefinition, recomputePivotData } from './pivot-engine'
 import { workbookPivotAddSchema } from '../shared/workbook-protocol'
 import { MAX_GRID_COLUMNS, MAX_GRID_ROWS } from '../shared/grid-bounds'
 
@@ -347,6 +354,21 @@ export async function computeCandidateState(
       affected.push(...stage.affectedTargets)
     }
     return stateChangeset(before, stage.nextState, affected)
+  }
+  if (intent.operations.some((op) => op.op === 'refresh_pivot')) {
+    if (!intent.operations.every((op) => op.op === 'refresh_pivot'))
+      throw new Error('PivotTable refresh must be a standalone transaction.')
+    return refreshSessionPivots(
+      before,
+      current,
+      intent,
+      intent.operations as Extract<
+        import('./workbook-dsl').WorkbookOperation,
+        { op: 'refresh_pivot' }
+      >[],
+      material,
+      options,
+    )
   }
   const pivotOp = intent.operations.find((op) => op.op === 'add_pivot')
   if (pivotOp) {
@@ -1849,9 +1871,42 @@ async function addSessionPivot(
         range: `${formatAddress(location.startRow + row, location.startColumn + columnOffset)}:${formatAddress(location.startRow + Math.min(dataRows, row + 1999), location.startColumn + columnOffset)}`,
         format: { numberFormat: format },
       })
+  const written = await applyBoundedWrites(current, intent, writes, material, options)
+  const state = written.state,
+    affected = written.affected
+  const addition = workbookPivotAddSchema.parse({
+    sheetId: targetId,
+    sourceSheetId: op.sheetId,
+    sourceArea: source,
+    location,
+    name,
+    ...layout.definition,
+  })
+  const next = structuredClone(state)
+  const target = next.sheets.find((sheet) => sheet.id === targetId)!
+  target.features = {
+    ...target.features,
+    pivotAdditions: [
+      ...(((target.features?.pivotAdditions ?? []) as unknown[]) ?? []),
+      JSON.parse(JSON.stringify(addition)),
+    ],
+  }
+  affected.push(
+    `${targetId}!${formatAddress(block.startRow, block.startColumn)}:${formatAddress(block.endRow, block.endColumn)}`,
+  )
+  return stateChangeset(before, next, affected)
+}
+
+/** Writes in private ordinary-batch stages (at most 2,000 cells each); only the final root is used. */
+async function applyBoundedWrites(
+  current: ReturnType<typeof workbookStateSchema.parse>,
+  intent: ReturnType<typeof transactionInputSchema.parse>,
+  writes: readonly import('./workbook-dsl').WorkbookOperation[],
+  material: CandidateMaterial,
+  options: Parameters<typeof computeCandidateState>[3],
+) {
   let state = current
   const affected: string[] = []
-  // Each stage is an ordinary batch: at most 2,000 written cells.
   let stageOps: import('./workbook-dsl').WorkbookOperation[] = [],
     budget = 0
   const flush = async () => {
@@ -1879,25 +1934,190 @@ async function addSessionPivot(
     budget += cells
   }
   await flush()
-  const addition = workbookPivotAddSchema.parse({
-    sheetId: targetId,
-    sourceSheetId: op.sheetId,
-    sourceArea: source,
-    location,
-    name,
-    ...layout.definition,
-  })
-  const next = structuredClone(state)
-  const target = next.sheets.find((sheet) => sheet.id === targetId)!
-  target.features = {
-    ...target.features,
-    pivotAdditions: [
-      ...(((target.features?.pivotAdditions ?? []) as unknown[]) ?? []),
-      JSON.parse(JSON.stringify(addition)),
-    ],
+  return { state, affected }
+}
+
+function matrixWrites(
+  sheetId: string,
+  startRow: number,
+  startColumn: number,
+  matrix: readonly (readonly (string | number | boolean | null)[])[],
+) {
+  const writes: import('./workbook-dsl').WorkbookOperation[] = []
+  const width = matrix[0]?.length ?? 0
+  for (let column = 0; column < width; column += 100) {
+    const span = Math.min(100, width - column),
+      band = Math.max(1, Math.min(500, Math.floor(2000 / span)))
+    for (let row = 0; row < matrix.length; row += band)
+      writes.push({
+        op: 'set_range',
+        sheetId,
+        start: formatAddress(startRow + row, startColumn + column),
+        values: matrix.slice(row, row + band).map((line) => line.slice(column, column + span)),
+      })
   }
-  affected.push(
-    `${targetId}!${formatAddress(block.startRow, block.startColumn)}:${formatAddress(block.endRow, block.endColumn)}`,
-  )
-  return stateChangeset(before, next, affected)
+  return writes
+}
+
+export interface FilePivot {
+  readonly path: string
+  readonly cachePath?: string
+  readonly definition?: import('../shared/workbook-protocol').WorkbookPivotDefinition
+  readonly error?: string
+}
+
+/** A sheet's file PivotTables, with definitions grown by earlier session refreshes. */
+export function filePivotsOfSheet(sheet: { features?: unknown }): FilePivot[] {
+  const features = (sheet.features ?? {}) as {
+    originalMetadata?: { pivotDefinitions?: FilePivot[]; pivotTables?: { path: string }[] }
+    pivotDefinitionEdits?: Record<string, FilePivot['definition']>
+  }
+  const parsed = features.originalMetadata?.pivotDefinitions ?? []
+  return (features.originalMetadata?.pivotTables ?? []).map(({ path }) => {
+    const entry = parsed.find((item) => item.path === path) ?? { path, error: 'not_loaded' }
+    const edited = features.pivotDefinitionEdits?.[path]
+    return edited ? { ...entry, definition: edited } : entry
+  })
+}
+
+/** The current sheet holding a file pivot's source (the definition names the original sheet). */
+export function pivotSourceSheet<
+  T extends { sheets: readonly { id: string; name: string }[]; sheetMap?: unknown },
+>(state: T, sourceSheet: string): T['sheets'][number] | undefined {
+  const map = (state.sheetMap ?? {}) as Record<string, { originalName?: string }>
+  return state.sheets.find((sheet) => (map[sheet.id]?.originalName ?? sheet.name) === sourceSheet)
+}
+
+/**
+ * Data → Refresh / Refresh All for file PivotTables, as the desktop does:
+ * recompute the data area from fresh source values, or fold new members into
+ * the layout and rewrite the widened output. Saves set refreshOnLoad and the
+ * new location; the cache records are rebuilt by Excel.
+ */
+async function refreshSessionPivots(
+  before: Parameters<typeof stateChangeset>[0],
+  current: ReturnType<typeof workbookStateSchema.parse>,
+  intent: ReturnType<typeof transactionInputSchema.parse>,
+  ops: readonly Extract<import('./workbook-dsl').WorkbookOperation, { op: 'refresh_pivot' }>[],
+  material: CandidateMaterial,
+  options: Parameters<typeof computeCandidateState>[3],
+) {
+  const writes: import('./workbook-dsl').WorkbookOperation[] = []
+  const edits = new Map<
+    string,
+    {
+      definitions: Record<string, unknown>
+      cachePaths: Set<string>
+      outputRefs: Record<string, string>
+    }
+  >()
+  let refreshed = 0
+  for (const op of ops) {
+    const sheet = current.sheets.find((item) => item.id === op.sheetId)
+    if (!sheet) throw new Error('unknown_sheet')
+    const pivots = filePivotsOfSheet(sheet)
+    if (!pivots.length) throw new Error('pivot_layout:sheetNoPivot')
+    if (!material.completeSheetIds.includes(sheet.id)) throw new Error('incomplete_pivot_material')
+    const edit = edits.get(sheet.id) ?? {
+      definitions: {},
+      cachePaths: new Set<string>(),
+      outputRefs: {},
+    }
+    edits.set(sheet.id, edit)
+    for (const pivot of pivots) {
+      const definition = pivot.definition
+      if (!definition || !pivot.cachePath) throw new Error('pivot_layout:defNotLoaded')
+      const sourceSheet = pivotSourceSheet(current, definition.sourceSheet)
+      if (!sourceSheet)
+        throw new Error(
+          `pivot_layout:sourceSheetMissing:${JSON.stringify({ name: definition.sourceSheet })}`,
+        )
+      const source = parseRange(definition.sourceRef)
+      const cells = []
+      for (let row = source.startRow; row <= source.endRow; row++) {
+        const line = []
+        for (let column = source.startColumn; column <= source.endColumn; column++) {
+          const cell = sourceSheet.cells[formatAddress(row, column)]
+          if (
+            cell?.formula &&
+            (cell.calculationState !== 'ready' || !Object.hasOwn(cell, 'cachedValue'))
+          )
+            throw new Error(
+              'Wait for PivotTable source formulas to finish calculating, then retry.',
+            )
+          line.push({
+            value: ((cell?.formula ? cell.cachedValue : cell?.rawValue) ?? null) as
+              string | number | boolean | null,
+            pattern: cell?.numberFormat ?? cell?.style?.numberFormat,
+            static1904: current.dateSystem === '1904' && !cell?.formula,
+          })
+        }
+        cells.push(line)
+      }
+      const grid = pivotSourceGrid(
+        cells,
+        definition.dataFields.flatMap(({ field }) => {
+          const owner = definition.fields[field]
+          return owner && owner.formula === undefined ? [owner.name] : []
+        }),
+      )
+      const growth = growPivotDefinition(definition, grid)
+      const { data } = recomputePivotData(growth.definition, grid)
+      const bounds = parseRange(definition.outputRef)
+      if (!growth.grown) {
+        const startRow = bounds.startRow + definition.firstDataRow,
+          startColumn = bounds.startColumn + definition.firstDataCol
+        if (
+          startRow + data.length - 1 !== bounds.endRow ||
+          startColumn + (data[0]?.length ?? 0) - 1 !== bounds.endColumn
+        )
+          throw new Error('pivot_layout:layoutMismatch')
+        if (data.length) writes.push(...matrixWrites(sheet.id, startRow, startColumn, data))
+      } else {
+        let output: ReturnType<typeof grownPivotBlock>
+        try {
+          output = grownPivotBlock(growth.definition, data, bounds, op.subtotalLabel ?? 'Subtotal')
+        } catch (error) {
+          if (error instanceof PivotGrowError)
+            throw new Error('pivot_layout:growUnsupported', { cause: error })
+          throw error
+        }
+        for (const area of output.growth)
+          for (let row = area.startRow; row <= area.endRow; row++)
+            for (let column = area.startColumn; column <= area.endColumn; column++) {
+              const cell = sheet.cells[formatAddress(row, column)]
+              if (cell && (cell.formula || (cell.rawValue !== null && cell.rawValue !== '')))
+                throw new Error('pivot_layout:growConflict')
+            }
+        writes.push(...matrixWrites(sheet.id, bounds.startRow, bounds.startColumn, output.block))
+        edit.definitions[pivot.path] = { ...growth.definition, outputRef: output.outputRef }
+        edit.outputRefs[pivot.cachePath] = output.outputRef
+      }
+      edit.cachePaths.add(pivot.cachePath)
+      refreshed++
+    }
+  }
+  if (!refreshed) throw new Error('pivot_layout:sheetNoPivot')
+  const written = await applyBoundedWrites(current, intent, writes, material, options)
+  const next = structuredClone(written.state)
+  for (const [sheetId, edit] of edits) {
+    const sheet = next.sheets.find((item) => item.id === sheetId)!
+    const features = (sheet.features ?? {}) as {
+      pivotDefinitionEdits?: Record<string, unknown>
+      pivotRefresh?: { cachePaths: string[]; outputRefs: Record<string, string> }
+    }
+    sheet.features = {
+      ...sheet.features,
+      pivotDefinitionEdits: JSON.parse(
+        JSON.stringify({ ...features.pivotDefinitionEdits, ...edit.definitions }),
+      ),
+      pivotRefresh: {
+        cachePaths: [
+          ...new Set([...(features.pivotRefresh?.cachePaths ?? []), ...edit.cachePaths]),
+        ],
+        outputRefs: { ...features.pivotRefresh?.outputRefs, ...edit.outputRefs },
+      },
+    }
+  }
+  return stateChangeset(before, next, [...written.affected, ...edits.keys()])
 }

@@ -1138,6 +1138,8 @@ const setNoteSchema = z.object({
 const refreshPivotSchema = z.object({
   op: z.literal('refresh_pivot'),
   sheetId: z.string().min(1),
+  /** Caption for subtotal rows when a refresh grows the layout; default "Subtotal" */
+  subtotalLabel: z.string().min(1).max(64).optional(),
 })
 
 // Freeze panes: rows/columns counted from the top-left; 0/0 unfreezes.

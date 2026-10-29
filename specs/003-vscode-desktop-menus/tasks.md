@@ -578,7 +578,7 @@ Get Data shared group follow-up (2026-10-29):
 - [x] Lift the 2,000-cell CSV limit to the desktop 50,000 cells through a host staged transaction that stays one history entry.
 - [x] Implement Merge Workbooks: host picker, private source snapshots, deduped sheets with values/styles/merges/row heights/column widths as one staged commit.
 - [ ] Merge Workbooks beyond 50,000 total cells, hyperlinks/validation/conditional formats/visuals of source sheets, and installed Linux/Windows acceptance.
-- [ ] Pivot-aware Refresh All (depends on the Pivot workflow).
+- [x] Pivot-aware Refresh All.
 - [ ] Investigate intermittent `protected-view-save.test.ts` failure under full parallel workbook-session runs (1 of 4 runs; passes alone).
 
 Working-tree fixes found while resuming (2026-10-29):
@@ -596,8 +596,10 @@ PivotTable create follow-up (2026-10-29):
 - [x] Add session `add_pivot` with desktop default placement, shared layout and source labels, overlap/name checks, bounded private write stages and one history entry.
 - [x] Persist session pivots as native pivot parts through a final package-writer stage; refuse coordinate/sheet changes that would desync a pending pivot.
 - [x] Mount the shared Data PivotTable group and Insert PivotTable button with the actual desktop dialog (async, retained draft on rejection); verify native create/history/save/reopen.
-- [ ] Refresh / Refresh All recompute for session and file pivots through the shared pivot engine.
+- [x] Refresh / Refresh All recompute for file pivots through the shared pivot engine, with growth, refreshOnLoad and location persistence; session-created pivots refresh after save, as on the desktop.
 - [ ] Edit PivotTable with the desktop PivotTable Fields pane (relayout of session and file pivots).
 - [ ] Slicers, timelines and PivotChart.
-- [ ] `Desktop Insert Link UI` fails in isolation at HEAD fc726c60 as well (Go To stays disabled); pre-existing.
+- [ ] `Desktop Insert Link UI` is flaky (Go To stays disabled in some runs, also at HEAD fc726c60); passed in the later Data/Insert run.
 - [ ] CLI: `mcp.test.ts` schema budget (96,298 > 94,208 bytes at HEAD), sidecar `info`, missing generated fixture and Homebrew install tests fail at HEAD; pre-existing.
+- [ ] A host-side commit that lands while a reopened view performs its first reads leaves the view on "The requested state is no longer current"; the view should resync instead of showing the error screen.
+- [ ] Selection-in-pivot hints and edit protection should follow grown (refreshed) output ranges, not only the original pivot ranges.

@@ -331,12 +331,8 @@ export function DesktopHomeRibbon({
             if (runtime) void run(() => runtime.ribbonChat())
           }}
           onRefreshPivot={() => {
-            try {
-              runtime?.refreshPivotSync()
-              return null
-            } catch (error) {
-              return error instanceof Error ? error.message : String(error)
-            }
+            if (runtime) void run(() => runtime.refreshPivots('sheet'))
+            return null
           }}
           onIsSelectionInPivot={() => runtime?.selectionInPivot ?? false}
         />

@@ -1,3 +1,7 @@
+import {
+  filePivotsOfSheet,
+  pivotSourceSheet,
+} from '@genoffice/xlsx-gateway/domain/session-candidate'
 import { chartSelectionReferences } from '@genoffice/xlsx-gateway/domain/chart-series-selection'
 import {
   applyChartStateEdit,
@@ -81,6 +85,25 @@ export async function prepareCandidateMaterial(input: {
       }
       if (op.op === 'add_chart') addRange(op.sheetId, op.dataRange)
       if (op.op === 'add_pivot') addRange(op.sheetId, op.sourceRange)
+      if (op.op === 'refresh_pivot') {
+        // Growth checks need the whole output sheet; recompute reads each source range.
+        const sheet = state.sheets.find((item) => item.id === op.sheetId)
+        if (sheet) {
+          if (Math.max(sheet.rows, 1) * Math.max(sheet.columns, 1) > LIMITS.rangeCells)
+            throw new WorkbookError(
+              'structural_material_budget',
+              'PivotTable refresh needs more than 200,000 cells of sheet material.',
+            )
+          addRange(
+            sheet.id,
+            `A1:${formatAddress(Math.max(0, sheet.rows - 1), Math.max(0, sheet.columns - 1))}`,
+          )
+          for (const pivot of filePivotsOfSheet(sheet)) {
+            const source = pivot.definition && pivotSourceSheet(state, pivot.definition.sourceSheet)
+            if (source && pivot.definition) addRange(source.id, pivot.definition.sourceRef)
+          }
+        }
+      }
       if ('source' in op && typeof op.source === 'string')
         addRange(
           'sourceSheetId' in op && op.sourceSheetId ? op.sourceSheetId : op.sheetId,

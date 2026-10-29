@@ -76,7 +76,7 @@ export function WorkbookRibbon({
   const [dedupeNotice, setDedupeNotice] = useState<number | null>(null)
   const pivot = usePivotCreate(runtime, locale, onError)
   const [dataNotice, setDataNotice] = useState<{
-    key: 'appCsvImported' | 'appMergeWorkbooksDone' | 'appOpenCanceled'
+    key: 'appCsvImported' | 'appMergeWorkbooksDone' | 'appOpenCanceled' | 'appPivotsRefreshed'
     params: Record<string, string | number>
   } | null>(null)
   const [advancedFilterContext, setAdvancedFilterContext] = useState<Awaited<
@@ -268,12 +268,12 @@ export function WorkbookRibbon({
                 else onError(`Unknown PivotTable command: ${command}`)
               }}
               onRefreshPivot={() => {
-                try {
-                  runtime?.refreshPivotSync()
-                  return null
-                } catch (error) {
-                  return error instanceof Error ? error.message : String(error)
-                }
+                run(async () => {
+                  setDataNotice(null)
+                  const count = await runtime!.refreshPivots('sheet')
+                  setDataNotice({ key: 'appPivotsRefreshed', params: { count } })
+                })
+                return null
               }}
               onIsSelectionInPivot={() => runtime?.selectionInPivot ?? false}
             />
@@ -287,7 +287,12 @@ export function WorkbookRibbon({
                     )
                     if (imported) setDataNotice({ key: 'appCsvImported', params: imported })
                   })
-                else if (command === 'refresh-all') run(() => runtime!.refreshAll())
+                else if (command === 'refresh-all')
+                  run(async () => {
+                    setDataNotice(null)
+                    const count = await runtime!.refreshPivots('all')
+                    setDataNotice({ key: 'appPivotsRefreshed', params: { count } })
+                  })
                 else if (command === 'merge-workbooks')
                   run(async () => {
                     setDataNotice(null)

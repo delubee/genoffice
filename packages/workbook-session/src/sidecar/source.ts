@@ -1,3 +1,4 @@
+import { readArchiveEntryText } from '@genoffice/xlsx-gateway/gateway/xlsx-package-io'
 import { calculationContextSchema } from '../calculation/context'
 import { parseRange } from '@genoffice/xlsx-gateway/domain/cell-address'
 import {
@@ -155,6 +156,9 @@ export class SidecarWorkbookSource implements WorkbookSource {
           ).values(),
         ]
     this.features.set(key, next)
+  }
+  readArchiveText(path: string, entry: string) {
+    return readArchiveEntryText(this.client, path, entry)
   }
   archiveManifest(path: string) {
     return this.client.archiveManifest(path)

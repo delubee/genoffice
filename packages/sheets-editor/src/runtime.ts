@@ -260,6 +260,7 @@ import {
   pickCsvFile,
 } from '../../../apps/sheets/src/renderer/csv-import-model'
 import { decodeCsvBuffer } from '@genoffice/xlsx-gateway/gateway/csv-import'
+import { filePivotsOfSheet } from '@genoffice/xlsx-gateway/domain/session-candidate'
 import {
   PIVOT_SOURCE_COL_LIMIT,
   PIVOT_SOURCE_ROW_LIMIT,
@@ -5177,33 +5178,61 @@ export class WorkbookRuntime implements EditorProjection {
     }
     return null
   }
-  /** Data → Refresh: the selected sheet's PivotTables, as on the desktop (synchronous ribbon contract). */
-  refreshPivotSync() {
-    const target = this.ribbonTarget
-    if (!target) throw new Error(t('appNoActiveSheet'))
-    const sheet = this.state?.sheets.find((item) => item.id === target.sheetId)
-    const features = (sheet?.features ?? {}) as {
-      pivotAdditions?: unknown[]
-      originalMetadata?: { pivotRanges?: unknown[] }
-    }
-    if (!features.pivotAdditions?.length && !features.originalMetadata?.pivotRanges?.length)
-      throw new Error(t('appCurrentSheetNoPivot'))
-    throw new Error('Refreshing PivotTables is not available in VS Code yet.')
-  }
-  /** Data → Refresh All: the workbook's pivot tables, as on the desktop. */
-  async refreshAll() {
-    const hasPivots = this.state?.sheets.some((sheet) => {
-      const features = (sheet.features ?? {}) as {
-        pivotAdditions?: unknown[]
-        originalMetadata?: { pivotRanges?: unknown[] }
-      }
-      return (
-        (features.pivotAdditions?.length ?? 0) > 0 ||
-        (features.originalMetadata?.pivotRanges?.length ?? 0) > 0
+  private pivotRefreshWork: Promise<number> | undefined
+  /**
+   * Data → Refresh (active sheet) / Refresh All (workbook): recomputes file
+   * PivotTables from fresh source values, as the desktop does. Pivots created
+   * this session are written on save and refresh after that.
+   */
+  refreshPivots(scope: 'sheet' | 'all') {
+    if (this.pivotRefreshWork)
+      return Promise.reject(new Error('PivotTables are already being refreshed.'))
+    const work = (async () => {
+      if (!(await this.flushCellEditor())) throw new Error('Finish editing before refreshing.')
+      const state = this.state,
+        target = this.ribbonTarget
+      if (!state) throw new Error(t('appOpenXlsxFirst'))
+      if (scope === 'sheet' && !target) throw new Error(t('appNoActiveSheet'))
+      const sheets = state.sheets.filter((sheet) =>
+        scope === 'sheet' ? sheet.id === target!.sheetId : true,
       )
-    })
-    if (!hasPivots) throw new Error(t('appWorkbookNoPivot'))
-    throw new Error('Refreshing PivotTables is not available in VS Code yet.')
+      const withFilePivots = sheets.filter((sheet) => filePivotsOfSheet(sheet).length > 0)
+      if (!withFilePivots.length) {
+        const pending = sheets.some(
+          (sheet) => ((sheet.features?.pivotAdditions ?? []) as unknown[]).length > 0,
+        )
+        throw new Error(
+          t(
+            pending
+              ? 'appPivotDefNotLoadedSave'
+              : scope === 'sheet'
+                ? 'appCurrentSheetNoPivot'
+                : 'appWorkbookNoPivot',
+          ),
+        )
+      }
+      const count = withFilePivots.reduce((sum, sheet) => sum + filePivotsOfSheet(sheet).length, 0)
+      try {
+        await this.enqueue(
+          withFilePivots.map((sheet) => ({
+            op: 'refresh_pivot' as const,
+            sheetId: sheet.id,
+            subtotalLabel: t('appPivotSubtotal'),
+          })),
+          { stateId: state.stateId, revision: this.revision },
+          { failureInDialog: true },
+        )
+      } catch (error) {
+        throw new Error(pivotErrorMessage(error), { cause: error })
+      }
+      return count
+    })()
+    this.pivotRefreshWork = work
+    const clear = () => {
+      if (this.pivotRefreshWork === work) this.pivotRefreshWork = undefined
+    }
+    void work.then(clear, clear)
+    return work
   }
   async subtotalContext() {
     if (!(await this.flushEditor())) throw new Error('Finish editing before creating subtotals.')
@@ -6163,6 +6192,7 @@ export class WorkbookRuntime implements EditorProjection {
       this.textToColumnsWork,
       this.csvImportWork,
       this.mergeWorkbooksWork,
+      this.pivotRefreshWork,
       this.consolidateWork,
       this.goalSeekWork,
       this.outlineWork,

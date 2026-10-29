@@ -4280,6 +4280,29 @@
                     "properties": {
                       "op": {
                         "type": "string",
+                        "const": "refresh_pivot"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "subtotalLabel": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
                         "const": "insert_rows"
                       },
                       "sheetId": {

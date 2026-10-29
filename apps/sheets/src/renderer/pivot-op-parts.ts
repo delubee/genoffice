@@ -131,6 +131,12 @@ const SESSION_ERROR_KEYS = {
   overlapExisting: 'appPivotOverlapExisting',
   overlapSession: 'appPivotOverlapSession',
   nameUsed: 'appPivotNameUsed',
+  sheetNoPivot: 'appSheetNoPivot',
+  defNotLoaded: 'appPivotDefNotLoaded',
+  sourceSheetMissing: 'appPivotSourceSheetMissing',
+  layoutMismatch: 'appPivotLayoutMismatch',
+  growUnsupported: 'appPivotGrowUnsupported',
+  growConflict: 'appPivotGrowConflict',
 } as const satisfies Record<string, Parameters<typeof t>[0]>
 
 /** Localizes a session `pivot_layout:<code>[:<params>]` rejection; other errors pass through. */
@@ -139,7 +145,7 @@ export function pivotErrorMessage(error: unknown): string {
   const match = /pivot_layout:(\w+)(?::(\{[^}]*\}))?/.exec(message)
   const key = match && SESSION_ERROR_KEYS[match[1] as keyof typeof SESSION_ERROR_KEYS]
   if (!key) return message
-  let params: Record<string, string | number> = {}
+  let params: Record<string, string | number>
   try {
     params = match[2] ? (JSON.parse(match[2]) as Record<string, string | number>) : {}
   } catch {

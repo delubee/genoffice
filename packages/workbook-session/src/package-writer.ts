@@ -528,8 +528,23 @@ export class SessionPackageWriter implements PackageWriter {
           })
         }
       }
+      // Refreshed file pivots: refreshOnLoad for their caches and widened locations. The
+      // writer checks growth areas against its input, so they share the cell-edit stage.
+      const pivotCacheRefreshPaths: string[] = [],
+        pivotRefreshUpdates: { cachePath: string; sheetName: string; newOutputRef: string }[] = []
+      for (const sheet of state.sheets) {
+        const refresh = (sheet.features?.pivotRefresh ?? {}) as {
+          cachePaths?: string[]
+          outputRefs?: Record<string, string>
+        }
+        pivotCacheRefreshPaths.push(...(refresh.cachePaths ?? []))
+        for (const [cachePath, newOutputRef] of Object.entries(refresh.outputRefs ?? {}))
+          pivotRefreshUpdates.push({ cachePath, sheetName: sheet.name, newOutputRef })
+      }
       if (
         edits.length ||
+        pivotCacheRefreshPaths.length ||
+        pivotRefreshUpdates.length ||
         hyperlinkEdits.length ||
         visualAdditions.length ||
         visualEdits.length ||
@@ -543,6 +558,8 @@ export class SessionPackageWriter implements PackageWriter {
       )
         await writeStage({
           edits,
+          pivotCacheRefreshPaths,
+          pivotRefreshUpdates,
           hyperlinkEdits,
           visualAdditions: visualAdditions.slice(0, 50),
           visualEdits,

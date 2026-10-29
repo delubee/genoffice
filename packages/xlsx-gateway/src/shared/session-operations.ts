@@ -1,6 +1,7 @@
 export const SESSION_OPERATION_NAMES = [
   'subtotal',
   'add_pivot',
+  'refresh_pivot',
   'set_cell',
   'paste_cells',
   'relocate_range',
