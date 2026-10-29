@@ -229,6 +229,11 @@ import {
   type ShapeEditChanges,
   type ChartEditData,
 } from '../../../apps/sheets/src/renderer/WorkbookVisuals'
+import { installSparklines } from '../../../apps/sheets/src/renderer/WorkbookVisuals'
+import {
+  sparklineCells,
+  type SessionSparklineGroup,
+} from '@genoffice/xlsx-gateway/domain/session-sparklines'
 import { installRibbonFocusBoundary } from './ribbon-focus-boundary'
 import {
   recommendCharts,
@@ -3424,6 +3429,51 @@ export class WorkbookRuntime implements EditorProjection {
     }
     throw new Error(`Unknown note command: ${command}`)
   }
+  private sparklineLayers: { dispose(): void }[] = []
+  /** File and session sparklines of the active sheet (shared desktop renderer). */
+  private installProjectedSparklines() {
+    for (const layer of this.sparklineLayers) layer.dispose()
+    this.sparklineLayers = []
+    const state = this.state
+    const sheetId = this.runtime.univerAPI.getActiveWorkbook()?.getActiveSheet()?.getSheetId()
+    const sheet = state?.sheets.find((item) => item.id === sheetId)
+    if (!sheet) return
+    const file = ((sheet.features?.originalMetadata as { sparklines?: unknown[] } | undefined)
+      ?.sparklines ?? []) as Parameters<typeof installSparklines>[1]
+    const session = (
+      (sheet.features?.sparklineAdditions ?? []) as unknown as SessionSparklineGroup[]
+    ).map((group) => ({
+      type: group.type,
+      ...(group.color === undefined ? {} : { color: group.color }),
+      cells: sparklineCells(sheet.name, group),
+    }))
+    const groups = [...file, ...session]
+    if (groups.length)
+      this.sparklineLayers = installSparklines(
+        this.runtime as unknown as Parameters<typeof installSparklines>[0],
+        groups,
+        sheet.id,
+      )
+  }
+  /** Insert > Sparklines: one sparkline per selected row, right of the selection. */
+  async insertSparklines(type: 'line' | 'column' | 'stacked') {
+    if (!(await this.flushEditor())) throw new Error(t('appClipboardBusy'))
+    const target = this.ribbonTarget
+    if (!target || !this.state) throw new Error(t('appSelectCellFirst'))
+    const bounds = parseRange(target.address)
+    if (bounds.endColumn === bounds.startColumn) throw new Error(t('appSparklineNeedsCols'))
+    if (bounds.endColumn + 1 >= MAX_GRID_COLUMNS) throw new Error(t('appSparklineNoSpace'))
+    const rows = Math.min(bounds.endRow - bounds.startRow + 1, 200)
+    await this.enqueue([
+      {
+        op: 'add_sparkline',
+        sheetId: target.sheetId,
+        type,
+        dataRange: `${formatAddress(bounds.startRow, bounds.startColumn)}:${formatAddress(bounds.startRow + rows - 1, bounds.endColumn)}`,
+      },
+    ])
+    return t('appSparklinesInserted', { count: rows })
+  }
   /** File and session tables render through Univer's table plugin (filters, structured refs, theme). */
   private async registerProjectedTables() {
     const state = this.state,
@@ -4488,6 +4538,7 @@ export class WorkbookRuntime implements EditorProjection {
       this.runtime.univerAPI.addEvent(this.runtime.univerAPI.Event.ActiveSheetChanged, () => {
         if (this.internal || this.installing) return
         this.syncFormulaView()
+        this.installProjectedSparklines()
         this.outlineProjection = undefined
         this.outlineGutter?.refresh()
         void this.loadOutlineProjection().catch(this.report)
@@ -4805,6 +4856,7 @@ export class WorkbookRuntime implements EditorProjection {
       this.applyProjectedThreads()
       this.applyProjectedNotes()
       await this.registerProjectedTables()
+      this.installProjectedSparklines()
       this.refreshViewOverlays()
       this.changed()
     } finally {

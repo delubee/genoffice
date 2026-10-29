@@ -90,6 +90,7 @@ import {
 import { DEFAULT_SHEET_PROTECTION_ALLOW } from '../gateway/xlsx-protection'
 import { hashSheetPassword, verifySheetPassword } from '../gateway/xlsx-protection-hash'
 import { MAX_GRID_COLUMNS, MAX_GRID_ROWS } from '../shared/grid-bounds'
+import { MAX_SESSION_SPARKLINES } from './session-sparklines'
 
 type TypedCell = z.infer<typeof cellRecordSchema>
 export interface CandidateMaterial {
@@ -967,7 +968,8 @@ export async function computeCandidateState(
       op.op === 'set_protected_ranges' ||
       op.op === 'set_thread' ||
       op.op === 'add_table' ||
-      op.op === 'edit_table'
+      op.op === 'edit_table' ||
+      op.op === 'add_sparkline'
     ) {
       const features =
         featureEdits.get(op.sheetId) ??
@@ -1099,6 +1101,26 @@ export async function computeCandidateState(
         features.outlineEdits = JSON.parse(
           JSON.stringify([...((features.outlineEdits ?? []) as unknown[]), op]),
         )
+      } else if (op.op === 'add_sparkline') {
+        const bounds = parseRange(op.dataRange)
+        if (bounds.endRow - bounds.startRow + 1 > MAX_SESSION_SPARKLINES)
+          throw new Error('sparkline:tooManyRows')
+        if (bounds.endColumn === bounds.startColumn && bounds.endRow === bounds.startRow)
+          throw new Error('sparkline:needsCols')
+        const target =
+          op.targetCell === undefined
+            ? { row: bounds.startRow, column: bounds.endColumn + 1 }
+            : parseAddress(op.targetCell)
+        if (target.column >= MAX_GRID_COLUMNS) throw new Error('sparkline:noSpace')
+        features.sparklineAdditions = [
+          ...((features.sparklineAdditions ?? []) as unknown[]),
+          {
+            type: op.type,
+            dataRange: op.dataRange,
+            ...(op.targetCell === undefined ? {} : { targetCell: op.targetCell }),
+            ...(op.color === undefined ? {} : { color: op.color }),
+          },
+        ]
       } else if (op.op === 'add_table' || op.op === 'edit_table') {
         const owner = current.sheets.find((sheet) => sheet.id === op.sheetId)!
         if (!owner.originalSheetId) throw new Error('table:addedSheet')

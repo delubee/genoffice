@@ -172,6 +172,12 @@ export function DesktopHomeRibbon({
       void run(async () => setViewNotice(await runtime.tableCommand(value)))
       return
     }
+    if (value.startsWith('sparkline:')) {
+      const type = value.slice('sparkline:'.length)
+      if (type === 'line' || type === 'column' || type === 'stacked')
+        void run(async () => setViewNotice(await runtime.insertSparklines(type)))
+      return
+    }
     if (value === 'insert-checkbox') {
       void run(() => runtime.insertCheckbox())
       return

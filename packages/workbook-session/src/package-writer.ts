@@ -1,4 +1,8 @@
 import { sessionPivotAdditions } from '@genoffice/xlsx-gateway/domain/session-candidate'
+import {
+  sparklineCells,
+  type SessionSparklineGroup,
+} from '@genoffice/xlsx-gateway/domain/session-sparklines'
 import type { PivotRefreshUpdate } from '@genoffice/xlsx-gateway/gateway/xlsx-pivot-expand'
 import type {
   SheetProtectedRangesState,
@@ -701,6 +705,15 @@ export class SessionPackageWriter implements PackageWriter {
       }
       if (tableAdditions.length || tableEdits.length)
         await writeStage({ edits: [], tableAdditions, tableEdits })
+      const sparklineAdditions = state.sheets.flatMap((sheet) =>
+        ((sheet.features?.sparklineAdditions ?? []) as unknown as SessionSparklineGroup[]).map((group) => ({
+          sheetName: sheet.name,
+          type: group.type,
+          ...(group.color === undefined ? {} : { color: group.color }),
+          cells: sparklineCells(sheet.name, group),
+        })),
+      )
+      if (sparklineAdditions.length) await writeStage({ edits: [], sparklineAdditions })
       for (let start = 0; start < pivots.length; start += 20)
         await writeStage({ edits: [], pivotAdditions: pivots.slice(start, start + 20) })
       assertNotCancelled(signal)

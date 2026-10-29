@@ -3522,3 +3522,10 @@ appearances and installed Linux/Windows VSIX. Not complete Data-tab parity.
   to range.
 - Shared extractions: `table-banding.ts` (desktop loader banding helpers) and
   `TableRangeDialog.tsx`.
+
+### Sparklines (2026-10-29)
+
+- workbook-session `sparkline-save` (real sidecar) and native `Insert icons and
+checkbox UI` sparkline test: one revision, exact undo, saved x14 sparkline
+  group and reopened file sparklines at C1. Full native suite with tables: 57
+  passing, only the 3 pre-existing failures.

@@ -120,4 +120,65 @@ suite('Desktop Insert icons and checkbox UI', () => {
       await browser.close()
     }
   })
+
+  test('inserts sparklines through the shared Sparklines menu and saves them', async function () {
+    const port = process.env.GENOFFICE_TEST_CDP_PORT
+    if (!port) return this.skip()
+    this.timeout(150_000)
+    const api = (await vscode.extensions
+      .getExtension('genoffice.genoffice-workbook')!
+      .activate()) as Api
+    const name = 'insert-sparklines-ui.xlsx'
+    const uri = vscode.Uri.joinPath(vscode.workspace.workspaceFolders![0]!.uri, name)
+    await vscode.workspace.fs.writeFile(uri, new Uint8Array(await manualWorkbook()))
+    const browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`)
+    try {
+      await vscode.commands.executeCommand('vscode.openWith', uri, 'genoffice.workbook')
+      let document = api.getDocument(uri)!
+      await document.whenViewReady()
+      const frame = await viewOf(browser, name)
+      await vscode.commands.executeCommand('notifications.clearAll')
+      await vscode.commands.executeCommand('workbench.action.closeAuxiliaryBar')
+      await vscode.commands.executeCommand('workbench.action.closeSidebar')
+      await vscode.commands.executeCommand('workbench.action.closePanel')
+      await frame.page().setViewportSize({ width: 1200, height: 900 })
+      await goTo(frame, 'Other!A1:B1')
+      await frame.locator('#ribbon-tab-insert').click()
+      const header = frame.locator('.workbook-desktop-header')
+      const before = structuredClone(document.engine.state)
+      const revision = document.engine.descriptor.revision
+      await header.getByRole('button', { name: 'Sparklines', exact: true }).click()
+      await frame.getByRole('listbox').getByRole('option', { name: 'Column', exact: true }).click()
+      await settle(document, revision + 1)
+      await frame
+        .getByRole('status')
+        .filter({ hasText: /sparkline/i })
+        .waitFor()
+      assert.deepEqual(document.engine.state.sheets[1]!.features?.sparklineAdditions, [
+        { type: 'column', dataRange: 'A1:B1' },
+      ])
+      await vscode.commands.executeCommand('undo')
+      assert.deepEqual(document.engine.state, before)
+      await vscode.commands.executeCommand('redo')
+      await vscode.commands.executeCommand('workbench.action.files.save')
+      const zip = await JSZip.loadAsync(await vscode.workspace.fs.readFile(uri))
+      assert.match(
+        await zip.file('xl/worksheets/sheet2.xml')!.async('string'),
+        /<x14:sparklineGroup\b/,
+      )
+      document = await reopen(api, uri, document.sessionId)
+      const sparklines = (
+        document.engine.state.sheets[1]!.features?.originalMetadata as {
+          sparklines: { cells: { cell: string }[] }[]
+        }
+      ).sparklines
+      assert.equal(sparklines[0]!.cells[0]!.cell, 'C1')
+    } finally {
+      if (api.getDocument(uri))
+        await vscode.commands.executeCommand('workbench.action.files.save', uri)
+      await vscode.commands.executeCommand('workbench.action.closeAllEditors')
+      await vscode.workspace.fs.delete(uri)
+      await browser.close()
+    }
+  })
 })

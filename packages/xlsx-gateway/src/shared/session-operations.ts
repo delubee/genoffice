@@ -9,6 +9,7 @@ export const SESSION_OPERATION_NAMES = [
   'set_thread',
   'add_table',
   'edit_table',
+  'add_sparkline',
   'set_cell',
   'paste_cells',
   'relocate_range',

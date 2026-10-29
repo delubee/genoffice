@@ -623,6 +623,7 @@ Review protection foundation (2026-10-29):
 - [x] `set_data_validation` was never in the session operation whitelist, so plugin validation edits (editor and Checkbox) were rejected by the session; added and verified natively.
 - [ ] Insert > Screenshot: no VS Code screen-capture API; reports an explicit host limitation.
 - [x] Tables: canonical `add_table` and new `edit_table` (rename, style, style options, header/totals rows with the desktop's cell writes, resize, convert to range) for session and file tables; Univer table preset projects file and session tables with Excel palettes; Insert Table / Format as Table / Create & Resize Table dialogs / Table Design contextual tab; saved table parts and reopen verified natively.
-- [ ] Insert remaining: PivotChart, Slicer, Timeline, Sparklines; Ctrl+T Create Table shortcut in the plugin.
+- [x] Insert > Sparklines: canonical `add_sparkline` in sessions (cells derived from the current sheet name at projection/save), shared desktop renderer, native menu/history/save/reopen.
+- [ ] Insert remaining: PivotChart, Slicer, Timeline; Ctrl+T Create Table shortcut in the plugin.
 - [ ] Allow-edit ranges do not yet permit edits inside a protected sheet (desktop guard allows them).
 - [ ] Browser suite under full load: `function confirmation preserves an unfinished grid draft` and `Sort & Filter group toggles smart source regions` failed once each after the table preset was added (130/132); both pass alone. Watch for a focus-timing regression.
