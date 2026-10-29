@@ -1,4 +1,5 @@
 import { columnLabel, formatAddress } from '@genoffice/xlsx-gateway/domain/cell-address'
+import { workbookStructureLocked } from '@genoffice/xlsx-gateway/domain/session-candidate'
 import { dedupeSheetName } from '@genoffice/xlsx-gateway/domain/sheet-name-dedupe'
 import type { WorkbookOperation } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
 import {
@@ -62,9 +63,7 @@ export async function buildMergeStages(input: {
   source: WorkbookSource
   signal?: AbortSignal
 }) {
-  const metadata = input.target.features?.originalMetadata as
-    { workbookProtection?: { lockStructure?: boolean } } | undefined
-  if (metadata?.workbookProtection?.lockStructure)
+  if (workbookStructureLocked(input.target.features))
     throw new WorkbookError('protected_workbook_structure', 'The workbook structure is protected.')
   const cells = input.sources.reduce(
     (total, file) =>

@@ -388,7 +388,7 @@ export async function computeCandidateState(
   const workbookMetadata = current.features?.originalMetadata as Record<string, unknown> | undefined
   if (
     intent.operations.some((op) => changingCoordinates.has(op.op) || op.op === 'add_sheet') &&
-    (workbookMetadata?.workbookProtection as { lockStructure?: boolean } | undefined)?.lockStructure
+    workbookStructureLocked(current.features)
   )
     throw new Error('protected_workbook_structure')
   // A pending PivotTable pins its source and output coordinates and sheet names.
@@ -551,6 +551,16 @@ export async function computeCandidateState(
       affected.push(op.name)
       await options.afterStep?.(book)
       options.fault?.(`afterOperation:${index + 1}`)
+      continue
+    }
+    if (op.op === 'protect_workbook') {
+      const original = workbookMetadata?.workbookProtection as { hasPassword?: boolean } | undefined
+      if (original?.hasPassword) throw new Error('protection:workbook_password')
+      workbookFeatures = {
+        ...workbookFeatures,
+        workbookProtectionEdits: { lockStructure: op.locked },
+      }
+      affected.push('workbook')
       continue
     }
     if (op.op === 'add_defined_name' || op.op === 'delete_defined_name') {
@@ -940,7 +950,8 @@ export async function computeCandidateState(
       op.op === 'set_cols_hidden' ||
       op.op === 'set_outline' ||
       op.op === 'set_outline_settings' ||
-      op.op === 'protect_sheet'
+      op.op === 'protect_sheet' ||
+      op.op === 'set_protected_ranges'
     ) {
       const features =
         featureEdits.get(op.sheetId) ??
@@ -1072,6 +1083,12 @@ export async function computeCandidateState(
         features.outlineEdits = JSON.parse(
           JSON.stringify([...((features.outlineEdits ?? []) as unknown[]), op]),
         )
+      } else if (op.op === 'set_protected_ranges') {
+        const source = (features.protectedRanges ?? []) as { hasPassword?: boolean }[]
+        // A rewrite cannot preserve per-range password hashes; fail closed.
+        if (!features.protectedRangeEdits && source.some((range) => range.hasPassword))
+          throw new Error('protection:range_password')
+        features.protectedRangeEdits = op.ranges.map(({ name, sqref }) => ({ name, sqref }))
       } else if (op.op === 'protect_sheet') {
         features.protectionEdits = await sheetProtectionEdit(features, op, intent.transactionId)
       } else if (op.op === 'set_page_setup') {
@@ -2403,4 +2420,13 @@ async function sheetProtectionEdit(
     password,
     verified: !op.protected,
   }
+}
+
+/** The workbook structure lock: a session edit, else the file's workbookProtection. */
+export function workbookStructureLocked(features: Record<string, unknown> | undefined) {
+  const edit = features?.workbookProtectionEdits as { lockStructure: boolean } | undefined
+  if (edit) return edit.lockStructure
+  const original = (features?.originalMetadata as Record<string, unknown> | undefined)
+    ?.workbookProtection as { lockStructure?: boolean } | undefined
+  return original?.lockStructure === true
 }

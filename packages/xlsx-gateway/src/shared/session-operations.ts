@@ -4,6 +4,8 @@ export const SESSION_OPERATION_NAMES = [
   'refresh_pivot',
   'edit_pivot',
   'protect_sheet',
+  'protect_workbook',
+  'set_protected_ranges',
   'set_cell',
   'paste_cells',
   'relocate_range',

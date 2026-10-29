@@ -189,6 +189,7 @@ export function WorkbookRibbon({
   const [visualAnchor, setVisualAnchor] = useState<HTMLDivElement | null>(null)
   const [pageAnchor, setPageAnchor] = useState<HTMLDivElement | null>(null)
   const [viewAnchor, setViewAnchor] = useState<HTMLDivElement | null>(null)
+  const [reviewAnchor, setReviewAnchor] = useState<HTMLDivElement | null>(null)
   const [chartAnchor, setChartAnchor] = useState<HTMLDivElement | null>(null)
   const panels: Record<Tab, ReactNode> = {
     chartDesign: <div ref={setChartAnchor} />,
@@ -390,46 +391,52 @@ export function WorkbookRibbon({
     ),
     review: (
       <>
-        <RibbonGroup title={text.notes}>
-          <textarea
-            aria-label={text.noteText}
-            value={note}
-            maxLength={32000}
-            onChange={(event) => {
-              const value = event.target.value
-              setNoteDrafts((drafts) => ({ ...drafts, [noteIdentity()]: value }))
-            }}
-          />
-          <button onClick={() => commitNote(false)}>{text.saveNote}</button>
-          <button onClick={() => commitNote(true)}>{text.deleteNote}</button>
-        </RibbonGroup>
-        <RibbonGroup title={text.findReplace}>
-          <input
-            aria-label={text.find}
-            placeholder={text.find}
-            value={find}
-            onChange={(event) => setFind(event.target.value)}
-          />
-          <input
-            aria-label={text.replaceWith}
-            placeholder={text.replaceWith}
-            value={replace}
-            onChange={(event) => setReplace(event.target.value)}
-          />
-          <button
-            onClick={() =>
-              submit(() => ({
-                op: 'find_replace',
-                sheetId: selected().sheetId,
-                range: selected().address,
-                find,
-                replace,
-              }))
-            }
-          >
-            {text.replaceAll}
-          </button>
-        </RibbonGroup>
+        <div ref={setReviewAnchor} />
+        <details className="workbook-additional-controls">
+          <summary>{text.notes}</summary>
+          <div className="workbook-toolbar">
+            <RibbonGroup title={text.notes}>
+              <textarea
+                aria-label={text.noteText}
+                value={note}
+                maxLength={32000}
+                onChange={(event) => {
+                  const value = event.target.value
+                  setNoteDrafts((drafts) => ({ ...drafts, [noteIdentity()]: value }))
+                }}
+              />
+              <button onClick={() => commitNote(false)}>{text.saveNote}</button>
+              <button onClick={() => commitNote(true)}>{text.deleteNote}</button>
+            </RibbonGroup>
+            <RibbonGroup title={text.findReplace}>
+              <input
+                aria-label={text.find}
+                placeholder={text.find}
+                value={find}
+                onChange={(event) => setFind(event.target.value)}
+              />
+              <input
+                aria-label={text.replaceWith}
+                placeholder={text.replaceWith}
+                value={replace}
+                onChange={(event) => setReplace(event.target.value)}
+              />
+              <button
+                onClick={() =>
+                  submit(() => ({
+                    op: 'find_replace',
+                    sheetId: selected().sheetId,
+                    range: selected().address,
+                    find,
+                    replace,
+                  }))
+                }
+              >
+                {text.replaceAll}
+              </button>
+            </RibbonGroup>
+          </div>
+        </details>
       </>
     ),
     view: <div ref={setViewAnchor} />,
@@ -494,9 +501,11 @@ export function WorkbookRibbon({
                     ? 'Page Layout'
                     : currentTab === 'view'
                       ? 'View'
-                      : currentTab === 'insert'
-                        ? 'Insert'
-                        : 'Home'
+                      : currentTab === 'review'
+                        ? 'Review'
+                        : currentTab === 'insert'
+                          ? 'Insert'
+                          : 'Home'
         }
         ribbonContainer={
           currentTab === 'home'
@@ -507,13 +516,15 @@ export function WorkbookRibbon({
                 ? pageAnchor
                 : currentTab === 'view'
                   ? viewAnchor
-                  : currentTab === 'insert'
-                    ? insertAnchor
-                    : currentTab === 'chartDesign'
-                      ? chartAnchor
-                      : currentTab === 'shapeFormat' || currentTab === 'pictureFormat'
-                        ? visualAnchor
-                        : null
+                  : currentTab === 'review'
+                    ? reviewAnchor
+                    : currentTab === 'insert'
+                      ? insertAnchor
+                      : currentTab === 'chartDesign'
+                        ? chartAnchor
+                        : currentTab === 'shapeFormat' || currentTab === 'pictureFormat'
+                          ? visualAnchor
+                          : null
         }
       />
       {visibleTabs.map((key) => (
@@ -523,7 +534,7 @@ export function WorkbookRibbon({
           role="tabpanel"
           aria-labelledby={`ribbon-tab-${key}`}
           hidden={currentTab !== key}
-          className={`workbook-ribbon-panel ${['home', 'insert', 'pageLayout', 'formulas', 'view', 'chartDesign', 'shapeFormat', 'pictureFormat'].includes(key) ? 'workbook-desktop-panel' : 'workbook-toolbar'}`}
+          className={`workbook-ribbon-panel ${['home', 'insert', 'pageLayout', 'formulas', 'review', 'view', 'chartDesign', 'shapeFormat', 'pictureFormat'].includes(key) ? 'workbook-desktop-panel' : 'workbook-toolbar'}`}
         >
           {panels[key]}
         </div>

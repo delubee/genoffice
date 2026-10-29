@@ -1,6 +1,9 @@
 import { sessionPivotAdditions } from '@genoffice/xlsx-gateway/domain/session-candidate'
 import type { PivotRefreshUpdate } from '@genoffice/xlsx-gateway/gateway/xlsx-pivot-expand'
-import type { SheetProtectionState } from '@genoffice/xlsx-gateway/gateway/xlsx-gateway'
+import type {
+  SheetProtectedRangesState,
+  SheetProtectionState,
+} from '@genoffice/xlsx-gateway/gateway/xlsx-gateway'
 import type { WorkbookPivotAdd } from '@genoffice/xlsx-gateway/shared/workbook-protocol'
 import {
   visibilityEditsSchema,
@@ -204,6 +207,9 @@ export class SessionPackageWriter implements PackageWriter {
         noteStates: SheetNoteState[] = []
       const filterStates: SheetFilterState[] = []
       const sheetProtections: SheetProtectionState[] = []
+      const protectedRangeStates: SheetProtectedRangesState[] = []
+      const workbookLock = state.features?.workbookProtectionEdits as
+        { lockStructure: boolean } | undefined
       const dvStates: SheetDvState[] = []
       for (const sheet of state.sheets) {
         if (names.get(sheet.id) !== sheet.name)
@@ -347,6 +353,9 @@ export class SessionPackageWriter implements PackageWriter {
         }
         const protection = sheet.features?.protectionEdits as
           (Omit<SheetProtectionState, 'sheetName'> & { hasPassword: boolean }) | undefined
+        const allowRanges = sheet.features?.protectedRangeEdits as
+          { name: string; sqref: string }[] | undefined
+        if (allowRanges) protectedRangeStates.push({ sheetName: sheet.name, ranges: allowRanges })
         if (protection) {
           const { hasPassword: _hasPassword, ...write } = protection
           sheetProtections.push({ sheetName: sheet.name, ...write })
@@ -575,6 +584,8 @@ export class SessionPackageWriter implements PackageWriter {
       if (
         edits.length ||
         sheetProtections.length ||
+        protectedRangeStates.length ||
+        workbookLock !== undefined ||
         pivotCacheRefreshPaths.length ||
         pivotRefreshUpdates.length ||
         hyperlinkEdits.length ||
@@ -591,6 +602,8 @@ export class SessionPackageWriter implements PackageWriter {
         await writeStage({
           edits,
           sheetProtections,
+          protectedRangeStates,
+          workbookProtectionState: workbookLock ?? null,
           pivotCacheRefreshPaths,
           pivotRefreshUpdates,
           hyperlinkEdits,

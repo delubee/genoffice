@@ -150,3 +150,86 @@ it(
     }
   },
 )
+
+it('locks workbook structure and saves allow-edit ranges through the session', async () => {
+  const directory = await resources.directory(),
+    path = join(directory, 'lock.xlsx')
+  await writeFile(path, await manualWorkbook())
+  const client = new XlsxSidecarClient(
+    fileURLToPath(
+      new URL(
+        '../../../apps/sheets/native/xlsx-engine/target/release/xlsx-sidecar' +
+          (process.platform === 'win32' ? '.exe' : ''),
+        import.meta.url,
+      ),
+    ),
+  )
+  try {
+    const source = new SidecarWorkbookSource(client)
+    const opened = await openWorkbookSnapshot({
+      uri: pathToFileURL(path).href,
+      storageDirectory: directory,
+      source,
+    })
+    try {
+      const run = async (state: WorkbookState, operations: WorkbookOperation[]) =>
+        computeCandidateState(
+          state,
+          {
+            schemaVersion: 1,
+            sessionId: 'lock',
+            transactionId: crypto.randomUUID(),
+            expectedRevision: 0,
+            origin: 'manual',
+            summary: 'Review',
+            operations,
+          },
+          await prepareCandidateMaterial({
+            state,
+            operations,
+            source,
+            sourceSessionId: opened.original.sidecarSessionId,
+          }),
+        )
+      const state = initialState(opened.metadata),
+        sheetId = state.sheets[0]!.id
+      const ranged = await run(state, [
+        {
+          op: 'set_protected_ranges',
+          sheetId,
+          ranges: [{ name: 'Inputs', sqref: 'B2:C3' }],
+        },
+      ])
+      const locked = await run(ranged.nextState, [{ op: 'protect_workbook', locked: true }])
+      expect(locked.nextState.features?.workbookProtectionEdits).toEqual({ lockStructure: true })
+      await expect(run(locked.nextState, [{ op: 'add_sheet', name: 'Blocked' }])).rejects.toThrow(
+        'protected_workbook_structure',
+      )
+      const staged = await new SessionPackageWriter(client, opened.metadata).stage(
+        opened.original.path,
+        locked.nextState,
+        join(directory, 'stage.xlsx'),
+      )
+      const zip = await JSZip.loadAsync(await readFile(staged.stagedPath))
+      expect(await zip.file('xl/workbook.xml')!.async('string')).toMatch(
+        /<workbookProtection\b[^>]*lockStructure="1"/,
+      )
+      expect(await zip.file('xl/worksheets/sheet1.xml')!.async('string')).toMatch(
+        /<protectedRange\b[^>]*name="Inputs"[^>]*sqref="B2:C3"|<protectedRange\b[^>]*sqref="B2:C3"[^>]*name="Inputs"/,
+      )
+      const reopened = await source.openSnapshot(staged.stagedPath)
+      try {
+        expect(
+          (reopened.metadata as { workbookProtection?: { lockStructure?: boolean } })
+            .workbookProtection?.lockStructure,
+        ).toBe(true)
+      } finally {
+        await source.close(reopened.sessionId)
+      }
+    } finally {
+      await opened.dispose()
+    }
+  } finally {
+    client.stop()
+  }
+})

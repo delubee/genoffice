@@ -643,6 +643,11 @@ test('seven ribbon tabs execute page, formula, data, review and view operations'
       .click()
     await expect.poll(() => page.evaluate(() => (window as any).toolbar.rowVisible(2))).toBe(true)
     await tab('Review')
+    await expect(page.locator('#ribbon-panel-review')).toHaveClass(/workbook-desktop-panel/)
+    await expect(
+      page.locator('.workbook-desktop-header').getByRole('button', { name: /Protect Sheet/ }),
+    ).toBeVisible()
+    await page.locator('#ribbon-panel-review details > summary').click()
     await page.evaluate(() => (window as any).toolbar.select('B2'))
     await page.getByRole('textbox', { name: 'Note text', exact: true }).fill('Review this amount')
     await page.getByRole('button', { name: 'Save note', exact: true }).click()

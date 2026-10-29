@@ -4718,6 +4718,65 @@
                     "properties": {
                       "op": {
                         "type": "string",
+                        "const": "protect_workbook"
+                      },
+                      "locked": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "locked"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "set_protected_ranges"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "ranges": {
+                        "maxItems": 100,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 255
+                            },
+                            "sqref": {
+                              "type": "string",
+                              "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,6}(:[A-Z]{1,3}[1-9][0-9]{0,6})?$"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "sqref"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "ranges"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
                         "const": "insert_rows"
                       },
                       "sheetId": {

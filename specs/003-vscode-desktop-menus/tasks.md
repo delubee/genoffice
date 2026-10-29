@@ -614,4 +614,6 @@ View tab follow-up (2026-10-29):
 Review protection foundation (2026-10-29):
 
 - [x] Session `protect_sheet`: Excel-hash passwords with a transaction-derived salt (view/host agree), verified unprotect, edits refused while protected, protection changes allowed on protected sheets, host-only candidate for the 100,000-round hash, saved/removed sheetProtection element.
-- [ ] Review tab UI: actual desktop band, Protect Sheet dialog, Protect Workbook, Allow Edit Ranges, Workbook Statistics, Translate→native chat, notes and threaded comments.
+- [x] Review tab R1: actual desktop band; Workbook Statistics over the canonical root; Translate routes to native chat; actual Protect/Unprotect Sheet dialog with verified passwords; Protect Workbook (`protect_workbook`) and Allow Edit Ranges (`set_protected_ranges`) with history, save and reopen; protection echo from host features.
+- [ ] Review tab R2: Univer note popup preset bridged to `set_note` (New/Show/Show All Notes, note pictures pane), threaded comments (store, pane, save of threaded comment parts), Convert to Notes, Previous/Next.
+- [ ] Allow-edit ranges do not yet permit edits inside a protected sheet (desktop guard allows them).

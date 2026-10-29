@@ -273,6 +273,7 @@ import type { PageSetupJournalState } from '../../../apps/sheets/src/renderer/ed
 import {
   filePivotsOfSheet,
   pivotSourceSheet,
+  workbookStructureLocked,
 } from '@genoffice/xlsx-gateway/domain/session-candidate'
 import {
   PIVOT_SOURCE_COL_LIMIT,
@@ -2535,8 +2536,37 @@ export class WorkbookRuntime implements EditorProjection {
         !!sheet &&
         (Object.values(sheet.cells).some((cell) => cell.rawValue !== null || !!cell.formula) ||
           (!!original?.rowCount && !!original.columnCount)),
-      protected: sheet?.protected ?? null,
+      protected: sheet ? (this.protectionEcho(sheet.id) ?? sheet.protected ?? null) : null,
     }
+  }
+  private protectionEchoes = new Map<string, boolean>()
+  private protectionEchoState: string | undefined
+  /** Effective sheet protection from the host (file element or session edit), cached per root. */
+  private protectionEcho(sheetId: string) {
+    const state = this.state
+    if (!state) return undefined
+    if (this.protectionEchoState !== state.stateId) {
+      this.protectionEchoState = state.stateId
+      this.protectionEchoes.clear()
+    }
+    if (!this.protectionEchoes.has(sheetId)) {
+      this.protectionEchoes.set(
+        sheetId,
+        state.sheets.find((item) => item.id === sheetId)?.protected ?? false,
+      )
+      void this.host
+        .read(sheetId, { startRow: 0, endRow: 0, startColumn: 0, endColumn: 0 }, state.stateId)
+        .then((read) => {
+          const protection = (read as { protection?: { protected: boolean } | null }).protection
+          if (this.closed || this.state?.stateId !== state.stateId || !protection) return
+          if (this.protectionEchoes.get(sheetId) !== protection.protected) {
+            this.protectionEchoes.set(sheetId, protection.protected)
+            this.changed()
+          }
+        })
+        .catch(() => {})
+    }
+    return this.protectionEchoes.get(sheetId)
   }
   async ribbonCommands(
     commands: readonly string[],
@@ -2945,6 +2975,100 @@ export class WorkbookRuntime implements EditorProjection {
         `page-break-${sheetId}`,
       ),
     )
+  }
+  get workbookProtected(): boolean | null {
+    return this.state ? workbookStructureLocked(this.state.features) : null
+  }
+  /** Review: the active sheet's protection and allow-edit ranges, read from the host. */
+  async protectionContext() {
+    if (!(await this.flushEditor())) throw new Error(t('appClipboardBusy'))
+    const target = this.ribbonTarget,
+      state = this.state
+    if (!target || !state) throw new Error(t('appProtectionNeedsFile'))
+    const read = (await this.host.read(
+      target.sheetId,
+      { startRow: 0, endRow: 0, startColumn: 0, endColumn: 0 },
+      state.stateId,
+    )) as {
+      protection?: { protected: boolean; hasPassword: boolean } | null
+      protectedRanges?: { name: string; sqref: string; hasPassword: boolean }[]
+    }
+    return {
+      sheetId: target.sheetId,
+      activeCell: target.address.split(':')[0]!,
+      frozen: { stateId: state.stateId, revision: this.revision },
+      protection: read.protection ?? null,
+      ranges: read.protectedRanges ?? [],
+    }
+  }
+  /** Submits a Review protection change; returns a localized message for the dialog or null. */
+  async protectionChange(
+    operation: WorkbookOperation,
+    frozen?: { stateId: string; revision: number },
+  ): Promise<string | null> {
+    try {
+      await this.enqueue([operation], frozen, { failureInDialog: true })
+      return null
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      const code = /protection:(\w+)/.exec(message)?.[1]
+      const key = (
+        {
+          password_required: 'appProtectedWithPassword',
+          password_unavailable: 'appProtectedWithPassword',
+          wrong_password: 'appProtectionWrongPassword',
+          not_indexed: 'appProtectionNeedsIndexed',
+          workbook_password: 'appWorkbookProtectedWithPassword',
+          range_password: 'appRangesPasswordBlocked',
+        } as const
+      )[code as 'wrong_password']
+      return key ? t(key) : message
+    }
+  }
+  /** Review > Workbook Statistics over the canonical root (read through the host). */
+  async workbookStatistics() {
+    if (!(await this.flushEditor())) throw new Error(t('appClipboardBusy'))
+    const state = this.state
+    if (!state) throw new Error(t('appOpenXlsxFirst'))
+    let cells = 0,
+      formulas = 0,
+      budget = 200_000,
+      partial = false
+    for (const sheet of state.sheets) {
+      const columns = Math.max(1, Math.min(sheet.columns, 2000)),
+        step = Math.max(1, Math.floor(2000 / columns))
+      if (sheet.columns > columns) partial = true
+      for (let row = 0; row < sheet.rows; row += step) {
+        if (budget <= 0) {
+          partial = true
+          break
+        }
+        const page = (await this.host.read(
+          sheet.id,
+          {
+            startRow: row,
+            endRow: Math.min(sheet.rows - 1, row + step - 1),
+            startColumn: 0,
+            endColumn: columns - 1,
+          },
+          state.stateId,
+        )) as { cells: ViewCell[] }
+        if (this.state?.stateId !== state.stateId)
+          throw new Error(t('appDocumentChangedDuringAction'))
+        budget -= step * columns
+        for (const cell of page.cells) {
+          if (cell.formula) formulas++
+          const value = cell.formula ? cell.cachedValue : cell.rawValue
+          if (value !== null && value !== undefined && value !== '') cells++
+        }
+      }
+    }
+    return t('appWorkbookStats', {
+      sheets: state.sheets.length,
+      cells: cells.toLocaleString(),
+      formulas: formulas.toLocaleString(),
+      note: partial ? t('appLoadedRegionOnly') : '',
+    })
   }
   /** View tab commands (workbook views, show, zoom, window). */
   async viewCommand(command: string): Promise<string | null> {

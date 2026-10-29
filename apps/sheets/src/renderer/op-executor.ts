@@ -44,6 +44,8 @@ import {
   restoreJournalCells,
   type HeaderFooterParts,
   type PageSetupJournalState,
+  recordWorkbookProtection,
+  recordProtectedRangesChange,
 } from './edit-journal'
 import { indexedFormulaText } from './formula-view'
 import { buildLazyChangePlan } from './lazy-plan'
@@ -1727,6 +1729,20 @@ async function executeOp(op: PlannedOp, run: OpRun): Promise<void> {
         note: op.text,
       })
     }
+  } else if (op.op === 'protect_workbook') {
+    const file = state.file.workbookProtection
+    if (file?.hasPassword) throw new Error(t('appWorkbookProtectedWithPassword'))
+    recordWorkbookProtection(state.editJournal, op.locked, file?.lockStructure ?? false)
+  } else if (op.op === 'set_protected_ranges') {
+    sheetById(op.sheetId)
+    // A rewrite cannot preserve per-range password hashes; fail closed.
+    if ((state.sheetProtectedRanges.get(op.sheetId) ?? []).some((range) => range.hasPassword))
+      throw new Error(t('appRangesPasswordBlocked'))
+    state.sheetProtectedRanges.set(
+      op.sheetId,
+      op.ranges.map((range) => ({ name: range.name, sqref: range.sqref, hasPassword: false })),
+    )
+    recordProtectedRangesChange(state.editJournal, op.sheetId)
   } else {
     ctx.chartEditRef.current(
       op.chartPath,

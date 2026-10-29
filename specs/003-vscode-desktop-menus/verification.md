@@ -3486,3 +3486,15 @@ appearances and installed Linux/Windows VSIX. Not complete Data-tab parity.
 - workbook-session `protect-sheet-save` (real sidecar): deterministic hash,
   blocked edit, saved hashed sheetProtection with sort allowed, reopen requires
   and verifies the password, unprotected save removes the element.
+
+### Review tab R1: statistics and protection (2026-10-29)
+
+- Native `Desktop Review tab UI`: Workbook Statistics status without revision;
+  Allow Edit Ranges, Protect Sheet (password) and Protect Workbook as three
+  revisions with label echoes; exact Undo/Redo; saved hashed sheetProtection,
+  protectedRange B2:C3 and workbook lockStructure; after reopen Unprotect Sheet
+  rejects a wrong password in-dialog and accepts the right one.
+- workbook-session protection tests (2) on the real sidecar; browser spec with
+  the desktop Review band; desktop executor handles the new ops for desktop AI.
+- Native protection/View/Data/Pivot subset: 10 passing, only the pre-existing
+  shortcuts failure.

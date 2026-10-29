@@ -1,3 +1,4 @@
+import { sheetProtectionOf } from '@genoffice/xlsx-gateway/domain/session-candidate'
 import {
   projectDataValidationRules,
   type DataValidationEdits,
@@ -356,6 +357,21 @@ export async function readCurrentRange(input: {
     rows,
     hyperlinks,
     pageSetup: features.pageSetup ?? null,
+    // Effective protection for the Review dialogs; password hashes stay on the host.
+    protection: (() => {
+      const effective = sheetProtectionOf({ ...sheet.features, ...features })
+      if (effective) return { protected: effective.protected, hasPassword: effective.hasPassword }
+      // An indexed sheet without a <sheetProtection> element is unprotected.
+      return 'sheetProtection' in features ? { protected: false, hasPassword: false } : null
+    })(),
+    protectedRanges: (
+      (sheet.features?.protectedRangeEdits ??
+        ('protectedRanges' in features ? features.protectedRanges : [])) as {
+        name: string
+        sqref: string
+        hasPassword?: boolean
+      }[]
+    ).map(({ name, sqref, hasPassword }) => ({ name, sqref, hasPassword: hasPassword === true })),
     pageBreaks: {
       rowBreaks: 'rowBreaks' in features ? features.rowBreaks : [],
       colBreaks: 'colBreaks' in features ? features.colBreaks : [],

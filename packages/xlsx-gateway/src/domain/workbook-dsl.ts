@@ -853,6 +853,29 @@ const protectSheetSchema = z.object({
   allow: sheetProtectionAllowSchema.optional(),
 })
 
+// Review > Protect Workbook: locks or unlocks the workbook structure (adding,
+// deleting, renaming, moving or hiding sheets). Password-protected workbook
+// structure cannot be changed here.
+const protectWorkbookSchema = z.object({
+  op: z.literal('protect_workbook'),
+  locked: z.boolean(),
+})
+
+// Review > Allow Edit Ranges: the sheet's complete set of ranges that stay
+// editable while it is protected ([] removes them all).
+const setProtectedRangesSchema = z.object({
+  op: z.literal('set_protected_ranges'),
+  sheetId: z.string().min(1),
+  ranges: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(255),
+        sqref: z.string().regex(/^[A-Z]{1,3}[1-9][0-9]{0,6}(:[A-Z]{1,3}[1-9][0-9]{0,6})?$/),
+      }),
+    )
+    .max(100),
+})
+
 // Creates (or replaces) the sheet's auto-filter over the range. Filter
 // criteria are then chosen by the user through the column dropdowns.
 const setFilterSchema = z.object({
@@ -1475,6 +1498,8 @@ export const workbookOperationSchema = z.discriminatedUnion('op', [
   setNoteSchema,
   refreshPivotSchema,
   editPivotSchema,
+  protectWorkbookSchema,
+  setProtectedRangesSchema,
   insertRowsSchema,
   deleteRowsSchema,
   insertColsSchema,
@@ -1630,6 +1655,8 @@ export type LayoutOperation =
   | z.infer<typeof setNoteSchema>
   | z.infer<typeof refreshPivotSchema>
   | z.infer<typeof editPivotSchema>
+  | z.infer<typeof protectWorkbookSchema>
+  | z.infer<typeof setProtectedRangesSchema>
   | DeleteVisualOperation
   | DeleteTableOperation
   | AddSparklineOperation
@@ -1714,6 +1741,8 @@ const LAYOUT_OPS = new Set([
   'set_note',
   'refresh_pivot',
   'edit_pivot',
+  'protect_workbook',
+  'set_protected_ranges',
   'delete_visual',
   'set_visual_anchor',
   'edit_visual',
@@ -2756,6 +2785,10 @@ export function layoutOpLabel(op: LayoutOperation): string {
       return op.text === null
         ? `Remove note at ${op.address}`
         : `Note at ${op.address}: "${op.text.length > 60 ? `${op.text.slice(0, 60)}…` : op.text}"`
+    case 'protect_workbook':
+      return op.locked ? 'Protect workbook structure' : 'Unprotect workbook structure'
+    case 'set_protected_ranges':
+      return `Allow edit ranges: ${op.ranges.map((range) => range.sqref).join(', ') || 'none'}`
     case 'edit_pivot':
       return `Edit PivotTable ${'session' in op.pivot ? op.pivot.session : op.pivot.file}`
     case 'refresh_pivot':

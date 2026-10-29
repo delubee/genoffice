@@ -24,6 +24,8 @@ import { normalizeLang } from '@genoffice/i18n'
 import { InsertFunctionFlow } from '../../../apps/sheets/src/renderer/InsertFunctionFlow'
 import { FunctionLibraryRibbon, SheetsRibbon } from '../../../apps/sheets/src/renderer/SheetsRibbon'
 import { GoToDialog } from '../../../apps/sheets/src/renderer/GoToDialog'
+import { ProtectSheetDialog } from '../../../apps/sheets/src/renderer/ProtectSheetDialog'
+import { AllowEditRangesDialog } from '../../../apps/sheets/src/renderer/AllowEditRangesDialog'
 import { AxisSizeDialog } from '../../../apps/sheets/src/renderer/AxisSizeDialog'
 import { FormatCellsDialog } from '../../../apps/sheets/src/renderer/FormatCellsDialog'
 import { LocaleScope, setModuleLang, t } from '../../../apps/sheets/src/renderer/i18n/locale'
@@ -50,6 +52,7 @@ export function DesktopHomeRibbon({
     | 'Insert'
     | 'Page Layout'
     | 'Formulas'
+    | 'Review'
     | 'View'
     | 'Chart Design'
     | 'Shape Format'
@@ -59,6 +62,10 @@ export function DesktopHomeRibbon({
   const lang = normalizeLang(locale ?? navigator.language)
   setModuleLang(lang)
   const [viewNotice, setViewNotice] = useState<string | null>(null)
+  const [protection, setProtection] = useState<{
+    mode: 'protect' | 'unprotect' | 'ranges'
+    context: Awaited<ReturnType<NonNullable<typeof runtime>['protectionContext']>>
+  } | null>(null)
   const [nameNotice, setNameNotice] = useState<{ count: number; skipped: number } | null>(null)
   const [dialog, setDialog] = useState<{
     kind: 'format' | 'row' | 'col' | 'link' | 'symbol' | 'header-footer' | 'recommended-charts'
@@ -103,6 +110,42 @@ export function DesktopHomeRibbon({
       value === 'unfreeze'
     ) {
       void run(async () => setViewNotice(await runtime.viewCommand(value)))
+      return
+    }
+    if (value === 'workbook-statistics') {
+      void run(async () => setViewNotice(await runtime.workbookStatistics()))
+      return
+    }
+    if (value === 'workbook-protect') {
+      void run(async () => {
+        const locked = !runtime.workbookProtected
+        const failure = await runtime.protectionChange({ op: 'protect_workbook', locked })
+        if (failure) throw new Error(failure)
+        setViewNotice(
+          t(locked ? 'appWorkbookProtectionWillWrite' : 'appWorkbookProtectionWillRemove'),
+        )
+      })
+      return
+    }
+    if (value === 'sheet-protect' || value === 'allow-edit-ranges-open') {
+      void run(async () => {
+        const context = await runtime.protectionContext()
+        if (value === 'allow-edit-ranges-open') {
+          setProtection({ mode: 'ranges', context })
+          return
+        }
+        if (!context.protection) throw new Error(t('appProtectionNeedsIndexed'))
+        if (!context.protection.protected) setProtection({ mode: 'protect', context })
+        else if (context.protection.hasPassword) setProtection({ mode: 'unprotect', context })
+        else {
+          const failure = await runtime.protectionChange(
+            { op: 'protect_sheet', sheetId: context.sheetId, protected: false },
+            context.frozen,
+          )
+          if (failure) throw new Error(failure)
+          setViewNotice(t('appProtectionWillRemove'))
+        }
+      })
       return
     }
     if (value === 'pivot-open' || value === 'pivot-edit') {
@@ -318,7 +361,7 @@ export function DesktopHomeRibbon({
           formatPainterActive={false}
           sheetHasContent={runtime?.ribbonEcho.hasContent ?? false}
           sheetProtected={runtime?.ribbonEcho.protected ?? null}
-          workbookProtected={null}
+          workbookProtected={runtime?.workbookProtected ?? null}
           formulaBarVisible={runtime?.formulaBarVisible ?? true}
           crossHighlightVisible={runtime?.crossHighlightVisible ?? false}
           themeEditingAvailable={false}
@@ -503,6 +546,63 @@ export function DesktopHomeRibbon({
               }}
               onClose={() => runtime.findReplace.terminate()}
               registerContainer={() => () => {}}
+            />
+          )}
+          {runtime && protection && protection.mode !== 'ranges' && (
+            <ProtectSheetDialog
+              mode={protection.mode}
+              onProtect={async ({ password, allow }) => {
+                const failure = await runtime.protectionChange(
+                  {
+                    op: 'protect_sheet',
+                    sheetId: protection.context.sheetId,
+                    protected: true,
+                    allow,
+                    ...(password ? { password } : {}),
+                  },
+                  protection.context.frozen,
+                )
+                if (failure === null) setViewNotice(t('appProtectionWillWrite'))
+                return failure
+              }}
+              onUnprotect={async (password) => {
+                const failure = await runtime.protectionChange(
+                  {
+                    op: 'protect_sheet',
+                    sheetId: protection.context.sheetId,
+                    protected: false,
+                    password,
+                  },
+                  protection.context.frozen,
+                )
+                if (failure === null) setViewNotice(t('appProtectionWillRemove'))
+                return failure
+              }}
+              onClose={() => setProtection(null)}
+            />
+          )}
+          {runtime && protection?.mode === 'ranges' && (
+            <AllowEditRangesDialog
+              ranges={protection.context.ranges}
+              defaultRef={protection.context.activeCell}
+              onApply={(ranges) => {
+                if (protection.context.ranges.some((range) => range.hasPassword))
+                  return t('appRangesPasswordBlocked')
+                void run(async () => {
+                  const failure = await runtime.protectionChange(
+                    {
+                      op: 'set_protected_ranges',
+                      sheetId: protection.context.sheetId,
+                      ranges: ranges.map(({ name, sqref }) => ({ name, sqref })),
+                    },
+                    protection.context.frozen,
+                  )
+                  if (failure) throw new Error(failure)
+                  setViewNotice(t('appRangesRecorded', { count: ranges.length }))
+                })
+                return null
+              }}
+              onClose={() => setProtection(null)}
             />
           )}
           {runtime?.goToOpen && (
