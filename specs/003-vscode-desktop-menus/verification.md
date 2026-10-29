@@ -3498,3 +3498,17 @@ appearances and installed Linux/Windows VSIX. Not complete Data-tab parity.
   the desktop Review band; desktop executor handles the new ops for desktop AI.
 - Native protection/View/Data/Pivot subset: 10 passing, only the pre-existing
   shortcuts failure.
+
+### Review R2 (notes, threaded comments), Icons/Equation/Checkbox (2026-10-29)
+
+- Native `Desktop Review tab UI` (3): protection; Notes menu → Univer note popup
+  → one set_note revision on close/flush, exact history, saved legacy comment,
+  reopen and Delete; Comments pane post/reply/resolve as three set_thread
+  revisions, exact history, saved threaded parts with reply and resolved flag.
+- Native `Desktop Insert icons and checkbox UI`: icon → picture revision,
+  Checkbox → validation revision, saved media and dataValidation sqref F2:F3.
+- workbook-session `thread-save` (real sidecar): thread, reply/resolve and
+  convert-to-note keeping the author.
+- Browser suite 132/132 after the focus-boundary refinement; full native run
+  54 passing with only the 3 pre-existing failures (before comments/icons).
+- docx-engine math.ts strict-index fixes (no behavior change): 1905 tests pass.

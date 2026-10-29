@@ -1,3 +1,4 @@
+import { threadStore } from './threaded-comments'
 import { reorder } from './visual-arrange-actions'
 /**
  * Applies a planned batch of workbook operations to the live Univer workbook:
@@ -1729,6 +1730,11 @@ async function executeOp(op: PlannedOp, run: OpRun): Promise<void> {
         note: op.text,
       })
     }
+  } else if (op.op === 'set_thread') {
+    sheetById(op.sheetId)
+    const { row, column } = parseAddress(op.address)
+    if (op.thread === null) threadStore.remove(op.sheetId, row, column)
+    else threadStore.put(op.sheetId, row, column, op.thread)
   } else if (op.op === 'protect_workbook') {
     const file = state.file.workbookProtection
     if (file?.hasPassword) throw new Error(t('appWorkbookProtectedWithPassword'))

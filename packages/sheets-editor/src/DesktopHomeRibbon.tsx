@@ -24,6 +24,12 @@ import { normalizeLang } from '@genoffice/i18n'
 import { InsertFunctionFlow } from '../../../apps/sheets/src/renderer/InsertFunctionFlow'
 import { FunctionLibraryRibbon, SheetsRibbon } from '../../../apps/sheets/src/renderer/SheetsRibbon'
 import { GoToDialog } from '../../../apps/sheets/src/renderer/GoToDialog'
+import { IconsDialog } from '../../../apps/sheets/src/renderer/IconsDialog'
+import { EquationDialog } from '../../../apps/sheets/src/renderer/EquationDialog'
+import {
+  ThreadHoverCard,
+  ThreadedCommentsPane,
+} from '../../../apps/sheets/src/renderer/ThreadedCommentsPane'
 import { ProtectSheetDialog } from '../../../apps/sheets/src/renderer/ProtectSheetDialog'
 import { AllowEditRangesDialog } from '../../../apps/sheets/src/renderer/AllowEditRangesDialog'
 import { AxisSizeDialog } from '../../../apps/sheets/src/renderer/AxisSizeDialog'
@@ -62,6 +68,7 @@ export function DesktopHomeRibbon({
   const lang = normalizeLang(locale ?? navigator.language)
   setModuleLang(lang)
   const [viewNotice, setViewNotice] = useState<string | null>(null)
+  const [rendered, setRendered] = useState<'icons' | 'equation' | null>(null)
   const [protection, setProtection] = useState<{
     mode: 'protect' | 'unprotect' | 'ranges'
     context: Awaited<ReturnType<NonNullable<typeof runtime>['protectionContext']>>
@@ -110,6 +117,40 @@ export function DesktopHomeRibbon({
       value === 'unfreeze'
     ) {
       void run(async () => setViewNotice(await runtime.viewCommand(value)))
+      return
+    }
+    if (
+      value === 'note-open' ||
+      value === 'note-show-toggle' ||
+      value === 'note-show-all' ||
+      value === 'note-delete'
+    ) {
+      void run(async () => setViewNotice(await runtime.noteCommand(value)))
+      return
+    }
+    if (
+      value === 'comment-new' ||
+      value === 'comment-reply' ||
+      value === 'comment-resolve' ||
+      value === 'comment-delete' ||
+      value === 'comment-prev' ||
+      value === 'comment-next' ||
+      value === 'comments-pane-toggle' ||
+      value === 'notes-convert'
+    ) {
+      void run(async () => setViewNotice(await runtime.commentCommand(value)))
+      return
+    }
+    if (value === 'insert-icons' || value === 'insert-equation') {
+      setRendered(value === 'insert-icons' ? 'icons' : 'equation')
+      return
+    }
+    if (value === 'insert-screenshot') {
+      onError('Screen capture is not available in VS Code; insert the image with Pictures instead.')
+      return
+    }
+    if (value === 'insert-checkbox') {
+      void run(() => runtime.insertCheckbox())
       return
     }
     if (value === 'workbook-statistics') {
@@ -603,6 +644,26 @@ export function DesktopHomeRibbon({
                 return null
               }}
               onClose={() => setProtection(null)}
+            />
+          )}
+          {runtime && <ThreadedCommentsPane getRuntime={() => runtime.univerRuntime as never} />}
+          <ThreadHoverCard hover={runtime?.threadHover ?? null} />
+          {runtime && rendered === 'icons' && (
+            <IconsDialog
+              onInsert={(dataUrl, _size, name) =>
+                void run(() =>
+                  runtime.insertRenderedPicture(dataUrl, `${name.replace(/\s+/g, '-')}.png`),
+                )
+              }
+              onClose={() => setRendered(null)}
+            />
+          )}
+          {runtime && rendered === 'equation' && (
+            <EquationDialog
+              onInsert={(dataUrl) =>
+                void run(() => runtime.insertRenderedPicture(dataUrl, 'Equation.png'))
+              }
+              onClose={() => setRendered(null)}
             />
           )}
           {runtime?.goToOpen && (

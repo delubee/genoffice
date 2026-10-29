@@ -157,4 +157,154 @@ suite('Desktop Review tab UI', () => {
       await browser.close()
     }
   })
+
+  test('edits notes through the shared Notes menu and Univer note popup with history, save and reopen', async function () {
+    const port = process.env.GENOFFICE_TEST_CDP_PORT
+    if (!port) return this.skip()
+    this.timeout(180_000)
+    const api = (await vscode.extensions
+      .getExtension('genoffice.genoffice-workbook')!
+      .activate()) as Api
+    const name = 'review-notes-ui.xlsx'
+    const uri = vscode.Uri.joinPath(vscode.workspace.workspaceFolders![0]!.uri, name)
+    await vscode.workspace.fs.writeFile(uri, new Uint8Array(await manualWorkbook()))
+    const browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`)
+    try {
+      await vscode.commands.executeCommand('vscode.openWith', uri, 'genoffice.workbook')
+      let document = api.getDocument(uri)!
+      await document.whenViewReady()
+      let frame = await viewOf(browser, name)
+      await vscode.commands.executeCommand('notifications.clearAll')
+      await vscode.commands.executeCommand('workbench.action.closeAuxiliaryBar')
+      await vscode.commands.executeCommand('workbench.action.closeSidebar')
+      await vscode.commands.executeCommand('workbench.action.closePanel')
+      await frame.page().setViewportSize({ width: 1200, height: 900 })
+      await goTo(frame, 'Data!C2')
+      await frame.locator('#ribbon-tab-review').click()
+      const header = frame.locator('.workbook-desktop-header')
+      const before = structuredClone(document.engine.state)
+      const revision = document.engine.descriptor.revision
+      await header.getByRole('button', { name: 'Notes', exact: true }).click()
+      await frame.getByRole('option', { name: 'New Note', exact: true }).click()
+      const editor = frame.locator('textarea').last()
+      await editor.waitFor()
+      await editor.fill('Check this total')
+      await new Promise((resolve) => setTimeout(resolve, 600))
+      assert.equal(document.engine.descriptor.revision, revision)
+      await goTo(frame, 'Data!E8')
+      await settle(document, revision + 1)
+      const edits = document.engine.state.sheets[0]!.features?.noteEdits as Record<string, string>
+      assert.equal(edits.C2, 'Check this total')
+      const after = structuredClone(document.engine.state)
+      await vscode.commands.executeCommand('undo')
+      assert.deepEqual(document.engine.state, before)
+      await vscode.commands.executeCommand('redo')
+      assert.deepEqual(document.engine.state, after)
+      await vscode.commands.executeCommand('workbench.action.files.save')
+      document = await reopen(api, uri, document.sessionId)
+      const comments = (
+        document.engine.state.sheets[0]!.features?.originalMetadata as {
+          comments?: { row: number; column: number; text: string }[]
+        }
+      ).comments
+      assert.ok(
+        comments?.some(
+          (comment) =>
+            comment.row === 1 && comment.column === 2 && comment.text === 'Check this total',
+        ),
+      )
+      frame = await viewOf(browser, name)
+      await goTo(frame, 'Data!C2')
+      await frame.locator('#ribbon-tab-review').click()
+      const reopened = document.engine.descriptor.revision
+      await frame
+        .locator('.workbook-desktop-header')
+        .getByRole('button', { name: /^Delete/ })
+        .first()
+        .click()
+      await settle(document, reopened + 1)
+      assert.equal(
+        (document.engine.state.sheets[0]!.features?.noteEdits as Record<string, null>).C2,
+        null,
+      )
+    } finally {
+      if (api.getDocument(uri))
+        await vscode.commands.executeCommand('workbench.action.files.save', uri)
+      await vscode.commands.executeCommand('workbench.action.closeAllEditors')
+      await vscode.workspace.fs.delete(uri)
+      await browser.close()
+    }
+  })
+
+  test('posts, replies to, resolves and saves threaded comments through the shared Comments pane', async function () {
+    const port = process.env.GENOFFICE_TEST_CDP_PORT
+    if (!port) return this.skip()
+    this.timeout(180_000)
+    const api = (await vscode.extensions
+      .getExtension('genoffice.genoffice-workbook')!
+      .activate()) as Api
+    const name = 'review-comments-ui.xlsx'
+    const uri = vscode.Uri.joinPath(vscode.workspace.workspaceFolders![0]!.uri, name)
+    await vscode.workspace.fs.writeFile(uri, new Uint8Array(await manualWorkbook()))
+    const browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`)
+    try {
+      await vscode.commands.executeCommand('vscode.openWith', uri, 'genoffice.workbook')
+      let document = api.getDocument(uri)!
+      await document.whenViewReady()
+      const frame = await viewOf(browser, name)
+      await vscode.commands.executeCommand('notifications.clearAll')
+      await vscode.commands.executeCommand('workbench.action.closeAuxiliaryBar')
+      await vscode.commands.executeCommand('workbench.action.closeSidebar')
+      await vscode.commands.executeCommand('workbench.action.closePanel')
+      await frame.page().setViewportSize({ width: 1200, height: 900 })
+      await goTo(frame, 'Data!B2')
+      await frame.locator('#ribbon-tab-review').click()
+      const header = frame.locator('.workbook-desktop-header')
+      const before = structuredClone(document.engine.state)
+      let revision = document.engine.descriptor.revision
+      await header.getByRole('button', { name: /^New Comment/ }).click()
+      const pane = frame.locator('aside.threaded-comments-pane')
+      await pane.waitFor()
+      await pane.locator('textarea').first().fill('Is this total right?')
+      await pane.getByRole('button', { name: 'Post', exact: true }).click()
+      await settle(document, ++revision)
+      const threads = () =>
+        document.engine.state.sheets[0]!.features?.threadEdits as Record<
+          string,
+          { text: string; done: boolean; replies: { text: string }[] }
+        >
+      assert.equal(threads().B2!.text, 'Is this total right?')
+      await pane.locator('textarea').last().fill('Yes, checked.')
+      await pane.getByRole('button', { name: 'Reply', exact: true }).click()
+      await settle(document, ++revision)
+      assert.equal(threads().B2!.replies[0]!.text, 'Yes, checked.')
+      await pane.getByRole('button', { name: 'Resolve', exact: true }).click()
+      await settle(document, ++revision)
+      assert.equal(threads().B2!.done, true)
+      const after = structuredClone(document.engine.state)
+      for (let step = 0; step < 3; step++) await vscode.commands.executeCommand('undo')
+      assert.deepEqual(document.engine.state, before)
+      for (let step = 0; step < 3; step++) await vscode.commands.executeCommand('redo')
+      assert.deepEqual(document.engine.state, after)
+      await vscode.commands.executeCommand('workbench.action.files.save')
+      document = await reopen(api, uri, document.sessionId)
+      const comment = (
+        document.engine.state.sheets[0]!.features?.originalMetadata as {
+          comments: {
+            row: number
+            column: number
+            thread?: { done: boolean; replies: unknown[] }
+          }[]
+        }
+      ).comments.find((entry) => entry.row === 1 && entry.column === 1)
+      assert.equal(comment?.thread?.done, true)
+      assert.equal(comment?.thread?.replies.length, 1)
+    } finally {
+      if (api.getDocument(uri))
+        await vscode.commands.executeCommand('workbench.action.files.save', uri)
+      await vscode.commands.executeCommand('workbench.action.closeAllEditors')
+      await vscode.workspace.fs.delete(uri)
+      await browser.close()
+    }
+  })
 })

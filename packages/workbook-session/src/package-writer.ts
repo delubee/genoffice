@@ -371,27 +371,49 @@ export class SessionPackageWriter implements PackageWriter {
             }),
           })
         }
-        if (sheet.features?.noteEdits) {
+        if (sheet.features?.noteEdits || sheet.features?.threadEdits) {
           const original =
             (sheet.features.originalMetadata as { comments?: SheetNoteState['notes'] } | undefined)
               ?.comments ?? []
           const notes = new Map(
             original.map((note) => [String(note.row) + ':' + String(note.column), note]),
           )
+          // Threads first: a thread converted to a note keeps its author.
+          const threadAuthors = new Map<string, string>()
+          for (const [address, thread] of Object.entries(
+            (sheet.features.threadEdits ?? {}) as Record<
+              string,
+              (NonNullable<SheetNoteState['notes'][number]['thread']> & { text: string }) | null
+            >,
+          )) {
+            const point = parseAddress(address),
+              key = `${point.row}:${point.column}`
+            const existing = notes.get(key)
+            if (thread === null) {
+              if (existing?.thread) threadAuthors.set(key, existing.thread.author)
+              notes.delete(key)
+              continue
+            }
+            const { text, ...meta } = thread
+            notes.set(key, { ...point, author: thread.author, text, thread: meta })
+          }
           const changes = z
             .record(z.string(), z.string().min(1).max(32000).nullable())
-            .parse(sheet.features.noteEdits)
+            .parse(sheet.features.noteEdits ?? {})
           for (const [address, text] of Object.entries(changes)) {
             const point = parseAddress(address),
               key = `${point.row}:${point.column}`
             if (text === null) notes.delete(key)
-            else
+            else {
+              const existing = notes.get(key)
               notes.set(key, {
-                ...notes.get(key),
+                ...existing,
                 ...point,
-                author: notes.get(key)?.author ?? 'GenOffice',
+                author: existing?.author ?? threadAuthors.get(key) ?? 'GenOffice',
                 text,
+                ...(existing?.thread || threadAuthors.has(key) ? { thread: null } : {}),
               })
+            }
           }
           noteStates.push({ sheetName: sheet.name, notes: [...notes.values()] })
         }

@@ -4,7 +4,7 @@
   "platform": "linux-x64",
   "fixtureHash": "ae1fb1a0c89752af8f122ab54d3ca57b9304c912bd93f2be1feb96c2b63d3da1",
   "inputCells": 100000,
-  "durationMs": 113144,
+  "durationMs": 93725,
   "sourceDataDigestPreserved": true,
   "sourceDataSha256": "16a768b34c15ec19096b8d338b2bd453f512a9c1bb931c7b017bdfb691956650",
   "sourceRevision": 1,
@@ -22,8 +22,8 @@
   },
   "chartReopened": true,
   "originalUnknownPartPreserved": true,
-  "scriptPath": "/home/github/genoffice/apps/vscode-office/test-workspace/.genoffice/work/40e1718d-a5be-4dbe-bcdd-b3faaddc8cfe/analysis.py",
-  "manifestPath": "/home/github/genoffice/apps/vscode-office/test-workspace/.genoffice/work/40e1718d-a5be-4dbe-bcdd-b3faaddc8cfe/input.manifest.json",
-  "checkedAt": "2026-10-29T13:25:14.593Z",
+  "scriptPath": "/home/github/genoffice/apps/vscode-office/test-workspace/.genoffice/work/c9a62ea4-0308-48a9-853a-8f71f9abb78b/analysis.py",
+  "manifestPath": "/home/github/genoffice/apps/vscode-office/test-workspace/.genoffice/work/c9a62ea4-0308-48a9-853a-8f71f9abb78b/input.manifest.json",
+  "checkedAt": "2026-10-29T15:57:54.651Z",
   "execution": "Existing Python interpreter invoked by test harness; native agent terminal approval not exercised."
 }

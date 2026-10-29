@@ -3982,6 +3982,557 @@
                     "properties": {
                       "op": {
                         "type": "string",
+                        "const": "set_data_validation"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "range": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,6}(:[A-Z]{1,3}[1-9][0-9]{0,6})?$"
+                      },
+                      "validation": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "any"
+                                  },
+                                  "options": {
+                                    "type": "object",
+                                    "properties": {
+                                      "allowBlank": {
+                                        "type": "boolean"
+                                      },
+                                      "showInputMessage": {
+                                        "type": "boolean"
+                                      },
+                                      "promptTitle": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "prompt": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "showErrorMessage": {
+                                        "type": "boolean"
+                                      },
+                                      "errorStyle": {
+                                        "type": "string",
+                                        "enum": [
+                                          "stop",
+                                          "warning",
+                                          "information"
+                                        ]
+                                      },
+                                      "errorTitle": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "error": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "showDropdown": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "kind"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "list"
+                                  },
+                                  "values": {
+                                    "minItems": 1,
+                                    "maxItems": 100,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 255
+                                    }
+                                  },
+                                  "options": {
+                                    "type": "object",
+                                    "properties": {
+                                      "allowBlank": {
+                                        "type": "boolean"
+                                      },
+                                      "showInputMessage": {
+                                        "type": "boolean"
+                                      },
+                                      "promptTitle": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "prompt": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "showErrorMessage": {
+                                        "type": "boolean"
+                                      },
+                                      "errorStyle": {
+                                        "type": "string",
+                                        "enum": [
+                                          "stop",
+                                          "warning",
+                                          "information"
+                                        ]
+                                      },
+                                      "errorTitle": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "error": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "showDropdown": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "values"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "listRef"
+                                  },
+                                  "range": {
+                                    "type": "string",
+                                    "maxLength": 8192
+                                  },
+                                  "options": {
+                                    "type": "object",
+                                    "properties": {
+                                      "allowBlank": {
+                                        "type": "boolean"
+                                      },
+                                      "showInputMessage": {
+                                        "type": "boolean"
+                                      },
+                                      "promptTitle": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "prompt": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "showErrorMessage": {
+                                        "type": "boolean"
+                                      },
+                                      "errorStyle": {
+                                        "type": "string",
+                                        "enum": [
+                                          "stop",
+                                          "warning",
+                                          "information"
+                                        ]
+                                      },
+                                      "errorTitle": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "error": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "showDropdown": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "range"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "numberBetween"
+                                  },
+                                  "min": {
+                                    "type": "number"
+                                  },
+                                  "max": {
+                                    "type": "number"
+                                  },
+                                  "options": {
+                                    "type": "object",
+                                    "properties": {
+                                      "allowBlank": {
+                                        "type": "boolean"
+                                      },
+                                      "showInputMessage": {
+                                        "type": "boolean"
+                                      },
+                                      "promptTitle": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "prompt": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "showErrorMessage": {
+                                        "type": "boolean"
+                                      },
+                                      "errorStyle": {
+                                        "type": "string",
+                                        "enum": [
+                                          "stop",
+                                          "warning",
+                                          "information"
+                                        ]
+                                      },
+                                      "errorTitle": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "error": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "showDropdown": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "min",
+                                  "max"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "dateBetween"
+                                  },
+                                  "start": {
+                                    "type": "string",
+                                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                                  },
+                                  "end": {
+                                    "type": "string",
+                                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                                  },
+                                  "options": {
+                                    "type": "object",
+                                    "properties": {
+                                      "allowBlank": {
+                                        "type": "boolean"
+                                      },
+                                      "showInputMessage": {
+                                        "type": "boolean"
+                                      },
+                                      "promptTitle": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "prompt": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "showErrorMessage": {
+                                        "type": "boolean"
+                                      },
+                                      "errorStyle": {
+                                        "type": "string",
+                                        "enum": [
+                                          "stop",
+                                          "warning",
+                                          "information"
+                                        ]
+                                      },
+                                      "errorTitle": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "error": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "showDropdown": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "start",
+                                  "end"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "checkbox"
+                                  },
+                                  "options": {
+                                    "type": "object",
+                                    "properties": {
+                                      "allowBlank": {
+                                        "type": "boolean"
+                                      },
+                                      "showInputMessage": {
+                                        "type": "boolean"
+                                      },
+                                      "promptTitle": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "prompt": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "showErrorMessage": {
+                                        "type": "boolean"
+                                      },
+                                      "errorStyle": {
+                                        "type": "string",
+                                        "enum": [
+                                          "stop",
+                                          "warning",
+                                          "information"
+                                        ]
+                                      },
+                                      "errorTitle": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "error": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "showDropdown": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "kind"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "formula"
+                                  },
+                                  "formula": {
+                                    "type": "string",
+                                    "maxLength": 8192,
+                                    "pattern": "^=.*"
+                                  },
+                                  "options": {
+                                    "type": "object",
+                                    "properties": {
+                                      "allowBlank": {
+                                        "type": "boolean"
+                                      },
+                                      "showInputMessage": {
+                                        "type": "boolean"
+                                      },
+                                      "promptTitle": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "prompt": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "showErrorMessage": {
+                                        "type": "boolean"
+                                      },
+                                      "errorStyle": {
+                                        "type": "string",
+                                        "enum": [
+                                          "stop",
+                                          "warning",
+                                          "information"
+                                        ]
+                                      },
+                                      "errorTitle": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "error": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "showDropdown": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "formula"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "criterion"
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "whole",
+                                      "decimal",
+                                      "date",
+                                      "time",
+                                      "textLength"
+                                    ]
+                                  },
+                                  "operator": {
+                                    "type": "string",
+                                    "enum": [
+                                      "between",
+                                      "notBetween",
+                                      "equal",
+                                      "notEqual",
+                                      "greaterThan",
+                                      "greaterThanOrEqual",
+                                      "lessThan",
+                                      "lessThanOrEqual"
+                                    ]
+                                  },
+                                  "formula1": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 8192
+                                  },
+                                  "formula2": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 8192
+                                  },
+                                  "options": {
+                                    "type": "object",
+                                    "properties": {
+                                      "allowBlank": {
+                                        "type": "boolean"
+                                      },
+                                      "showInputMessage": {
+                                        "type": "boolean"
+                                      },
+                                      "promptTitle": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "prompt": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "showErrorMessage": {
+                                        "type": "boolean"
+                                      },
+                                      "errorStyle": {
+                                        "type": "string",
+                                        "enum": [
+                                          "stop",
+                                          "warning",
+                                          "information"
+                                        ]
+                                      },
+                                      "errorTitle": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "error": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "showDropdown": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "type",
+                                  "operator",
+                                  "formula1"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "range",
+                      "validation"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
                         "const": "add_defined_name"
                       },
                       "scopeSheetId": {
@@ -4769,6 +5320,113 @@
                       "op",
                       "sheetId",
                       "ranges"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "set_thread"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "address": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,6}$"
+                      },
+                      "thread": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "maxLength": 64
+                              },
+                              "personId": {
+                                "type": "string",
+                                "maxLength": 64
+                              },
+                              "author": {
+                                "type": "string",
+                                "maxLength": 255
+                              },
+                              "dT": {
+                                "type": "string",
+                                "maxLength": 40
+                              },
+                              "done": {
+                                "type": "boolean"
+                              },
+                              "replies": {
+                                "maxItems": 500,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "maxLength": 64
+                                    },
+                                    "personId": {
+                                      "type": "string",
+                                      "maxLength": 64
+                                    },
+                                    "author": {
+                                      "type": "string",
+                                      "maxLength": 255
+                                    },
+                                    "dT": {
+                                      "type": "string",
+                                      "maxLength": 40
+                                    },
+                                    "text": {
+                                      "type": "string",
+                                      "maxLength": 32767
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "personId",
+                                    "author",
+                                    "dT",
+                                    "text"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "text": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 32000
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "personId",
+                              "author",
+                              "dT",
+                              "done",
+                              "replies",
+                              "text"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "address",
+                      "thread"
                     ],
                     "additionalProperties": false
                   },

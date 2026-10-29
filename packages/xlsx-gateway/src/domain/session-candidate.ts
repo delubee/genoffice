@@ -951,7 +951,8 @@ export async function computeCandidateState(
       op.op === 'set_outline' ||
       op.op === 'set_outline_settings' ||
       op.op === 'protect_sheet' ||
-      op.op === 'set_protected_ranges'
+      op.op === 'set_protected_ranges' ||
+      op.op === 'set_thread'
     ) {
       const features =
         featureEdits.get(op.sheetId) ??
@@ -1083,6 +1084,11 @@ export async function computeCandidateState(
         features.outlineEdits = JSON.parse(
           JSON.stringify([...((features.outlineEdits ?? []) as unknown[]), op]),
         )
+      } else if (op.op === 'set_thread') {
+        features.threadEdits = {
+          ...((features.threadEdits ?? {}) as Record<string, unknown>),
+          [op.address]: op.thread === null ? null : JSON.parse(JSON.stringify(op.thread)),
+        }
       } else if (op.op === 'set_protected_ranges') {
         const source = (features.protectedRanges ?? []) as { hasPassword?: boolean }[]
         // A rewrite cannot preserve per-range password hashes; fail closed.

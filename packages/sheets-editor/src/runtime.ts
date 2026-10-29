@@ -9,6 +9,22 @@ import sortEnUS from '@univerjs/preset-sheets-sort/locales/en-US'
 import sortZhCN from '@univerjs/preset-sheets-sort/locales/zh-CN'
 import sortZhTW from '@univerjs/preset-sheets-sort/locales/zh-TW'
 import '@univerjs/preset-sheets-sort/lib/index.css'
+import { UniverSheetsNotePreset } from '@univerjs/preset-sheets-note'
+import noteEnUS from '@univerjs/preset-sheets-note/locales/en-US'
+import noteZhCN from '@univerjs/preset-sheets-note/locales/zh-CN'
+import noteZhTW from '@univerjs/preset-sheets-note/locales/zh-TW'
+import '@univerjs/preset-sheets-note/lib/index.css'
+import { SheetsNoteModel } from '@univerjs/sheets-note'
+import { SheetsNotePopupService } from '@univerjs/sheets-note-ui'
+import {
+  threadPane,
+  threadStore,
+  type CellThread,
+} from '../../../apps/sheets/src/renderer/threaded-comments'
+import {
+  installThreadedCommentAffordances,
+  type ThreadHover,
+} from '../../../apps/sheets/src/renderer/threaded-comment-marker'
 import {
   UniverSheetsFilterPreset,
   SheetsFilterService,
@@ -2927,7 +2943,15 @@ export class WorkbookRuntime implements EditorProjection {
     return this.crossHighlightOn
   }
   /** Display-only overlays (cross highlight, page-break preview) follow each projection. */
+  private threadAffordances: { dispose(): void } | undefined
   private refreshViewOverlays() {
+    this.threadAffordances ??= installThreadedCommentAffordances(this.runtime, {
+      theme: () => (this.darkTheme() ? 'dark' : 'light'),
+      onHover: (hover) => {
+        this.threadHover = hover
+        this.changed()
+      },
+    })
     if (!this.crossHighlight && this.crossHighlightOn) {
       this.crossHighlight = installCrossHighlight(this.runtime, {
         theme: () => (this.darkTheme() ? 'dark' : 'light'),
@@ -3069,6 +3093,344 @@ export class WorkbookRuntime implements EditorProjection {
       formulas: formulas.toLocaleString(),
       note: partial ? t('appLoadedRegionOnly') : '',
     })
+  }
+  private notesApplying = 0
+  private dirtyNotes = new Map<string, { sheetId: string; row: number; column: number }>()
+  private notePopupWatch: { unsubscribe(): void } | undefined
+  /** File notes plus session edits, in the desktop's "Author:" display form. */
+  private projectedNotes(sheet: NonNullable<typeof this.state>['sheets'][number]) {
+    const original = (
+      (
+        sheet.features?.originalMetadata as
+          | {
+              comments?: {
+                row: number
+                column: number
+                text: string
+                author?: string
+                thread?: unknown
+              }[]
+            }
+          | undefined
+      )?.comments ?? []
+    ).filter((comment) => !comment.thread)
+    const notes = new Map(
+      original.map((comment) => [
+        formatAddress(comment.row, comment.column),
+        { author: comment.author ?? '', text: comment.text },
+      ]),
+    )
+    for (const [address, thread] of Object.entries(
+      (sheet.features?.threadEdits ?? {}) as Record<string, unknown>,
+    ))
+      if (thread) notes.delete(address)
+    for (const [address, text] of Object.entries(
+      (sheet.features?.noteEdits ?? {}) as Record<string, string | null>,
+    ))
+      if (text === null) notes.delete(address)
+      else notes.set(address, { author: notes.get(address)?.author ?? '', text })
+    return notes
+  }
+  /** File threads plus session thread edits, keyed by address. */
+  private projectedThreads(sheet: NonNullable<typeof this.state>['sheets'][number]) {
+    const threads = new Map<string, Omit<CellThread, 'row' | 'column'>>()
+    for (const comment of (
+      sheet.features?.originalMetadata as
+        | {
+            comments?: {
+              row: number
+              column: number
+              thread?: Omit<CellThread, 'row' | 'column'>
+            }[]
+          }
+        | undefined
+    )?.comments ?? [])
+      if (comment.thread) threads.set(formatAddress(comment.row, comment.column), comment.thread)
+    for (const [address, thread] of Object.entries(
+      (sheet.features?.threadEdits ?? {}) as Record<
+        string,
+        Omit<CellThread, 'row' | 'column'> | null
+      >,
+    ))
+      if (thread) threads.set(address, thread)
+      else threads.delete(address)
+    for (const [address, text] of Object.entries(
+      (sheet.features?.noteEdits ?? {}) as Record<string, string | null>,
+    ))
+      if (text !== null) threads.delete(address)
+    return threads
+  }
+  private threadsLoading = false
+  threadHover: ThreadHover | null = null
+  /** The Univer runtime for shared desktop panes (comments pane). */
+  get univerRuntime() {
+    return this.runtime
+  }
+  private applyProjectedThreads() {
+    const state = this.state
+    if (!state) return
+    this.threadsLoading = true
+    try {
+      threadStore.load({
+        sheets: state.sheets.map((sheet) => ({
+          id: sheet.id,
+          comments: [...this.projectedThreads(sheet)].map(([address, thread]) => {
+            const { row, column } = parseAddress(address)
+            return { row, column, author: thread.author, text: thread.text, thread }
+          }),
+        })),
+      } as unknown as Parameters<typeof threadStore.load>[0])
+    } finally {
+      this.threadsLoading = false
+    }
+    threadStore.onChange = (sheetId) => {
+      if (this.threadsLoading || this.closed) return
+      void this.submitThreads(sheetId).catch(this.report)
+    }
+  }
+  /** Comments pane edits: the changed threads become canonical set_thread operations. */
+  private async submitThreads(sheetId: string, extra: WorkbookOperation[] = []) {
+    const sheet = this.state?.sheets.find((item) => item.id === sheetId)
+    if (!sheet) return
+    const projected = this.projectedThreads(sheet)
+    const current = new Map(
+      threadStore
+        .sheetThreads(sheetId)
+        .map(({ row, column, ...thread }) => [formatAddress(row, column), thread] as const),
+    )
+    const operations: WorkbookOperation[] = []
+    for (const [address, thread] of current)
+      if (JSON.stringify(projected.get(address)) !== JSON.stringify(thread))
+        operations.push({
+          op: 'set_thread',
+          sheetId,
+          address,
+          thread: { ...thread, replies: thread.replies.map((reply) => ({ ...reply })) },
+        })
+    for (const address of projected.keys())
+      if (!current.has(address))
+        operations.push({ op: 'set_thread', sheetId, address, thread: null })
+    if (operations.length || extra.length) await this.enqueue([...operations, ...extra])
+  }
+  /** Review > Comments (threaded) and the shared note navigation. */
+  async commentCommand(command: string): Promise<string | null> {
+    const target = this.ribbonTarget
+    if (!target) throw new Error(t('appSelectCellFirst'))
+    const sheet = this.state?.sheets.find((item) => item.id === target.sheetId)
+    if (!sheet) throw new Error(t('appSelectCellFirst'))
+    const { row, column } = parseAddress(target.address.split(':')[0]!)
+    const thread = threadStore.get(sheet.id, row, column)
+    const note = this.projectedNotes(sheet).has(formatAddress(row, column))
+    switch (command) {
+      case 'comment-new':
+        if (thread) threadPane.openAt(sheet.id, row, column, false)
+        else if (note) return t('appThreadCellHasNote')
+        else threadPane.openAt(sheet.id, row, column, true)
+        return null
+      case 'comment-reply':
+        if (!thread) return t('appThreadNoneAtSelection')
+        threadPane.openAt(sheet.id, row, column, false)
+        return null
+      case 'comment-resolve':
+        if (!thread) return t('appThreadNoneAtSelection')
+        threadStore.setDone(sheet.id, row, column, !thread.done)
+        return null
+      case 'comment-delete':
+        if (thread) {
+          threadStore.remove(sheet.id, row, column)
+          return null
+        }
+        return this.noteCommand('note-delete')
+      case 'comments-pane-toggle':
+        threadPane.toggle()
+        return null
+      case 'notes-convert': {
+        const threads = threadStore.sheetThreads(sheet.id)
+        if (!threads.length) return t('appNoCommentsOnSheet')
+        this.threadsLoading = true
+        try {
+          for (const entry of threads) threadStore.convertToNote(sheet.id, entry.row, entry.column)
+        } finally {
+          this.threadsLoading = false
+        }
+        await this.submitThreads(
+          sheet.id,
+          threads.map((entry) => ({
+            op: 'set_note' as const,
+            sheetId: sheet.id,
+            address: formatAddress(entry.row, entry.column),
+            text: [entry.text, ...entry.replies.map((reply) => reply.text)].join('\n\n'),
+          })),
+        )
+        return t('appThreadConverted', { count: threads.length })
+      }
+      case 'comment-prev':
+      case 'comment-next': {
+        const worksheet = this.runtime.univerAPI.getActiveWorkbook()?.getSheetBySheetId(sheet.id)
+        if (!worksheet) return null
+        const stops = [
+          ...threadStore.sheetThreads(sheet.id).map(({ row, column }) => ({ row, column })),
+          ...[...this.projectedNotes(sheet).keys()].map((address) => parseAddress(address)),
+        ].sort((a, b) => a.row - b.row || a.column - b.column)
+        if (!stops.length) return t('appNoNotesOnSheet')
+        const after = stops.find(
+          (stop) => stop.row > row || (stop.row === row && stop.column > column),
+        )
+        const before = [...stops]
+          .reverse()
+          .find((stop) => stop.row < row || (stop.row === row && stop.column < column))
+        const next = command === 'comment-next' ? (after ?? stops[0]!) : (before ?? stops.at(-1)!)
+        worksheet.getRange(next.row, next.column, 1, 1).activate()
+        await revealCellBelowFreeze(worksheet, next.row, next.column)
+        if (threadStore.get(sheet.id, next.row, next.column))
+          threadPane.openAt(sheet.id, next.row, next.column, false)
+        else await this.runtime.univerAPI.executeCommand('sheet.operation.add-note-popup')
+        return null
+      }
+    }
+    throw new Error(`Unknown comment command: ${command}`)
+  }
+  private applyProjectedNotes() {
+    const state = this.state,
+      workbook = this.runtime.univerAPI.getActiveWorkbook()
+    if (!state || !workbook) return
+    this.notesApplying++
+    try {
+      for (const sheet of state.sheets) {
+        const worksheet = workbook.getSheetBySheetId(sheet.id)
+        if (!worksheet) continue
+        const desired = this.projectedNotes(sheet)
+        for (const note of worksheet.getNotes() as { row: number; col: number }[])
+          if (!desired.has(formatAddress(note.row, note.col)))
+            worksheet.getRange(note.row, note.col).deleteNote()
+        for (const [address, note] of desired) {
+          const { row, column } = parseAddress(address)
+          worksheet.getRange(row, column).createOrUpdateNote({
+            id: `note-${sheet.id}-${row}-${column}`,
+            row,
+            col: column,
+            width: 220,
+            height: 90,
+            note: note.author ? `${note.author}:\n${note.text}` : note.text,
+          })
+        }
+      }
+    } finally {
+      this.notesApplying--
+    }
+    if (!this.notePopupWatch)
+      this.notePopupWatch = this.runtime.univer
+        .__getInjector()
+        .get(SheetsNotePopupService)
+        .activePopup$.subscribe((popup) => {
+          if (!popup || popup.temp) void this.flushNotes().catch(this.report)
+        })
+  }
+  /** Commits note popup edits as canonical set_note operations once the popup closes. */
+  private async flushNotes() {
+    if (!this.dirtyNotes.size || !this.state) return
+    const dirty = [...this.dirtyNotes.values()]
+    this.dirtyNotes.clear()
+    const workbook = this.runtime.univerAPI.getActiveWorkbook()
+    const model = this.runtime.univer.__getInjector().get(SheetsNoteModel)
+    const operations: WorkbookOperation[] = []
+    for (const { sheetId, row, column } of dirty) {
+      const sheet = this.state.sheets.find((item) => item.id === sheetId)
+      if (!sheet || !workbook) continue
+      const address = formatAddress(row, column)
+      const current = model.getNote(workbook.getId(), sheetId, { row, col: column }) as
+        { note?: string } | undefined
+      const previous = this.projectedNotes(sheet).get(address)
+      let text = current?.note ?? ''
+      if (previous?.author && text.startsWith(`${previous.author}:\n`))
+        text = text.slice(previous.author.length + 2)
+      const next = text.trim() === '' ? null : text
+      if ((previous?.text ?? null) === next) continue
+      operations.push({ op: 'set_note', sheetId, address, text: next })
+    }
+    if (operations.length) await this.enqueue(operations)
+  }
+  /** Review > Notes commands on the selection. */
+  async noteCommand(command: string) {
+    const target = this.ribbonTarget
+    if (!target) throw new Error(t('appSelectCellFirst'))
+    const sheet = this.state?.sheets.find((item) => item.id === target.sheetId)
+    const workbook = this.runtime.univerAPI.getActiveWorkbook()
+    const worksheet = workbook?.getSheetBySheetId(target.sheetId)
+    if (!sheet || !workbook || !worksheet) throw new Error(t('appSelectCellFirst'))
+    const cell = parseAddress(target.address.split(':')[0]!)
+    const notes = worksheet.getNotes() as { row: number; col: number; show?: boolean }[]
+    if (command === 'note-open') {
+      await this.runtime.univerAPI.executeCommand('sheet.operation.add-note-popup')
+      return null
+    }
+    if (command === 'note-show-toggle') {
+      await this.runtime.univerAPI.executeCommand('sheet.command.toggle-note-popup')
+      return null
+    }
+    if (command === 'note-show-all') {
+      const hidden = notes.filter((note) => !note.show)
+      const targets = hidden.length ? hidden : notes
+      if (!targets.length) return t('appNoNotesOnSheet')
+      for (const note of targets)
+        await this.runtime.univerAPI.executeCommand('sheet.mutation.toggle-note-popup', {
+          unitId: workbook.getId(),
+          sheetId: target.sheetId,
+          row: note.row,
+          col: note.col,
+        })
+      return null
+    }
+    if (command === 'note-delete' || command === 'comment-delete') {
+      const address = formatAddress(cell.row, cell.column)
+      if (!this.projectedNotes(sheet).has(address)) return t('appNoNotesOnSheet')
+      await this.enqueue([{ op: 'set_note', sheetId: target.sheetId, address, text: null }])
+      return null
+    }
+    if (command === 'comment-prev' || command === 'comment-next') {
+      const stops = notes
+        .map((note) => ({ row: note.row, column: note.col }))
+        .sort((a, b) => a.row - b.row || a.column - b.column)
+      if (!stops.length) return t('appNoNotesOnSheet')
+      const after = stops.find(
+        (stop) => stop.row > cell.row || (stop.row === cell.row && stop.column > cell.column),
+      )
+      const before = [...stops]
+        .reverse()
+        .find((stop) => stop.row < cell.row || (stop.row === cell.row && stop.column < cell.column))
+      const next =
+        command === 'comment-next' ? (after ?? stops[0]!) : (before ?? stops[stops.length - 1]!)
+      worksheet.getRange(next.row, next.column, 1, 1).activate()
+      await this.runtime.univerAPI.executeCommand('sheet.operation.add-note-popup')
+      return null
+    }
+    throw new Error(`Unknown note command: ${command}`)
+  }
+  /** Insert > Icons / Equation: the rendered PNG becomes a canonical picture at the selection. */
+  async insertRenderedPicture(dataUrl: string, fileName: string) {
+    if (!(await this.flushEditor())) throw new Error('Finish editing before inserting a picture.')
+    const target = this.ribbonTarget
+    if (!target || !this.state || this.closed) throw new Error(t('appSelectCellFirst'))
+    const frozen = { stateId: this.state.stateId, revision: this.revision }
+    // The webview CSP does not allow fetching data: URLs; decode the PNG directly.
+    const base64 = /^data:image\/png;base64,(.+)$/.exec(dataUrl)?.[1]
+    if (!base64) throw new Error(t('appPictureBadType'))
+    const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
+    await this.insertPictureFile(new File([bytes], fileName, { type: 'image/png' }), target, frozen)
+  }
+  /** Insert > Checkbox: a checkbox validation rule on the selection, as on the desktop. */
+  async insertCheckbox() {
+    if (!(await this.flushEditor())) throw new Error(t('appClipboardBusy'))
+    const target = this.ribbonTarget
+    if (!target) throw new Error(t('appSelectCellFirst'))
+    await this.enqueue([
+      {
+        op: 'set_data_validation',
+        sheetId: target.sheetId,
+        range: target.address,
+        validation: { kind: 'checkbox' },
+      },
+    ])
   }
   /** View tab commands (workbook views, show, zoom, window). */
   async viewCommand(command: string): Promise<string | null> {
@@ -3264,9 +3626,9 @@ export class WorkbookRuntime implements EditorProjection {
           ? LocaleType.ZH_CN
           : LocaleType.EN_US,
       locales: {
-        [LocaleType.EN_US]: { ...enUS, ...filterEnUS, ...sortEnUS },
-        [LocaleType.ZH_CN]: { ...zhCN, ...filterZhCN, ...sortZhCN },
-        [LocaleType.ZH_TW]: { ...zhTW, ...filterZhTW, ...sortZhTW },
+        [LocaleType.EN_US]: { ...enUS, ...filterEnUS, ...sortEnUS, ...noteEnUS },
+        [LocaleType.ZH_CN]: { ...zhCN, ...filterZhCN, ...sortZhCN, ...noteZhCN },
+        [LocaleType.ZH_TW]: { ...zhTW, ...filterZhTW, ...sortZhTW, ...noteZhTW },
       },
       darkMode: this.darkTheme(),
       presets: [
@@ -3282,6 +3644,7 @@ export class WorkbookRuntime implements EditorProjection {
         UniverSheetsDataValidationPreset(),
         UniverSheetsFilterPreset(),
         UniverSheetsSortPreset(),
+        UniverSheetsNotePreset(),
       ],
     })
     const gutterHost = container.parentElement
@@ -3576,6 +3939,13 @@ export class WorkbookRuntime implements EditorProjection {
       })
     const commands = this.runtime.univer.__getInjector().get(ICommandService)
     this.disposables.push(
+      commands.onCommandExecuted((command) => {
+        if (
+          command.id.startsWith('sheet.operation.set-cell-edit-visible') &&
+          (command.params as { visible?: boolean } | undefined)?.visible
+        )
+          this.ribbonFocusBoundary?.editStarted()
+      }),
       commands.beforeCommandExecuted((command, options) => {
         if (this.internal) return
         if (
@@ -3737,6 +4107,31 @@ export class WorkbookRuntime implements EditorProjection {
         if (
           command.id.includes('set-formula-calculation') ||
           command.id.includes('set-formula-result')
+        )
+          return
+        // Note popups edit locally while open; the final text commits on close.
+        if (
+          command.id === 'sheet.mutation.update-note' ||
+          command.id === 'sheet.mutation.remove-note'
+        ) {
+          const params = command.params as { sheetId?: string; row?: number; col?: number }
+          if (
+            !this.notesApplying &&
+            params.sheetId !== undefined &&
+            params.row !== undefined &&
+            params.col !== undefined
+          )
+            this.dirtyNotes.set(`${params.sheetId}!${params.row}:${params.col}`, {
+              sheetId: params.sheetId,
+              row: params.row,
+              column: params.col,
+            })
+          return
+        }
+        // Showing or pinning a note popup is display state, as on the desktop.
+        if (
+          command.id === 'sheet.mutation.toggle-note-popup' ||
+          command.id === 'sheet.mutation.update-note-position'
         )
           return
         if (command.type === CommandType.MUTATION && command.id.startsWith('sheet.'))
@@ -4074,6 +4469,8 @@ export class WorkbookRuntime implements EditorProjection {
       this.installChartVisuals()
       void this.loadOutlineProjection().catch(this.report)
       this.findReplace.contextChanged()
+      this.applyProjectedThreads()
+      this.applyProjectedNotes()
       this.refreshViewOverlays()
       this.changed()
     } finally {
@@ -6659,6 +7056,13 @@ export class WorkbookRuntime implements EditorProjection {
     while (!this.closed && (isVisualDragActive() || isChartApplyActive() || isSheetShapeDragging()))
       await new Promise<void>((resolve) => setTimeout(resolve, 16))
     if (this.closed || !(await this.flushCellEditor())) return false
+    // An open note popup's text commits before Save and other flushing commands.
+    if (this.dirtyNotes.size)
+      try {
+        await this.flushNotes()
+      } catch {
+        return false
+      }
     for (;;) {
       try {
         await Promise.all(work)

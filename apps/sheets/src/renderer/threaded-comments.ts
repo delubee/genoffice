@@ -148,6 +148,17 @@ export class ThreadStore {
     return thread
   }
 
+  /// Replaces the whole thread at a cell (AI/canonical edits carry complete threads).
+  put(
+    sheetId: string,
+    row: number,
+    column: number,
+    thread: Omit<CellThread, 'row' | 'column'>,
+  ): void {
+    this.sheet(sheetId).set(cellKey(row, column), { row, column, ...thread })
+    this.bump(sheetId)
+  }
+
   reply(sheetId: string, row: number, column: number, text: string): void {
     this.update(sheetId, row, column, (thread) => ({
       ...thread,

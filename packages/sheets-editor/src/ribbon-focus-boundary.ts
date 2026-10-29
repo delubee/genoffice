@@ -24,12 +24,14 @@ export function installRibbonFocusBoundary(renders: IRenderManagerService, grid:
   owner.addEventListener('focusin', focusIn, true)
   owner.addEventListener('pointerdown', pointerDown, true)
   const restorers = new Map<string, () => void>()
+  let deferred: (() => void) | undefined
   const attach = (render: ReturnType<IRenderManagerService['getRenderById']>) => {
     if (!render || render.unitId !== DOCS_NORMAL_EDITOR_UNIT_ID_KEY || restorers.has(render.unitId))
       return
     const selection = render.with(DocSelectionRenderService)
     const original = selection.focus
     const guarded = () => {
+      deferred = undefined
       if (tab?.isConnected && owner.activeElement === tab) return
       // Dialogs and side panes own focus while open; engine sync must not move
       // typing into the hidden cell editor (Go To, Fields pane, chart pane, …).
@@ -37,9 +39,12 @@ export function installRibbonFocusBoundary(renders: IRenderManagerService, grid:
       if (
         active instanceof HTMLElement &&
         !grid.contains(active) &&
-        active.closest('[role="dialog"], [role="complementary"], .chart-format-pane')
-      )
+        active.closest('[role="dialog"], [role="complementary"], aside, .chart-format-pane')
+      ) {
+        // Selection sync focuses the cell editor; it applies only if an edit starts.
+        deferred = () => original.call(selection)
         return
+      }
       original.call(selection)
     }
     selection.focus = guarded
@@ -56,6 +61,12 @@ export function installRibbonFocusBoundary(renders: IRenderManagerService, grid:
   return {
     release() {
       tab = null
+    },
+    /** A cell edit started: apply the editor focus a dialog had held back. */
+    editStarted() {
+      const focus = deferred
+      deferred = undefined
+      focus?.()
     },
     dispose() {
       owner.removeEventListener('focusin', focusIn, true)

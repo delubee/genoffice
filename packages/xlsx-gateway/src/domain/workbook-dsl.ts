@@ -2,6 +2,7 @@ import { colorFilterCriteriaSchema } from './color-filter'
 import { customFilterCriteriaSchema } from './custom-filter'
 import { setOutlineSchema, setOutlineSettingsSchema } from './session-outline'
 import { cellRecordSchema } from '../shared/cell-record'
+import { sheetThreadSchema } from '../shared/workbook-protocol'
 import { chartSeriesSelectionSchema } from './chart-series-selection'
 import {
   drawingAnchorSchema,
@@ -853,6 +854,15 @@ const protectSheetSchema = z.object({
   allow: sheetProtectionAllowSchema.optional(),
 })
 
+// Review > Comments: the complete threaded comment at a cell (root text,
+// author, time, resolved flag and replies); null deletes the thread.
+const setThreadSchema = z.object({
+  op: z.literal('set_thread'),
+  sheetId: z.string().min(1),
+  address: cellAddressSchema,
+  thread: sheetThreadSchema.extend({ text: z.string().min(1).max(32_000) }).nullable(),
+})
+
 // Review > Protect Workbook: locks or unlocks the workbook structure (adding,
 // deleting, renaming, moving or hiding sheets). Password-protected workbook
 // structure cannot be changed here.
@@ -1500,6 +1510,7 @@ export const workbookOperationSchema = z.discriminatedUnion('op', [
   editPivotSchema,
   protectWorkbookSchema,
   setProtectedRangesSchema,
+  setThreadSchema,
   insertRowsSchema,
   deleteRowsSchema,
   insertColsSchema,
@@ -1657,6 +1668,7 @@ export type LayoutOperation =
   | z.infer<typeof editPivotSchema>
   | z.infer<typeof protectWorkbookSchema>
   | z.infer<typeof setProtectedRangesSchema>
+  | z.infer<typeof setThreadSchema>
   | DeleteVisualOperation
   | DeleteTableOperation
   | AddSparklineOperation
@@ -1743,6 +1755,7 @@ const LAYOUT_OPS = new Set([
   'edit_pivot',
   'protect_workbook',
   'set_protected_ranges',
+  'set_thread',
   'delete_visual',
   'set_visual_anchor',
   'edit_visual',
@@ -2785,6 +2798,8 @@ export function layoutOpLabel(op: LayoutOperation): string {
       return op.text === null
         ? `Remove note at ${op.address}`
         : `Note at ${op.address}: "${op.text.length > 60 ? `${op.text.slice(0, 60)}…` : op.text}"`
+    case 'set_thread':
+      return op.thread ? `Comment at ${op.address}` : `Delete comment at ${op.address}`
     case 'protect_workbook':
       return op.locked ? 'Protect workbook structure' : 'Unprotect workbook structure'
     case 'set_protected_ranges':

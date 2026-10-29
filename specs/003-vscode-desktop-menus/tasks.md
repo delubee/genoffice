@@ -603,7 +603,7 @@ PivotTable create follow-up (2026-10-29):
 - [ ] CLI: `mcp.test.ts` schema budget (96,298 > 94,208 bytes at HEAD), sidecar `info`, missing generated fixture and Homebrew install tests fail at HEAD; pre-existing.
 - [ ] A host-side commit that lands while a reopened view performs its first reads leaves the view on "The requested state is no longer current"; the view should resync instead of showing the error screen.
 - [ ] Selection-in-pivot hints and edit protection should follow grown (refreshed) output ranges, not only the original pivot ranges.
-- [x] Go To flake: engine-sync focus calls moved typing from open dialogs/panes into the hidden cell editor; the ribbon focus boundary now also protects focused dialog/pane controls. Full native run: 51 passing, only the 3 pre-existing failures.
+- [x] Go To flake: engine selection-sync focus moved typing from open dialogs/panes into the hidden cell editor. The focus boundary now holds that focus back while a dialog/pane control (including `aside` panes) owns focus, and replays it only when a cell edit actually starts (set-cell-edit-visible), so non-modal reference editing keeps working. Browser suite 132/132.
 
 View tab follow-up (2026-10-29):
 
@@ -615,5 +615,12 @@ Review protection foundation (2026-10-29):
 
 - [x] Session `protect_sheet`: Excel-hash passwords with a transaction-derived salt (view/host agree), verified unprotect, edits refused while protected, protection changes allowed on protected sheets, host-only candidate for the 100,000-round hash, saved/removed sheetProtection element.
 - [x] Review tab R1: actual desktop band; Workbook Statistics over the canonical root; Translate routes to native chat; actual Protect/Unprotect Sheet dialog with verified passwords; Protect Workbook (`protect_workbook`) and Allow Edit Ranges (`set_protected_ranges`) with history, save and reopen; protection echo from host features.
-- [ ] Review tab R2: Univer note popup preset bridged to `set_note` (New/Show/Show All Notes, note pictures pane), threaded comments (store, pane, save of threaded comment parts), Convert to Notes, Previous/Next.
+- [x] Review tab R2 notes: Univer note preset in the plugin; projected file/session notes in the desktop "Author:" form; popup edits commit as `set_note` when the popup closes or before Save/flushing commands; New/Show-Hide/Show All/Delete/Previous/Next.
+- [x] Review tab R2 comments: canonical `set_thread`; shared thread store and desktop Comments pane, marker and hover card; post/reply/resolve/delete/edit as canonical edits; Convert to Notes keeps the author; threaded parts saved and reopened.
+- [ ] Note pictures pane (note-pictures-pane-toggle) and VS Code author identity for new comments (currently the desktop fallback author).
+- [x] Insert > Checkbox: canonical checkbox validation on the selection.
+- [x] Insert > Icons and Equation: actual desktop dialogs; rendered PNGs become canonical pictures (data URLs decoded directly under the webview CSP).
+- [x] `set_data_validation` was never in the session operation whitelist, so plugin validation edits (editor and Checkbox) were rejected by the session; added and verified natively.
+- [ ] Insert > Screenshot: no VS Code screen-capture API; reports an explicit host limitation.
+- [ ] Insert remaining: Table/Format as Table + Table Design tab, PivotChart, Slicer, Timeline, Sparklines.
 - [ ] Allow-edit ranges do not yet permit edits inside a protected sheet (desktop guard allows them).
