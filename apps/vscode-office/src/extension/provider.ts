@@ -259,6 +259,18 @@ export class WorkbookEditorProvider
         },
       }),
     )
+    document.bridge!.handle('workbook.mergeWorkbooks', async () => {
+      if (this.getDocument(document.uri) !== document || document.sessionId !== actionSession)
+        throw new Error('The workbook view is no longer current.')
+      // The requesting view flushes its own editor first; a nested view.flush would wait on itself.
+      const files = await vscode.window.showOpenDialog({
+        canSelectMany: true,
+        openLabel: 'Merge',
+        filters: { 'Excel Workbook': ['xlsx'] },
+      })
+      if (!files?.length) return { canceled: true }
+      return document.mergeWorkbooks(files)
+    })
     const configuration = () =>
       vscode.workspace.getConfiguration('genoffice.workbook', document.uri)
     document.bridge!.handle('appearance.change', async (raw) => {

@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { SubtotalConfig } from '@genoffice/xlsx-gateway/domain/subtotal-plan'
 import {
   UniverSheetsSortPreset,
@@ -4991,8 +4992,6 @@ export class WorkbookRuntime implements EditorProjection {
     const matrix = csvImportMatrix(text)
     if ('error' in matrix) throw new Error(t(matrix.error))
     const { rows, columns, values } = matrix
-    if (rows * columns > 2000)
-      throw new Error('From Text/CSV currently imports at most 2,000 cells in one transaction.')
     if (!(await this.flushCellEditor())) throw new Error('Finish editing before importing a CSV.')
     // The pick can take arbitrarily long; bind to the selection and revision as of the write.
     const target = this.ribbonTarget,
@@ -5025,21 +5024,37 @@ export class WorkbookRuntime implements EditorProjection {
       )
     )
       throw new Error('Remove merged cells from the CSV destination range before importing.')
-    // set_range carries at most 500 rows × 100 columns per operation.
-    const operations: WorkbookOperation[] = []
-    for (let row = 0; row < rows; row += 500)
-      for (let column = 0; column < columns; column += 100)
-        operations.push({
+    // set_range carries at most 500 rows × 100 columns; each stage stays within one ordinary batch.
+    const stages: WorkbookOperation[][] = []
+    let stage: WorkbookOperation[] = [],
+      budget = 0
+    for (let column = 0; column < columns; column += 100) {
+      const width = Math.min(100, columns - column),
+        band = Math.max(1, Math.min(500, Math.floor(2000 / width)))
+      for (let row = 0; row < rows; row += band) {
+        const block = values
+          .slice(row, row + band)
+          .map((line) =>
+            line.slice(column, column + width).map((value) => (value === '' ? null : value)),
+          )
+        const cells = block.length * width
+        if (stage.length && budget + cells > 2000) {
+          stages.push(stage)
+          stage = []
+          budget = 0
+        }
+        stage.push({
           op: 'set_range',
           sheetId: target.sheetId,
           start: formatAddress(origin.row + row, origin.column + column),
-          values: values
-            .slice(row, row + 500)
-            .map((line) =>
-              line.slice(column, column + 100).map((value) => (value === '' ? null : value)),
-            ),
+          values: block,
         })
-    await this.enqueue(operations, frozen)
+        budget += cells
+      }
+    }
+    stages.push(stage)
+    if (stages.length === 1) await this.enqueue(stages[0]!, frozen)
+    else await this.enqueueStaged(stages, frozen)
     return { rows, columns, cell: formatAddress(origin.row, origin.column) }
   }
   /** Data → Refresh All: the workbook's pivot tables, as on the desktop. */
@@ -5935,6 +5950,58 @@ export class WorkbookRuntime implements EditorProjection {
     )
     return result
   }
+  /** Several bounded stages, published by the host as one revision and history entry. */
+  enqueueStaged(
+    stages: readonly (readonly WorkbookOperation[])[],
+    frozen: { stateId: string; revision: number },
+  ) {
+    const result = this.pending.then(() => {
+      if (this.state?.stateId !== frozen.stateId || this.revision !== frozen.revision)
+        throw new Error('The document changed before applying this operation. Try again.')
+      if (!this.state || this.closed) throw new Error('view_unavailable')
+      if (!this.host.submitStaged) throw new Error('Large edits are unavailable in this host.')
+      return this.host.submitStaged(
+        { transactionId: crypto.randomUUID(), expectedRevision: this.revision },
+        stages,
+      )
+    })
+    this.pending = result.then(
+      () => {
+        this.pendingError = false
+      },
+      () => {
+        this.pendingError = false
+      },
+    )
+    return result
+  }
+  private mergeWorkbooksWork: Promise<unknown> | undefined
+  /** Data → Merge Workbooks; the host owns the picker, source reads and the staged commit. */
+  mergeWorkbooks() {
+    if (this.mergeWorkbooksWork)
+      return Promise.reject(new Error('Workbooks are already being merged.'))
+    const work = (async () => {
+      const metadata = this.state?.features?.originalMetadata as
+        { workbookProtection?: { lockStructure?: boolean } } | undefined
+      if (metadata?.workbookProtection?.lockStructure) throw new Error(t('appMergeWorkbooksLocked'))
+      if (!this.host.mergeWorkbooks) throw new Error('Merge Workbooks is unavailable in this host.')
+      if (!(await this.flushCellEditor()))
+        throw new Error('Finish editing before merging workbooks.')
+      await this.pending
+      return z
+        .union([
+          z.object({ canceled: z.literal(true) }),
+          z.object({ sheets: z.number(), files: z.number(), sheetNames: z.array(z.string()) }),
+        ])
+        .parse(await this.host.mergeWorkbooks())
+    })()
+    this.mergeWorkbooksWork = work
+    const clear = () => {
+      if (this.mergeWorkbooksWork === work) this.mergeWorkbooksWork = undefined
+    }
+    void work.then(clear, clear)
+    return work
+  }
   requestHistory(direction: 'undo' | 'redo') {
     return requestHostHistory(this.host, direction, () => this.flushEditor())
   }
@@ -5959,6 +6026,7 @@ export class WorkbookRuntime implements EditorProjection {
       this.removeDuplicatesWork,
       this.textToColumnsWork,
       this.csvImportWork,
+      this.mergeWorkbooksWork,
       this.consolidateWork,
       this.goalSeekWork,
       this.outlineWork,

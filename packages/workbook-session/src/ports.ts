@@ -1,3 +1,4 @@
+import type { WorkbookOperation } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
 import type {
   CommitReceipt,
   DocumentDescriptor,
@@ -32,6 +33,13 @@ export interface CandidateInterpreter {
     state: WorkbookState,
     intent: TransactionInput,
     batch: ImportBatch,
+    signal?: AbortSignal,
+  ): Promise<PreparedChangeset>
+  /** Host-built bounded stages published as one root (see staged-candidate). */
+  prepareStaged?(
+    state: WorkbookState,
+    intent: TransactionInput,
+    stages: readonly (readonly WorkbookOperation[])[],
     signal?: AbortSignal,
   ): Promise<PreparedChangeset>
   dispose(): void | Promise<void>

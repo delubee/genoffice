@@ -31,6 +31,13 @@ export interface EditorHost {
     expectedRevision: number
     operations: readonly unknown[]
   }): Promise<unknown>
+  /** Bounded stages committed as one manual revision (bulk imports). */
+  submitStaged?(
+    intent: { transactionId: string; expectedRevision: number },
+    stages: readonly (readonly unknown[])[],
+  ): Promise<unknown>
+  /** Data → Merge Workbooks: the host picks and reads the source files. */
+  mergeWorkbooks?(): Promise<unknown>
   selection(sheetId: string, range: GridRange | null): void
   history(direction: 'undo' | 'redo'): Promise<void>
 }

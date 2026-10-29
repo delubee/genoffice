@@ -72,10 +72,9 @@ export function WorkbookRibbon({
     ReturnType<WorkbookRuntime['removeDuplicatesContext']>
   > | null>(null)
   const [dedupeNotice, setDedupeNotice] = useState<number | null>(null)
-  const [csvNotice, setCsvNotice] = useState<{
-    rows: number
-    columns: number
-    cell: string
+  const [dataNotice, setDataNotice] = useState<{
+    key: 'appCsvImported' | 'appMergeWorkbooksDone' | 'appOpenCanceled'
+    params: Record<string, string | number>
   } | null>(null)
   const [advancedFilterContext, setAdvancedFilterContext] = useState<Awaited<
     ReturnType<WorkbookRuntime['advancedFilterContext']>
@@ -263,15 +262,26 @@ export function WorkbookRibbon({
               onCommand={(command) => {
                 if (command === 'import-csv')
                   run(async () => {
-                    setCsvNotice(null)
+                    setDataNotice(null)
                     const imported = await runtime!.importCsv(
                       normalizeLang(locale ?? navigator.language),
                     )
-                    if (imported) setCsvNotice(imported)
+                    if (imported) setDataNotice({ key: 'appCsvImported', params: imported })
                   })
                 else if (command === 'refresh-all') run(() => runtime!.refreshAll())
                 else if (command === 'merge-workbooks')
-                  onError('Merge Workbooks is not available in VS Code yet.')
+                  run(async () => {
+                    setDataNotice(null)
+                    const merged = await runtime!.mergeWorkbooks()
+                    setDataNotice(
+                      'canceled' in merged
+                        ? { key: 'appOpenCanceled', params: {} }
+                        : {
+                            key: 'appMergeWorkbooksDone',
+                            params: { sheets: merged.sheets, files: merged.files },
+                          },
+                    )
+                  })
                 else onError(`Unknown Get Data command: ${command}`)
               }}
             />
@@ -580,9 +590,9 @@ export function WorkbookRibbon({
           )}
         </p>
       )}
-      {csvNotice && (
+      {dataNotice && (
         <p role="status">
-          {tFor(normalizeLang(locale ?? navigator.language), 'appCsvImported', csvNotice)}
+          {tFor(normalizeLang(locale ?? navigator.language), dataNotice.key, dataNotice.params)}
         </p>
       )}
       {advancedFilterContext && runtime && (

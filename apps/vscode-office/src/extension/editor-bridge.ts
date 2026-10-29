@@ -56,6 +56,7 @@ export class WebviewCandidateBridge implements CandidateInterpreter {
       getState(): WorkbookState
       getDescriptor(): DocumentDescriptor
       submit(intent: TransactionInput): Promise<unknown>
+      submitStaged?(intent: Omit<TransactionInput, 'operations'>, stages: unknown): Promise<unknown>
       history?(direction: 'undo' | 'redo'): Promise<void>
     },
   ) {
@@ -156,6 +157,20 @@ export class WebviewCandidateBridge implements CandidateInterpreter {
       if (intent.sessionId !== input.sessionId || intent.origin !== 'manual')
         throw new BridgeError('session_mismatch', 'Unexpected manual transaction source.')
       return input.submit(intent)
+    })
+    // Host-bounded stages (CSV import): one manual commit above the ordinary batch ceiling.
+    this.bridge.handle('view.stagedIntent', async (raw) => {
+      const request = z
+        .strictObject({
+          intent: transactionInputSchema.omit({ operations: true }),
+          stages: z.unknown(),
+        })
+        .parse(raw)
+      if (request.intent.sessionId !== input.sessionId || request.intent.origin !== 'manual')
+        throw new BridgeError('session_mismatch', 'Unexpected manual transaction source.')
+      if (!input.submitStaged)
+        throw new BridgeError('unsupported_operation', 'Staged edits are unavailable in this host.')
+      return input.submitStaged(request.intent, request.stages)
     })
     this.bridge.handle('history.request', async (raw) => {
       const request = z.strictObject({ direction: z.enum(['undo', 'redo']) }).parse(raw)

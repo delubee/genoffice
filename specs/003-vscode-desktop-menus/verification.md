@@ -3410,3 +3410,19 @@ Evidence (scratchpad logs of this session):
 
 Still open: 50,000-cell parity, Merge Workbooks, pivot refresh, locales/
 appearances and installed Linux/Windows VSIX. Not complete Data-tab parity.
+
+### Staged bulk transactions, 50,000-cell CSV and Merge Workbooks (2026-10-29)
+
+- workbook-session `staged-candidate` (4): above-ceiling stages publish one
+  changeset; add-sheet then content stages; >50,000 cells refused; engine commit
+  is one revision/one history entry, idempotent retry and exact undo.
+- workbook-session `merge-workbooks` (1, real sidecar): deduped "Data (2)"/
+  "Other", values, cached formula value without formula, bold/fill/number
+  format, C1:D1 merge, 21.5-character column width and 30pt row height.
+- Native VS Code 1.109.5 `Desktop Get Data bulk UI` (2): an 8,400-cell CSV is
+  one revision with exact Undo/Redo and saved/reopened values; Merge Workbooks
+  through the host open dialog (simple-dialog mode) adds two deduped sheets in
+  one revision with exact Undo/Redo, saved and reopened values/styles.
+- Unit: xlsx-gateway 331, workbook-session 255, sheets-editor 42,
+  vscode-office 61, desktop merge/csv 7; typechecks, lint and production build
+  with boundary checks pass.

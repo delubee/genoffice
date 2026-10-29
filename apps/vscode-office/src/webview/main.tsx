@@ -55,6 +55,18 @@ const host: EditorHost = {
       origin: 'manual',
       summary: 'Manual workbook edit',
     }),
+  submitStaged: (intent, stages) =>
+    bridge.request('view.stagedIntent', {
+      intent: {
+        schemaVersion: 1,
+        ...intent,
+        sessionId,
+        origin: 'manual',
+        summary: 'Manual workbook edit',
+      },
+      stages: JSON.parse(JSON.stringify(stages)),
+    }),
+  mergeWorkbooks: () => bridge.request('workbook.mergeWorkbooks', {}),
   selection: () => {}, // Binding explicitly requests the flushed selection.
   history: async (direction) => {
     await bridge.request('history.request', { direction })

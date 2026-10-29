@@ -575,11 +575,18 @@ Get Data shared group follow-up (2026-10-29):
 - [x] Share desktop CSV picking, byte/cell budgets, charset preference and typed matrix building (`csv-import-model.ts`); parser cap failures map to the desktop "too large" message.
 - [x] Import CSV in the plugin as one canonical transaction bound to the post-pick selection/revision, with merge, grid-edge, stale and single-flight guards included in Save flushing.
 - [x] Verify native shared-button import, cancel, Refresh All no-pivot message, one revision, exact Undo/Redo, saved package preservation and independent reopen.
-- [ ] Lift the 2,000-cell CSV limit to the desktop 50,000 cells through a manual import path that stays one history entry.
-- [ ] Implement Merge Workbooks (host file pick, sheet copy with styles/dedupe names) and pivot-aware Refresh All.
+- [x] Lift the 2,000-cell CSV limit to the desktop 50,000 cells through a host staged transaction that stays one history entry.
+- [x] Implement Merge Workbooks: host picker, private source snapshots, deduped sheets with values/styles/merges/row heights/column widths as one staged commit.
+- [ ] Merge Workbooks beyond 50,000 total cells, hyperlinks/validation/conditional formats/visuals of source sheets, and installed Linux/Windows acceptance.
+- [ ] Pivot-aware Refresh All (depends on the Pivot workflow).
 - [ ] Investigate intermittent `protected-view-save.test.ts` failure under full parallel workbook-session runs (1 of 4 runs; passes alone).
 
 Working-tree fixes found while resuming (2026-10-29):
 
 - [x] `projectDataValidationRules` readonly clone type error broke typecheck in four packages.
 - [x] Data-validation sqref rewriting kept throwing on document-controlled areas outside the A1 grammar; such areas are now preserved verbatim (restores `dv-sqref-replace` regressions) while parseable areas keep overlap splitting and formula offsets.
+
+Native suite baseline findings (2026-10-29, VS Code 1.109.5, full `--label minimum` run):
+
+- [ ] `Workbook native shortcuts UI`, `Product workspace skill commands` (expects packaged skill 0.1.0, finds 0.2.0) and `Product worksheet dimensions` (91 vs 104 px) fail in isolation at checkpoint 29ceb04c as well; pre-existing, not caused by the Get Data work.
+- [ ] Column Header Filter, Advanced Filter and the bulk CSV test pass alone but failed in the full run (notification toasts/chat pane covering the webview, Go To left disabled, timeouts); harden suite isolation.

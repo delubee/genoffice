@@ -109,6 +109,8 @@ export const protocolMessageSchema = z.strictObject({
     'appearance.change',
     'appearance.changed',
     'view.intent',
+    'view.stagedIntent',
+    'workbook.mergeWorkbooks',
     'candidate.prepare',
     'candidate.result',
     'state.committed',
