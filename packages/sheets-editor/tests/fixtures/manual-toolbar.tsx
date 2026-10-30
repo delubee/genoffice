@@ -603,6 +603,7 @@ export async function mountManualToolbar(
       return book.startEditing()
     },
     reveal: (range: string) => projection.goToReference(range, { focus: false }),
+    facade: () => facade,
     select(range: string) {
       const sheet = facade.getActiveWorkbook().getActiveSheet()
       sheet.setActiveRange(sheet.getRange(range))

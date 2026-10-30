@@ -17,15 +17,19 @@ import {
 import { SymbolDialog } from '../../../apps/sheets/src/renderer/SymbolDialog'
 import { LinkDialog } from '../../../apps/sheets/src/renderer/LinkDialog'
 import { createPortal } from 'react-dom'
-import { formatAddress } from '@genoffice/xlsx-gateway/domain/cell-address'
+import { formatAddress, parseRange } from '@genoffice/xlsx-gateway/domain/cell-address'
 import { FindReplacePanel } from '../../../apps/sheets/src/renderer/FindReplacePanel'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { resolveGlobalShortcut } from '../../../apps/sheets/src/renderer/global-shortcuts'
 import { normalizeLang } from '@genoffice/i18n'
 import { InsertFunctionFlow } from '../../../apps/sheets/src/renderer/InsertFunctionFlow'
 import { FunctionLibraryRibbon, SheetsRibbon } from '../../../apps/sheets/src/renderer/SheetsRibbon'
 import { GoToDialog } from '../../../apps/sheets/src/renderer/GoToDialog'
 import { TableRangeDialog } from '../../../apps/sheets/src/renderer/TableRangeDialog'
 import { IconsDialog } from '../../../apps/sheets/src/renderer/IconsDialog'
+import { InsertDeleteCellsDialog } from '../../../apps/sheets/src/renderer/InsertDeleteCellsDialog'
+import { FillSeriesDialog } from '../../../apps/sheets/src/renderer/FillSeriesDialog'
+import { fillSeriesDefaultType } from '../../../apps/sheets/src/renderer/fill-series-apply'
 import { EquationDialog } from '../../../apps/sheets/src/renderer/EquationDialog'
 import {
   ThreadHoverCard,
@@ -49,7 +53,10 @@ export function DesktopHomeRibbon({
   onPivotCreate,
   onPivotEdit,
   onPivotFilter,
+  onSharedCommand,
 }: {
+  /** Data commands the desktop also dispatches from Home; true when handled. */
+  onSharedCommand?(value: string): boolean
   onPivotCreate?(): void
   onPivotFilter?(kind: 'slicer' | 'timeline'): void
   onPivotEdit?(): void
@@ -74,6 +81,10 @@ export function DesktopHomeRibbon({
   const [viewNotice, setViewNotice] = useState<string | null>(null)
   const [rendered, setRendered] = useState<'icons' | 'equation' | null>(null)
   const [tableDialog, setTableDialog] = useState<'create' | 'resize' | null>(null)
+  const [cellsDialog, setCellsDialog] = useState<'insert' | 'delete' | null>(null)
+  const [fillSeries, setFillSeries] = useState<
+    NonNullable<typeof runtime>['fillSeriesContext'] | null
+  >(null)
   const [protection, setProtection] = useState<{
     mode: 'protect' | 'unprotect' | 'ranges'
     context: Awaited<ReturnType<NonNullable<typeof runtime>['protectionContext']>>
@@ -110,6 +121,7 @@ export function DesktopHomeRibbon({
       onError('The document is still loading.')
       return
     }
+    if (onSharedCommand?.(value)) return
     if (
       value === 'toggle-formula-bar' ||
       value === 'toggle-cross-highlight' ||
@@ -184,6 +196,68 @@ export function DesktopHomeRibbon({
       const type = value.slice('sparkline:'.length)
       if (type === 'line' || type === 'column' || type === 'stacked')
         void run(async () => setViewNotice(await runtime.insertSparklines(type)))
+      return
+    }
+    if (value === 'cf-open') {
+      void run(() => runtime.openConditionalFormatting())
+      return
+    }
+    if (value === 'fill-series-open') {
+      void run(async () => {
+        if (!(await runtime.flushEditor()))
+          throw new Error('Finish editing before filling a series.')
+        setFillSeries(runtime.fillSeriesContext)
+      })
+      return
+    }
+    if (value === 'insert-cells' || value === 'delete-cells') {
+      void run(async () => {
+        const mode = value === 'insert-cells' ? 'insert' : 'delete'
+        const direct = runtime.cellsDecision()
+        if (direct) await runtime.cellsCommand(mode, direct)
+        else setCellsDialog(mode)
+      })
+      return
+    }
+    if (value === 'insert-sheet') {
+      void run(async () => setViewNotice(await runtime.insertSheet()))
+      return
+    }
+    if (value === 'insert-now:date' || value === 'insert-now:time') {
+      void run(() => runtime.insertNow(value === 'insert-now:date' ? 'date' : 'time'))
+      return
+    }
+    if (/^page-(row|col):-?1$/.test(value)) {
+      runtime.pageMove(value.startsWith('page-col:'), value.endsWith(':-1') ? -1 : 1)
+      return
+    }
+    if (value === 'outline-group:auto' || value === 'outline-ungroup:auto') {
+      // Shift+Alt+Arrow: whole columns selected mean columns, anything else rows.
+      const target = runtime.ribbonTarget
+      const bounds = target ? parseRange(target.address) : null
+      const dimensions = target?.dimensions
+      const columns =
+        bounds &&
+        dimensions &&
+        bounds.endRow - bounds.startRow + 1 >= dimensions.rows &&
+        bounds.endColumn - bounds.startColumn + 1 < dimensions.columns
+      void run(() =>
+        runtime.outlineCommand(
+          value === 'outline-group:auto' ? 'group' : 'ungroup',
+          columns ? 'cols' : 'rows',
+        ),
+      )
+      return
+    }
+    if (value === 'formula-bar-toggle') {
+      // Univer keeps the expanded state in component state; the fold arrow is the only way in.
+      document
+        .querySelector<HTMLElement>('[data-u-comp="formula-bar"] .univer-w-5.univer-cursor-pointer')
+        ?.click()
+      return
+    }
+    if (value === 'format-painter' || value === 'format-painter:dblclick') {
+      void run(() => runtime.formatPainter(value === 'format-painter' ? 1 : 2))
       return
     }
     if (value === 'insert-checkbox') {
@@ -422,6 +496,30 @@ export function DesktopHomeRibbon({
     }
     void run(() => runtime.ribbonCommands([value]))
   }
+  // The desktop window shortcut table (global-shortcuts.ts). Capture keeps
+  // VS Code's own bindings for these chords from firing inside the editor.
+  const commandRef = useRef(command)
+  commandRef.current = command
+  useEffect(() => {
+    if (!runtime) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return
+      const guards = runtime.shortcutGuards(event)
+      const action = guards && resolveGlobalShortcut(event, guards)
+      if (!action) return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      commandRef.current(
+        action.kind === 'command'
+          ? action.command
+          : action.dialog === 'formatCells'
+            ? 'format-cells'
+            : 'goto-open',
+      )
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [runtime])
   const unused = (): never => {
     throw new Error('A non-Home ribbon callback was invoked in the Home adapter.')
   }
@@ -440,7 +538,7 @@ export function DesktopHomeRibbon({
         <SheetsRibbon
           activeTab={activeTab}
           selectionFormat={runtime?.ribbonTarget?.format ?? null}
-          formatPainterActive={false}
+          formatPainterActive={runtime?.formatPainterActive ?? false}
           sheetHasContent={runtime?.ribbonEcho.hasContent ?? false}
           sheetProtected={runtime?.ribbonEcho.protected ?? null}
           workbookProtected={runtime?.workbookProtected ?? null}
@@ -689,6 +787,27 @@ export function DesktopHomeRibbon({
           )}
           {runtime && <ThreadedCommentsPane getRuntime={() => runtime.univerRuntime as never} />}
           <ThreadHoverCard hover={runtime?.threadHover ?? null} />
+          {fillSeries && runtime && (
+            <FillSeriesDialog
+              context={fillSeries}
+              defaultType={fillSeriesDefaultType(fillSeries.numberFormat)}
+              onApply={(options) => {
+                void run(async () => {
+                  const failure = await runtime.fillSeries(options)
+                  if (failure) throw new Error(failure)
+                })
+                return null
+              }}
+              onClose={() => setFillSeries(null)}
+            />
+          )}
+          {cellsDialog && runtime && (
+            <InsertDeleteCellsDialog
+              mode={cellsDialog}
+              onApply={(choice) => void run(() => runtime.cellsCommand(cellsDialog, choice))}
+              onClose={() => setCellsDialog(null)}
+            />
+          )}
           {runtime && tableDialog === 'create' && (
             <TableRangeDialog
               title={t('appCreateTable')}

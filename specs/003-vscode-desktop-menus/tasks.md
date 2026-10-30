@@ -588,7 +588,7 @@ Working-tree fixes found while resuming (2026-10-29):
 
 Native suite baseline findings (2026-10-29, VS Code 1.109.5, full `--label minimum` run):
 
-- [ ] `Workbook native shortcuts UI`, `Product workspace skill commands` (expects packaged skill 0.1.0, finds 0.2.0) and `Product worksheet dimensions` (91 vs 104 px) fail in isolation at checkpoint 29ceb04c as well; pre-existing, not caused by the Get Data work.
+- [ ] `Product workspace skill commands` (expects packaged skill 0.1.0, finds 0.2.0) and `Product worksheet dimensions` (91 vs 104 px) fail in isolation at checkpoint 29ceb04c as well; pre-existing, not caused by the Get Data work.
 - [ ] Column Header Filter, Advanced Filter and the bulk CSV test pass alone but failed in the full run (notification toasts/chat pane covering the webview, Go To left disabled, timeouts); harden suite isolation.
 
 PivotTable create follow-up (2026-10-29):
@@ -626,6 +626,11 @@ Review protection foundation (2026-10-29):
 - [x] Insert > Sparklines: canonical `add_sparkline` in sessions (cells derived from the current sheet name at projection/save), shared desktop renderer, native menu/history/save/reopen.
 - [x] Insert > PivotChart: one transaction (add_chart + series edit of the predicted chart id) with the desktop's pivot series; native verified on a reopened file pivot.
 - [x] Insert > Slicer / Timeline: canonical `filter_pivot` (the desktop's applyPivotSlicer + growth rewrite; shrunken output cleared), actual desktop field pickers and floating panels as session UI; native filter/undo/save/remove verified.
-- [ ] Ctrl+T Create Table shortcut in the plugin.
+- [x] Desktop window shortcut table (global-shortcuts.ts) in the plugin: Ctrl+T Create Table, Ctrl+1, Ctrl+K, Shift+F2, Ctrl+Shift+number formats/borders, Ctrl+; date/time, Shift+F11 Insert Sheet, PageUp/PageDown paging, Alt+Shift+arrows outline, Ctrl+Shift+U formula bar; captured so VS Code's own chords do not fire.
+- [x] Home gaps found by a dynamic per-control audit: Format Painter (once/locked/Esc, formats painted on release through paste_cells), Insert/Delete Cells (whole rows/columns direct, shift dialog via relocate_range), Fill → Series (desktop planner, canonical writes), Sort & Filter / Flash Fill routed to the shared Data handlers.
+- [x] Conditional Formatting: Univer CF preset in the plugin; file rules projected with the desktop builder (cf-rule-build.ts); rule-manager edits captured as declarative `set_conditional_formats` (save-ability checked at edit time, coordinates pinned while pending); saved as native rules and read back after reopen.
+- [x] `Workbook native shortcuts UI` failure was a notification toast covering the Go To button; the test now clears notifications.
+- [ ] Univer keyboard layer from excel-shortcuts.ts (Ctrl+PgUp/PgDn tabs, Ctrl+Home/End, Ctrl/Shift+Space, Ctrl+Shift+= / Ctrl+-) and the desktop cell context menu (Univer contextMenu is off in the plugin).
+- [ ] File CF rules on sheets with pending structural edits are not projected (source coordinates); cfvo formula/reference thresholds are not pre-resolved as on the desktop.
 - [ ] Allow-edit ranges do not yet permit edits inside a protected sheet (desktop guard allows them).
 - [ ] Browser suite under full load: `function confirmation preserves an unfinished grid draft` and `Sort & Filter group toggles smart source regions` failed once each after the table preset was added (130/132); both pass alone. Watch for a focus-timing regression.

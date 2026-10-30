@@ -112,10 +112,8 @@ function safeFormat(pattern: string, value: number | string): string | null {
   }
 }
 
-/// Marker on `cell.custom` for a numeric cell whose shrinkToFit was baked
-/// into the font size at load: the #### rule stands down (Excel shrinks the
-/// formatted number instead of hashing it).
-export const SHRINK_TO_FIT_KEY = 'shrinkToFit'
+import { SHRINK_TO_FIT_KEY } from './shrink-to-fit-key'
+export { SHRINK_TO_FIT_KEY }
 
 /// The text a numeric cell will display, for width measurement at load
 /// time (before the NUMFMT interceptor has run).
@@ -352,10 +350,8 @@ export function exponentialDecimalRepair(pattern: string, value: number): string
 
 const NBSP = /\u00a0/g
 
-/// Days between the 1900 and 1904 date-system epochs. numfmt is 1900-only,
-/// so 1904 workbooks shift date serials before formatting (display-only; the
-/// model keeps the file's original serials so saving stays lossless).
-export const DATE_1904_OFFSET = 1462
+import { DATE_1904_OFFSET } from './date-1904'
+export { DATE_1904_OFFSET }
 
 const datePatternCache = new Map<string, boolean>()
 

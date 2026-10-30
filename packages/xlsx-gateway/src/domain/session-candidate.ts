@@ -81,6 +81,7 @@ import {
   pivotPageRows,
   pivotSourceGrid,
 } from './pivot-placement'
+import { cfRuleUnsaveableReason } from '../gateway/xlsx-cf'
 import { applyPivotSlicer, growPivotDefinition, recomputePivotData } from './pivot-engine'
 import {
   workbookPivotAddSchema,
@@ -411,6 +412,12 @@ export async function computeCandidateState(
     )
   )
     throw new Error('unsupported_structural_feature: session_table')
+  // Session conditional formats keep their absolute ranges until saved.
+  if (
+    intent.operations.some((op) => changingCoordinates.has(op.op)) &&
+    current.sheets.some((sheet) => sheet.features?.cfEdits)
+  )
+    throw new Error('unsupported_structural_feature: session_conditional_format')
   // A pending PivotTable pins its source and output coordinates and sheet names.
   const pendingPivots = sessionPivotAdditions(current)
   if (pendingPivots.length) {
@@ -966,6 +973,7 @@ export async function computeCandidateState(
       op.op === 'reapply_filter' ||
       op.op === 'set_filter_criteria' ||
       op.op === 'set_data_validation' ||
+      op.op === 'set_conditional_formats' ||
       op.op === 'set_rows_hidden' ||
       op.op === 'set_cols_hidden' ||
       op.op === 'set_outline' ||
@@ -1083,6 +1091,15 @@ export async function computeCandidateState(
             }
         }
         features.filterEdits = nextFilter
+      } else if (op.op === 'set_conditional_formats') {
+        for (const rule of op.rules) {
+          const reason = cfRuleUnsaveableReason(rule.rule)
+          if (reason) throw new Error(`unsupported_conditional_format: ${reason}`)
+          for (const range of rule.ranges)
+            if (range.endRow < range.startRow || range.endColumn < range.startColumn)
+              throw new Error('invalid_range')
+        }
+        features.cfEdits = JSON.parse(JSON.stringify({ rules: op.rules }))
       } else if (op.op === 'set_data_validation') {
         const area = parseRange(op.range),
           edits = (features.dataValidationEdits ?? { rules: [], remove: [] }) as {

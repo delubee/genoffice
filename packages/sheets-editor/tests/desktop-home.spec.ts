@@ -992,3 +992,148 @@ test('Shift-selecting original and session charts deletes both with one authorit
     await page.evaluate(() => (window as any).toolbar.snapshot().sheets[0].features.visualEdits),
   ).toEqual({ 'original-chart': { remove: true } })
 })
+
+test('desktop window shortcuts and Format Painter route through the shared command table', async ({
+  page,
+}) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(String(error)))
+  await page.goto(base)
+  await page.evaluate(async () => {
+    const { mountManualToolbar } = await import(
+      /* @vite-ignore */ String('/packages/sheets-editor/tests/fixtures/manual-toolbar.tsx')
+    )
+    ;(window as any).toolbar = await mountManualToolbar(true)
+    ;(window as any).toolbar.select('B2')
+  })
+  const snapshot = () => page.evaluate(() => (window as any).toolbar.snapshot())
+  const revision = () => page.evaluate(() => (window as any).toolbar.revision())
+  await page.getByRole('tab', { name: 'Home', exact: true }).click()
+  // Ctrl+Shift+5: percent format, the desktop's number-format chord.
+  await page.keyboard.press('Control+Shift+Digit5')
+  await expect.poll(async () => (await snapshot()).sheets[0].cells.B2.numberFormat).toBe('0%')
+  // Ctrl+1 opens Format Cells; Ctrl+T opens Create Table.
+  await page.keyboard.press('Control+Digit1')
+  const format = page.getByRole('dialog', { name: 'Format Cells', exact: true })
+  await expect(format).toBeVisible()
+  await format.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page.getByRole('tab', { name: 'Home', exact: true }).click()
+  await page.keyboard.press('Control+KeyT')
+  const table = page.getByRole('dialog', { name: 'Create Table', exact: true })
+  await expect(table).toBeVisible()
+  await table.getByRole('button', { name: 'Cancel', exact: true }).click()
+  // Shift+F11 appends the next free SheetN.
+  await page.getByRole('tab', { name: 'Home', exact: true }).click()
+  const before = await revision()
+  await page.keyboard.press('Shift+F11')
+  await expect.poll(revision).toBe(before + 1)
+  expect((await snapshot()).sheets.map((sheet: { name: string }) => sheet.name)).toContain('Sheet1')
+  // Format Painter: B2's formats paint onto B3 when the target selection is released.
+  await page.evaluate(() => {
+    ;(window as any).toolbar.selectSheet('Data')
+    ;(window as any).toolbar.select('B2')
+  })
+  const painter = page
+    .locator('.workbook-desktop-header')
+    .getByRole('button', { name: 'Format Painter', exact: true })
+  await painter.click()
+  await expect(painter).toHaveAttribute('aria-pressed', 'true')
+  const painted = await revision()
+  await page.evaluate(() => {
+    ;(window as any).toolbar.select('B3')
+    document
+      .querySelector('canvas[id^="univer-sheet-main-canvas"]')!
+      .dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0 }))
+  })
+  await expect.poll(revision).toBe(painted + 1)
+  expect((await snapshot()).sheets[0].cells.B3.numberFormat).toBe('0%')
+  await expect(painter).toHaveAttribute('aria-pressed', 'false')
+  expect(errors).toEqual([])
+})
+
+test('Home Insert Cells and Fill Series write canonical edits through the desktop dialogs', async ({
+  page,
+}) => {
+  await page.goto(base)
+  await page.evaluate(async () => {
+    const { mountManualToolbar } = await import(
+      /* @vite-ignore */ String('/packages/sheets-editor/tests/fixtures/manual-toolbar.tsx')
+    )
+    ;(window as any).toolbar = await mountManualToolbar(true)
+    ;(window as any).toolbar.select('B2')
+  })
+  const cells = async () =>
+    (await page.evaluate(() => (window as any).toolbar.snapshot())).sheets[0].cells
+  const home = page.locator('.workbook-desktop-header')
+  await home.getByRole('button', { name: 'Insert Cells…', exact: true }).click()
+  const insert = page.getByRole('dialog', { name: 'Insert', exact: true })
+  await insert.getByRole('button', { name: 'OK', exact: true }).click()
+  await expect.poll(async () => (await cells()).B4?.rawValue).toBe(-30)
+  expect((await cells()).B3?.rawValue).toBe(120)
+  expect((await cells()).B2?.rawValue ?? null).toBe(null)
+  expect((await cells()).A2?.rawValue).toBe('North')
+  await page.evaluate(() => (window as any).toolbar.select('B3'))
+  await home.getByRole('button', { name: 'Fill', exact: true }).click()
+  await page.getByRole('listbox').getByRole('option', { name: 'Series…', exact: true }).click()
+  const series = page.getByRole('dialog', { name: 'Series', exact: true })
+  await series.getByLabel('Columns', { exact: true }).check()
+  await series.getByLabel('Step value', { exact: true }).fill('5')
+  await series.getByLabel('Stop value', { exact: true }).fill('130')
+  await series.getByRole('button', { name: 'OK', exact: true }).click()
+  await expect.poll(async () => (await cells()).B5?.rawValue).toBe(130)
+  expect((await cells()).B4?.rawValue).toBe(125)
+})
+
+test('Conditional Formatting opens the shared rule manager and saves panel rules as one session edit', async ({
+  page,
+}) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(String(error)))
+  await page.goto(base)
+  await page.evaluate(async () => {
+    const { mountManualToolbar } = await import(
+      /* @vite-ignore */ String('/packages/sheets-editor/tests/fixtures/manual-toolbar.tsx')
+    )
+    ;(window as any).toolbar = await mountManualToolbar(true)
+    ;(window as any).toolbar.select('B2:B3')
+  })
+  const revision = () => page.evaluate(() => (window as any).toolbar.revision())
+  await page
+    .locator('.workbook-desktop-header')
+    .getByRole('button', { name: 'Conditional Formatting', exact: true })
+    .click()
+  await expect(page.locator('span', { hasText: /^Manage\s*$/ }).first()).toBeVisible()
+  const before = await revision()
+  // A rule added through Univer's own command path, as the panel's Apply does.
+  await page.evaluate(() => {
+    const sheet = (window as any).toolbar.facade().getActiveWorkbook().getActiveSheet()
+    const rule = sheet
+      .newConditionalFormattingRule()
+      .whenNumberGreaterThan(100)
+      .setBackground('#FFC7CE')
+      .setRanges([sheet.getRange('B2:B3').getRange()])
+      .build()
+    sheet.addConditionalFormattingRule(rule)
+  })
+  await expect.poll(revision).toBe(before + 1)
+  const edits = await page.evaluate(
+    () => (window as any).toolbar.snapshot().sheets[0].features.cfEdits,
+  )
+  expect(edits.rules).toHaveLength(1)
+  expect(edits.rules[0].ranges).toEqual([{ startRow: 1, endRow: 2, startColumn: 1, endColumn: 1 }])
+  expect(edits.rules[0].rule.type).toBe('highlightCell')
+  // The projected rule survives the reinstall that follows the commit.
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as any).toolbar
+            .facade()
+            .getActiveWorkbook()
+            .getActiveSheet()
+            .getConditionalFormattingRules().length,
+      ),
+    )
+    .toBe(1)
+  expect(errors).toEqual([])
+})

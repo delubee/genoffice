@@ -120,6 +120,40 @@ export function WorkbookRibbon({
       onError(String(error))
     }
   }
+  /** Commands the desktop dispatches from both Home and Data (one handler each, as in ExcelShell). */
+  const sharedCommand = (command: string): boolean => {
+    if (command === 'sort-custom-open')
+      run(async () => setSortContext(await runtime!.customSortContext()))
+    else if (command === 'filter-advanced')
+      run(async () => setAdvancedFilterContext(await runtime!.advancedFilterContext()))
+    else if (
+      command === 'filter-toggle' ||
+      command === 'filter-clear' ||
+      command === 'filter-reapply' ||
+      command === 'sort:asc' ||
+      command === 'sort:desc'
+    )
+      run(() => runtime!.sortFilterCommand(command))
+    else if (command === 'flash-fill') run(() => runtime!.flashFill())
+    else if (command === 'remove-duplicates-open')
+      run(async () => {
+        setDedupeNotice(null)
+        setDedupeContext(await runtime!.removeDuplicatesContext())
+      })
+    else if (command === 'dv-open') openDataValidation()
+    else if (command === 'consolidate-open') openConsolidate()
+    else if (command === 'subtotal-open')
+      run(async () => setSubtotalContext(await runtime!.subtotalContext()))
+    else if (command === 'goal-seek-open')
+      run(async () => {
+        if (!runtime || !(await runtime.flushEditor())) throw new Error(text.selectFirst)
+        const context = runtime?.goalSeekContext
+        if (!context) throw new Error(text.selectFirst)
+        setGoalSeekContext(context)
+      })
+    else return false
+    return true
+  }
   const selected = () => {
     const value = runtime?.selection
     if (!value) throw new Error(text.selectFirst)
@@ -307,32 +341,13 @@ export function WorkbookRibbon({
             />
             <SortFilterRibbonGroup
               onCommand={(command) => {
-                if (command === 'sort-custom-open')
-                  run(async () => setSortContext(await runtime!.customSortContext()))
-                else if (command === 'filter-advanced')
-                  run(async () => setAdvancedFilterContext(await runtime!.advancedFilterContext()))
-                else if (
-                  command === 'filter-toggle' ||
-                  command === 'filter-clear' ||
-                  command === 'filter-reapply' ||
-                  command === 'sort:asc' ||
-                  command === 'sort:desc'
-                )
-                  run(() => runtime!.sortFilterCommand(command))
-                else onError(`Unknown Sort & Filter command: ${command}`)
+                if (!sharedCommand(command)) onError(`Unknown Sort & Filter command: ${command}`)
               }}
             />
             <DataToolsRibbonGroup
               onCommand={(command) => {
-                if (command === 'flash-fill') run(() => runtime!.flashFill())
-                else if (command === 'remove-duplicates-open')
-                  run(async () => {
-                    setDedupeNotice(null)
-                    setDedupeContext(await runtime!.removeDuplicatesContext())
-                  })
-                else if (command === 'dv-open') openDataValidation()
-                else if (command === 'consolidate-open') openConsolidate()
-                else if (command === 'text-to-columns:1') run(() => runtime!.textToColumns(1))
+                if (sharedCommand(command)) return
+                if (command === 'text-to-columns:1') run(() => runtime!.textToColumns(1))
                 else if (command === 'text-to-columns:2') run(() => runtime!.textToColumns(2))
                 else if (command === 'text-to-columns:4') run(() => runtime!.textToColumns(4))
                 else if (command === 'text-to-columns:8') run(() => runtime!.textToColumns(8))
@@ -341,23 +356,14 @@ export function WorkbookRibbon({
             />
             <ForecastRibbonGroup
               onCommand={(command) => {
-                if (command === 'goal-seek-open')
-                  run(async () => {
-                    if (!runtime || !(await runtime.flushEditor()))
-                      throw new Error(text.selectFirst)
-                    const context = runtime?.goalSeekContext
-                    if (!context) throw new Error(text.selectFirst)
-                    setGoalSeekContext(context)
-                  })
-                else onError(`Unknown Forecast command: ${command}`)
+                if (!sharedCommand(command)) onError(`Unknown Forecast command: ${command}`)
               }}
             />
             <OutlineRibbonGroup
               outlineSummary={runtime?.outlineSummary ?? { below: true, right: true }}
               onCommand={(command) => {
-                if (command === 'subtotal-open')
-                  run(async () => setSubtotalContext(await runtime!.subtotalContext()))
-                else if (command === 'outline-summary-below')
+                if (sharedCommand(command)) return
+                if (command === 'outline-summary-below')
                   run(() => runtime!.outlineCommand('summary-below'))
                 else if (command === 'outline-summary-right')
                   run(() => runtime!.outlineCommand('summary-right'))
@@ -499,6 +505,7 @@ export function WorkbookRibbon({
         onPivotCreate={pivot.open}
         onPivotEdit={pivot.edit}
         onPivotFilter={slicers.open}
+        onSharedCommand={sharedCommand}
         activeTab={
           currentTab === 'shapeFormat'
             ? 'Shape Format'

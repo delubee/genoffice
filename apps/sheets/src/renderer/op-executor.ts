@@ -1,4 +1,5 @@
 import { threadStore } from './threaded-comments'
+import { nextSheetName } from './sheet-default-name'
 import { reorder } from './visual-arrange-actions'
 /**
  * Applies a planned batch of workbook operations to the live Univer workbook:
@@ -338,15 +339,6 @@ export function planFromOps(
   )
 }
 
-/** Excel-style default name for an inserted sheet: the lowest free SheetN. */
-export function nextSheetName(taken: readonly string[]): string {
-  const lower = new Set(taken.map((name) => name.toLowerCase()))
-  for (let n = 1; ; n += 1) {
-    const candidate = `Sheet${n}`
-    if (!lower.has(candidate.toLowerCase())) return candidate
-  }
-}
-
 function planTargetSheets(plan: ChangePlan): Set<string> {
   const sheets = new Set<string>()
   for (const structural of plan.structuralChanges) {
@@ -573,6 +565,10 @@ async function executeOp(op: PlannedOp, run: OpRun): Promise<void> {
     throw new Error('unsupported_operation: edit_pivot requires a canonical workbook session')
   if (op.op === 'filter_pivot')
     throw new Error('unsupported_operation: filter_pivot requires a canonical workbook session')
+  if (op.op === 'set_conditional_formats')
+    throw new Error(
+      'unsupported_operation: set_conditional_formats requires a canonical workbook session',
+    )
   if (op.op === 'edit_table')
     throw new Error('unsupported_operation: edit_table requires a canonical workbook session')
   if (op.op === 'relocate_range')
@@ -1776,3 +1772,5 @@ function headerFooterParts(
     ...(parts.right === undefined ? {} : { right: parts.right }),
   }
 }
+
+export { nextSheetName }

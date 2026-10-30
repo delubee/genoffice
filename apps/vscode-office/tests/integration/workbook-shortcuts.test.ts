@@ -50,6 +50,8 @@ suite('Workbook native shortcuts UI', () => {
         if (!frame) await new Promise((resolve) => setTimeout(resolve, 100))
       }
       assert.ok(frame, 'workbook frame')
+      await vscode.commands.executeCommand('notifications.clearAll')
+      await vscode.commands.executeCommand('workbench.action.closeAuxiliaryBar')
       const state = structuredClone(document.engine.state),
         revision = document.engine.descriptor.revision
       assert.equal(await vscode.commands.executeCommand('genoffice.workbook.goto'), true)

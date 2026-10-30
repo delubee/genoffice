@@ -18,6 +18,21 @@ import { UniverSheetsTablePreset } from '@univerjs/preset-sheets-table'
 import tableEnUS from '@univerjs/preset-sheets-table/locales/en-US'
 import tableZhCN from '@univerjs/preset-sheets-table/locales/zh-CN'
 import tableZhTW from '@univerjs/preset-sheets-table/locales/zh-TW'
+import { UniverSheetsConditionalFormattingPreset } from '@univerjs/preset-sheets-conditional-formatting'
+import cfEnUS from '@univerjs/preset-sheets-conditional-formatting/locales/en-US'
+import cfZhCN from '@univerjs/preset-sheets-conditional-formatting/locales/zh-CN'
+import cfZhTW from '@univerjs/preset-sheets-conditional-formatting/locales/zh-TW'
+import '@univerjs/preset-sheets-conditional-formatting/lib/index.css'
+import {
+  AddConditionalRuleMutation,
+  ConditionalFormattingRuleModel,
+  DeleteConditionalRuleMutation,
+  type IConditionFormattingRule,
+} from '@univerjs/preset-sheets-conditional-formatting'
+import {
+  buildConditionalRule,
+  dropShadowedPaintOnceRules,
+} from '../../../apps/sheets/src/renderer/cf-rule-build'
 import '@univerjs/preset-sheets-table/lib/index.css'
 import {
   DEFAULT_TABLE_STYLE,
@@ -170,7 +185,21 @@ import {
 import { SheetClipboardController, ISheetClipboardService } from '@univerjs/preset-sheets-core'
 import { planNativeCellPaste } from './native-cell-paste'
 import { cellAtClientPoint } from '../../../apps/sheets/src/renderer/picture-grid-target'
-import { isGridKeyTarget } from '../../../apps/sheets/src/renderer/clear-selection-keyboard'
+import {
+  isFormulaBarKeyTarget,
+  isGridKeyTarget,
+} from '../../../apps/sheets/src/renderer/clear-selection-keyboard'
+import {
+  isModalOpen,
+  type GlobalShortcutGuards,
+} from '../../../apps/sheets/src/renderer/global-shortcuts'
+import { getScrollAnchor } from '../../../apps/sheets/src/renderer/scroll-anchor'
+import { nextSheetName } from '../../../apps/sheets/src/renderer/sheet-default-name'
+import {
+  FILL_SERIES_OPEN_ENDED_LIMIT,
+  planFillSeries,
+  type FillSeriesOptions,
+} from '../../../apps/sheets/src/renderer/fill-series'
 import {
   pickPictureFile,
   pickTransferImage,
@@ -265,6 +294,8 @@ import {
   LifecycleStages,
   ThemeService,
   RANGE_TYPE,
+  BooleanNumber,
+  CellValueType,
   type ICellData,
   type IWorkbookData,
 } from '@univerjs/core'
@@ -1382,6 +1413,356 @@ export class WorkbookRuntime implements EditorProjection {
     } finally {
       if (this.clipboardWork === work) this.clipboardWork = undefined
     }
+  }
+  /** Guards for the desktop window shortcut table; null outside this editor. */
+  shortcutGuards(event: KeyboardEvent): GlobalShortcutGuards | null {
+    const target = event.target
+    if (
+      this.closed ||
+      event.isComposing ||
+      this.composing ||
+      !(target instanceof Element) ||
+      !this.container.closest('.workbook-editor')?.contains(target)
+    )
+      return null
+    return {
+      isMac: /Mac/i.test(navigator.platform),
+      modalOpen: isModalOpen(this.container.ownerDocument),
+      cellEditing: this.runtime.univerAPI.getActiveWorkbook()?.isCellEditing() ?? false,
+      gridTarget: isGridKeyTarget(target, this.container),
+      formulaBarTarget: isFormulaBarKeyTarget(target),
+    }
+  }
+  /**
+   * Home → Insert / Delete Cells: whole rows or columns act at once; any other
+   * selection asks for the shift (null), as the desktop's requestCellsAction.
+   */
+  cellsDecision(): 'entire-row' | 'entire-column' | null {
+    const sheet = this.runtime.univerAPI.getActiveWorkbook()?.getActiveSheet()
+    const range = sheet?.getActiveRange()?.getRange()
+    if (!sheet || !range) throw new Error(t('appSelectCellFirst'))
+    if (
+      range.rangeType === RANGE_TYPE.ROW ||
+      range.rangeType === RANGE_TYPE.ALL ||
+      (range.startColumn <= 0 && range.endColumn >= sheet.getMaxColumns() - 1)
+    )
+      return 'entire-row'
+    if (
+      range.rangeType === RANGE_TYPE.COLUMN ||
+      (range.startRow <= 0 && range.endRow >= sheet.getMaxRows() - 1)
+    )
+      return 'entire-column'
+    return null
+  }
+  /** Inserts or deletes the selected cells; shifts move the rest of the band like a drag-move. */
+  async cellsCommand(
+    mode: 'insert' | 'delete',
+    choice: 'shift-horizontal' | 'shift-vertical' | 'entire-row' | 'entire-column',
+  ) {
+    if (!(await this.flushEditor())) throw new Error('Finish editing before changing cells.')
+    const target = this.ribbonTarget,
+      state = this.state
+    if (!target || !state) throw new Error(t('appSelectCellFirst'))
+    const sheet = state.sheets.find((item) => item.id === target.sheetId)
+    if (!sheet) throw new Error(t('appSelectCellFirst'))
+    const bounds = parseRange(target.address)
+    const height = bounds.endRow - bounds.startRow + 1,
+      width = bounds.endColumn - bounds.startColumn + 1
+    const sheetId = target.sheetId
+    let operations: WorkbookOperation[]
+    if (choice === 'entire-row')
+      operations = [
+        mode === 'insert'
+          ? { op: 'insert_rows', sheetId, row: bounds.startRow + 1, count: height }
+          : { op: 'delete_rows', sheetId, row: bounds.startRow + 1, count: height },
+      ]
+    else if (choice === 'entire-column')
+      operations = [
+        mode === 'insert'
+          ? { op: 'insert_cols', sheetId, column: columnLabel(bounds.startColumn), count: width }
+          : { op: 'delete_cols', sheetId, column: columnLabel(bounds.startColumn), count: width },
+      ]
+    else {
+      // The band runs from the selection to the used edge of the sheet.
+      const vertical = choice === 'shift-vertical'
+      const lastRow = Math.max(0, sheet.rows - 1),
+        lastColumn = Math.max(0, sheet.columns - 1)
+      const area = (startRow: number, startColumn: number, endRow: number, endColumn: number) =>
+        `${formatAddress(startRow, startColumn)}:${formatAddress(endRow, endColumn)}`
+      if (mode === 'insert') {
+        const end = vertical ? lastRow : lastColumn,
+          start = vertical ? bounds.startRow : bounds.startColumn
+        operations =
+          start > end
+            ? []
+            : [
+                {
+                  op: 'relocate_range',
+                  sheetId,
+                  sourceSheetId: sheetId,
+                  source: vertical
+                    ? area(bounds.startRow, bounds.startColumn, lastRow, bounds.endColumn)
+                    : area(bounds.startRow, bounds.startColumn, bounds.endRow, lastColumn),
+                  start: vertical
+                    ? formatAddress(bounds.startRow + height, bounds.startColumn)
+                    : formatAddress(bounds.startRow, bounds.startColumn + width),
+                },
+              ]
+      } else {
+        const after = vertical ? bounds.endRow + 1 : bounds.endColumn + 1
+        const end = vertical ? lastRow : lastColumn
+        operations =
+          after > end
+            ? [{ op: 'clear_range', sheetId, range: target.address }]
+            : [
+                {
+                  op: 'relocate_range',
+                  sheetId,
+                  sourceSheetId: sheetId,
+                  source: vertical
+                    ? area(after, bounds.startColumn, lastRow, bounds.endColumn)
+                    : area(bounds.startRow, after, bounds.endRow, lastColumn),
+                  start: formatAddress(bounds.startRow, bounds.startColumn),
+                },
+              ]
+      }
+    }
+    if (operations.length) await this.enqueue(operations)
+  }
+  /** Home → Fill → Series dialog defaults (direction from the selection shape). */
+  get fillSeriesContext() {
+    const active = this.runtime.univerAPI.getActiveWorkbook()?.getActiveRange()
+    return {
+      direction:
+        active && active.getHeight() > active.getWidth() ? ('columns' as const) : ('rows' as const),
+      date1904: this.state?.dateSystem === '1904',
+      numberFormat: this.ribbonTarget?.format?.numberFormat,
+    }
+  }
+  /** Fill → Series: the desktop's planFillSeries written as canonical cells; returns a message or null. */
+  async fillSeries(options: FillSeriesOptions): Promise<string | null> {
+    if (!(await this.flushEditor())) return 'Finish editing before filling a series.'
+    const workbook = this.runtime.univerAPI.getActiveWorkbook()
+    const active = workbook?.getActiveRange()
+    const state = this.state
+    if (!active || !state) return t('appSelectRangeFirst')
+    const frozen = { stateId: state.stateId, revision: this.revision }
+    const sheetId = active.getSheetId()
+    const { startRow, startColumn } = active.getRange()
+    const cells = active.getCellDatas()
+    const computed = active.getValues()
+    const grid = cells.map((row, r) =>
+      row.map((cell, c) => {
+        const v = cell?.v
+        if (typeof v === 'number') return v
+        if (typeof v === 'string' && cell?.t === CellValueType.NUMBER && v.trim() !== '') {
+          const numeric = Number(v)
+          if (Number.isFinite(numeric)) return numeric
+        }
+        if (cell?.f !== undefined || cell?.si !== undefined) {
+          const result = computed[r]?.[c]
+          if (typeof result === 'number') return result
+        }
+        return v ?? null
+      }),
+    )
+    const writes = planFillSeries(grid, options, FILL_SERIES_OPEN_ENDED_LIMIT)
+    if (!writes.length) return t('appFillSeriesNothing')
+    const operations: WorkbookOperation[] = []
+    for (const write of writes) {
+      const start = formatAddress(startRow + write.row, startColumn + write.column)
+      const height = write.values.length,
+        width = write.values[0]?.length ?? 1
+      const range = `${start}:${formatAddress(startRow + write.row + height - 1, startColumn + write.column + width - 1)}`
+      for (let offset = 0; offset < height; offset += 500)
+        operations.push({
+          op: 'set_range',
+          sheetId,
+          start: formatAddress(startRow + write.row + offset, startColumn + write.column),
+          values: write.values.slice(offset, offset + 500).map((line) => [...line]),
+        })
+      // Filled cells take their line's seed number format, so a date series keeps showing dates.
+      const seed =
+        options.direction === 'rows'
+          ? sheetCellFormat(workbook!, sheetId, startRow + write.row, startColumn)
+          : sheetCellFormat(workbook!, sheetId, startRow, startColumn + write.column)
+      if (seed)
+        operations.push({ op: 'format_range', sheetId, range, format: { numberFormat: seed } })
+    }
+    const cellsWritten = writes.reduce(
+      (sum, write) => sum + write.values.length * (write.values[0]?.length ?? 0),
+      0,
+    )
+    if (cellsWritten <= 2000) await this.enqueue(operations, frozen)
+    else await this.enqueueStaged([operations], frozen)
+    return null
+  }
+  /** Shift+F11: a new SheetN at the end, as the desktop's insert-sheet. */
+  async insertSheet() {
+    if (!(await this.flushEditor())) throw new Error('Finish editing before inserting a sheet.')
+    const state = this.state
+    if (!state) throw new Error(t('appOpenXlsxFirst'))
+    await this.enqueue([
+      { op: 'add_sheet', name: nextSheetName(state.sheets.map((sheet) => sheet.name)) },
+    ])
+    return t('appSheetAdded')
+  }
+  /** Ctrl+; / Ctrl+Shift+;: the static current date or time into the active cell. */
+  async insertNow(kind: 'date' | 'time') {
+    if (!(await this.flushEditor())) throw new Error('Finish editing before inserting the date.')
+    const state = this.state,
+      sheet = this.runtime.univerAPI.getActiveWorkbook()?.getActiveSheet()
+    const current = sheet?.getSelection()?.getCurrentCell()
+    const target = this.ribbonTarget
+    if (!state || !sheet || !target) throw new Error(t('appSelectRangeFirst'))
+    const origin = parseRange(target.address)
+    const address = formatAddress(
+      current?.actualRow ?? origin.startRow,
+      current?.actualColumn ?? origin.startColumn,
+    )
+    const now = new Date()
+    const serial =
+      (Date.UTC(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        now.getHours(),
+        now.getMinutes(),
+        now.getSeconds(),
+      ) -
+        Date.UTC(1899, 11, 30)) /
+      86400000
+    const value =
+      kind === 'time'
+        ? serial - Math.floor(serial)
+        : Math.floor(serial) - (state.dateSystem === '1904' ? 1462 : 0)
+    await this.enqueue([
+      { op: 'set_cell', sheetId: target.sheetId, address, value },
+      {
+        op: 'format_range',
+        sheetId: target.sheetId,
+        range: address,
+        format: { numberFormat: kind === 'time' ? 'h:mm' : 'yyyy/m/d' },
+      },
+    ])
+  }
+  /**
+   * Excel's PageUp/PageDown (Alt+ = one screen left/right): move the active
+   * cell by one viewport and scroll with it, keeping its on-screen position.
+   */
+  pageMove(horizontal: boolean, direction: 1 | -1) {
+    const workbook = this.runtime.univerAPI.getActiveWorkbook()
+    const sheet = workbook?.getActiveSheet()
+    const active = workbook?.getActiveRange()
+    if (!workbook || !sheet || !active || workbook.isCellEditing()) return
+    let visible: { startRow: number; endRow: number; startColumn: number; endColumn: number } | null
+    try {
+      visible = sheet.getVisibleRange()
+    } catch {
+      return
+    }
+    if (!visible) return
+    const page = horizontal
+      ? Math.max(1, visible.endColumn - visible.startColumn)
+      : Math.max(1, visible.endRow - visible.startRow)
+    const clamp = (value: number, max: number) => Math.min(max, Math.max(0, value))
+    const maxRow = sheet.getMaxRows() - 1,
+      maxColumn = sheet.getMaxColumns() - 1
+    const row = horizontal ? active.getRow() : clamp(active.getRow() + direction * page, maxRow)
+    const column = horizontal
+      ? clamp(active.getColumn() + direction * page, maxColumn)
+      : active.getColumn()
+    const rtl = sheet.getSheet().getConfig().rightToLeft === BooleanNumber.TRUE
+    const anchor = getScrollAnchor(workbook, sheet) ?? {
+      row: visible.startRow,
+      column: rtl ? visible.endColumn : visible.startColumn,
+    }
+    const anchorColumn =
+      rtl && horizontal ? Math.max(anchor.column, visible.endColumn) : anchor.column
+    workbook.setActiveRange(sheet.getRange(row, column))
+    sheet.scrollToCell(
+      horizontal ? anchor.row : clamp(anchor.row + direction * page, maxRow),
+      horizontal ? clamp(anchorColumn + direction * page, maxColumn) : anchor.column,
+    )
+  }
+  private painter: { mode: 'once' | 'lock'; snapshot: SpecialPasteSnapshot } | null = null
+  get formatPainterActive() {
+    return this.painter !== null
+  }
+  /**
+   * Home → Format Painter: a click copies the selection's formats for one
+   * paint (a second click cancels), a double-click keeps painting until Esc
+   * or another click, as the desktop's painter.
+   */
+  async formatPainter(detail: number) {
+    if (detail >= 2) {
+      if (this.painter?.mode === 'once') {
+        this.painter = { ...this.painter, mode: 'lock' }
+        this.changed()
+      }
+      return
+    }
+    if (this.painter) {
+      this.painter = null
+      this.changed()
+      return
+    }
+    if (!(await this.flushEditor())) throw new Error(t('appClipboardBusy'))
+    const target = this.ribbonTarget,
+      state = this.state
+    if (!target || !state || this.closed) throw new Error(t('appSelectRangeFirst'))
+    const bounds = parseRange(target.address)
+    if (rangeCellCount(bounds) > 2000) throw new Error(t('appClipboardUnsupported'))
+    const read = (await this.host.read(target.sheetId, bounds, state.stateId)) as {
+      cells: ViewCell[]
+      merges?: GridRange[]
+    }
+    const rows = Array.from(
+        { length: bounds.endRow - bounds.startRow + 1 },
+        (_, r) => bounds.startRow + r,
+      ),
+      columns = Array.from(
+        { length: bounds.endColumn - bounds.startColumn + 1 },
+        (_, c) => bounds.startColumn + c,
+      )
+    const block = createCopiedBlock(`painter-${Date.now()}`, bounds, read, rows, columns)
+    this.painter = {
+      mode: 'once',
+      snapshot: {
+        source: {
+          kind: 'internal',
+          unitId: 'projection',
+          subUnitId: target.sheetId,
+          rows,
+          cols: columns,
+          cut: false,
+        },
+        block,
+        sheetId: target.sheetId,
+        html: '',
+        text: '',
+      },
+    }
+    this.changed()
+  }
+  private async paintFormats() {
+    const painter = this.painter,
+      target = this.ribbonTarget,
+      state = this.state
+    if (!painter || !target || !state) return
+    if (painter.mode === 'once') {
+      this.painter = null
+      this.changed()
+    }
+    await this.applySpecialPaste(
+      {
+        target: { sheetId: target.sheetId, address: target.address },
+        stateId: state.stateId,
+        revision: this.revision,
+        snapshot: painter.snapshot,
+      },
+      { ...defaultPasteSpecial, type: 'formats' },
+    )
   }
   pasteSpecialDialog: SpecialPasteContext | null = null
   async openPasteSpecial() {
@@ -2931,6 +3312,115 @@ export class WorkbookRuntime implements EditorProjection {
   private disposables: { dispose(): void }[] = []
   private loaded = new Set<string>()
   private loadedDataValidations = new Set<string>()
+  /** File conditional formats per sheet, kept for projection after session edits are undone. */
+  private fileCfRules = new Map<string, WorkbookRangeResult['conditionalRules']>()
+  /** What each sheet's Univer CF model currently projects ('file' or the session rule JSON). */
+  private cfSignatures = new Map<string, string>()
+  private cfCaptures = new Map<string, ReturnType<typeof setTimeout>>()
+  /**
+   * Projects a sheet's conditional formats into Univer: the session rule set
+   * when one exists, otherwise the file rules in the desktop's precedence order.
+   */
+  private projectConditionalFormats(sheetId: string) {
+    const workbook = this.runtime.univerAPI.getActiveWorkbook()
+    const sheet = workbook?.getSheetBySheetId(sheetId)
+    const canonical = this.state?.sheets.find((item) => item.id === sheetId)
+    if (!workbook || !sheet || !canonical) return
+    const session = (
+      canonical.features?.cfEdits as { rules: IConditionFormattingRule[] } | undefined
+    )?.rules
+    const file = this.fileCfRules.get(sheetId)
+    if (!session && !file) return
+    const signature = session ? JSON.stringify(session) : 'file'
+    if (this.cfSignatures.get(sheetId) === signature) return
+    this.cfSignatures.set(sheetId, signature)
+    const injector = this.runtime.univer.__getInjector()
+    const commands = injector.get(ICommandService)
+    const unitId = workbook.getId()
+    this.internal++
+    try {
+      for (const rule of [
+        ...(injector.get(ConditionalFormattingRuleModel).getSubunitRules(unitId, sheetId) ?? []),
+      ])
+        commands.syncExecuteCommand(DeleteConditionalRuleMutation.id, {
+          unitId,
+          subUnitId: sheetId,
+          cfId: rule.cfId,
+        })
+      // Univer's addRule unshifts: the rule added last is evaluated first.
+      const rules: IConditionFormattingRule[] = session
+        ? session.map((rule, index) => ({ ...rule, cfId: `session-cf-${index}` }))
+        : [...dropShadowedPaintOnceRules(file!)]
+            .sort((a, b) => a.priority - b.priority)
+            .flatMap((rule) => {
+              try {
+                const built = buildConditionalRule(
+                  sheet as never,
+                  ((this.state?.features?.originalMetadata as { dxfStyles?: never[] } | undefined)
+                    ?.dxfStyles ?? []) as never,
+                  rule,
+                )
+                return built ? [built as IConditionFormattingRule] : []
+              } catch {
+                // An unsupported rule must not cost the sheet its other rules.
+                return []
+              }
+            })
+      for (const rule of [...rules].reverse())
+        commands.syncExecuteCommand(AddConditionalRuleMutation.id, {
+          unitId,
+          subUnitId: sheetId,
+          rule,
+        })
+    } finally {
+      this.internal--
+    }
+  }
+  /** Home → Conditional Formatting: Univer's rule manager, as on the desktop. */
+  async openConditionalFormatting() {
+    if (!(await this.flushEditor()))
+      throw new Error('Finish editing before changing conditional formatting.')
+    // value 2 = the manage-rules list; a missing params object silently no-ops.
+    await this.runtime.univerAPI.executeCommand(
+      'sheet.operation.open.conditional.formatting.panel',
+      { value: 2 },
+    )
+  }
+  /** Home → Conditional Formatting panel edits become one declarative session edit. */
+  private captureConditionalFormats(sheetId: string) {
+    const pending = this.cfCaptures.get(sheetId)
+    if (pending) clearTimeout(pending)
+    this.cfCaptures.set(
+      sheetId,
+      setTimeout(() => {
+        this.cfCaptures.delete(sheetId)
+        const workbook = this.runtime.univerAPI.getActiveWorkbook()
+        if (!workbook || this.closed) return
+        const rules = (
+          this.runtime.univer
+            .__getInjector()
+            .get(ConditionalFormattingRuleModel)
+            .getSubunitRules(workbook.getId(), sheetId) ?? []
+        ).map(({ ranges, stopIfTrue, rule }) => ({
+          ranges: ranges.map(({ startRow, endRow, startColumn, endColumn }) => ({
+            startRow,
+            endRow,
+            startColumn,
+            endColumn,
+          })),
+          stopIfTrue: Boolean(stopIfTrue),
+          rule: JSON.parse(JSON.stringify(rule)) as Record<string, unknown>,
+        }))
+        this.cfSignatures.set(sheetId, JSON.stringify(rules))
+        void this.enqueue([{ op: 'set_conditional_formats', sheetId, rules }]).catch((error) => {
+          // The view returns to the authoritative rules.
+          this.cfSignatures.delete(sheetId)
+          this.projectConditionalFormats(sheetId)
+          this.report(error)
+        })
+      }, 0),
+    )
+  }
   private pageWork: Promise<void> | undefined
   private filePageBreaks = new Map<string, { rowBreaks: number[]; colBreaks: number[] }>()
   get pageLayoutEcho(): PageLayoutEcho {
@@ -4080,9 +4570,30 @@ export class WorkbookRuntime implements EditorProjection {
           ? LocaleType.ZH_CN
           : LocaleType.EN_US,
       locales: {
-        [LocaleType.EN_US]: { ...enUS, ...filterEnUS, ...sortEnUS, ...noteEnUS, ...tableEnUS },
-        [LocaleType.ZH_CN]: { ...zhCN, ...filterZhCN, ...sortZhCN, ...noteZhCN, ...tableZhCN },
-        [LocaleType.ZH_TW]: { ...zhTW, ...filterZhTW, ...sortZhTW, ...noteZhTW, ...tableZhTW },
+        [LocaleType.EN_US]: {
+          ...enUS,
+          ...filterEnUS,
+          ...sortEnUS,
+          ...noteEnUS,
+          ...tableEnUS,
+          ...cfEnUS,
+        },
+        [LocaleType.ZH_CN]: {
+          ...zhCN,
+          ...filterZhCN,
+          ...sortZhCN,
+          ...noteZhCN,
+          ...tableZhCN,
+          ...cfZhCN,
+        },
+        [LocaleType.ZH_TW]: {
+          ...zhTW,
+          ...filterZhTW,
+          ...sortZhTW,
+          ...noteZhTW,
+          ...tableZhTW,
+          ...cfZhTW,
+        },
       },
       darkMode: this.darkTheme(),
       presets: [
@@ -4100,6 +4611,7 @@ export class WorkbookRuntime implements EditorProjection {
         UniverSheetsSortPreset(),
         UniverSheetsNotePreset(),
         UniverSheetsTablePreset(),
+        UniverSheetsConditionalFormattingPreset(),
       ],
     })
     const gutterHost = container.parentElement
@@ -4200,6 +4712,20 @@ export class WorkbookRuntime implements EditorProjection {
       event.stopImmediatePropagation()
       void this.sortFilterCommand('filter-toggle').catch(this.report)
     }
+    // Format Painter paints when the target selection is released, as Univer's painter does.
+    const paintUp = (event: PointerEvent) => {
+      if (
+        !this.painter ||
+        event.button !== 0 ||
+        !(event.target instanceof Element) ||
+        !this.container.contains(event.target) ||
+        !isGridKeyTarget(event.target, this.container)
+      )
+        return
+      setTimeout(() => void this.paintFormats().catch(this.report), 0)
+    }
+    window.addEventListener('pointerup', paintUp, true)
+    this.disposables.push({ dispose: () => window.removeEventListener('pointerup', paintUp, true) })
     window.addEventListener('keydown', filterKey, true)
     this.disposables.push({ dispose: () => window.removeEventListener('keydown', filterKey, true) })
     const copyKey = (event: KeyboardEvent) => {
@@ -4270,6 +4796,20 @@ export class WorkbookRuntime implements EditorProjection {
         event.preventDefault()
         event.stopImmediatePropagation()
         void this.openPasteSpecial().catch(this.report)
+        return
+      }
+      if (
+        event.key === 'Escape' &&
+        this.painter &&
+        event.target instanceof Element &&
+        container.contains(event.target) &&
+        isGridKeyTarget(event.target, container) &&
+        !this.runtime.univerAPI.getActiveWorkbook()?.isCellEditing()
+      ) {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        this.painter = null
+        this.changed()
         return
       }
       if (
@@ -4589,6 +5129,13 @@ export class WorkbookRuntime implements EditorProjection {
           command.id === 'sheet.mutation.update-note-position'
         )
           return
+        if (CF_MUTATIONS.has(command.id)) {
+          const subUnitId = (command.params as { subUnitId?: string } | undefined)?.subUnitId
+          if (!subUnitId || !this.state?.sheets.some((sheet) => sheet.id === subUnitId))
+            throw new Error('invalid_manual_target')
+          this.captureConditionalFormats(subUnitId)
+          return
+        }
         if (command.type === CommandType.MUTATION && command.id.startsWith('sheet.'))
           throw new Error('unsupported_manual_command')
       }),
@@ -4678,6 +5225,7 @@ export class WorkbookRuntime implements EditorProjection {
       const viewport = sheetId ? this.viewports.get(sheetId) : undefined
       this.closeFilterPopup()
       this.projectionEpoch++
+      this.cfSignatures.clear()
       this.clearChartVisuals()
       this.clearTraceArrows()
       for (const disposable of this.projectionDisposables) disposable.dispose()
@@ -5070,6 +5618,17 @@ export class WorkbookRuntime implements EditorProjection {
         }
         this.loadedDataValidations.add(sheet.getSheetId())
       }
+      const cfResult = result as {
+        conditionalRules?: WorkbookRangeResult['conditionalRules']
+        sessionConditionalFormats?: unknown[] | null
+      }
+      if (
+        !this.fileCfRules.has(sheet.getSheetId()) &&
+        cfResult.sessionConditionalFormats === null &&
+        cfResult.conditionalRules
+      )
+        this.fileCfRules.set(sheet.getSheetId(), cfResult.conditionalRules)
+      this.projectConditionalFormats(sheet.getSheetId())
       const canonicalSheet = state.sheets.find((item) => item.id === sheet.getSheetId())!
       const heights = (canonicalSheet.features?.rowHeights ?? {}) as Record<string, number>
       const filter = canonicalSheet.features?.filterEdits as
@@ -7630,3 +8189,27 @@ function tableErrorMessage(error: unknown): string {
   }
   return t(key, { name: '', ...params })
 }
+
+/** A cell's projected number format, for series and painter seeds. */
+function sheetCellFormat(
+  workbook: {
+    getSheetBySheetId(
+      id: string,
+    ): { getRange(row: number, column: number): { getCellStyleData(): unknown } } | null
+  },
+  sheetId: string,
+  row: number,
+  column: number,
+): string | undefined {
+  const style = workbook.getSheetBySheetId(sheetId)?.getRange(row, column).getCellStyleData()
+  const pattern = (style as { n?: { pattern?: string } } | null)?.n?.pattern
+  return pattern && pattern !== 'General' ? pattern : undefined
+}
+
+/** Univer's conditional-format model mutations, captured as declarative session edits. */
+const CF_MUTATIONS = new Set([
+  'sheet.mutation.add-conditional-rule',
+  'sheet.mutation.set-conditional-rule',
+  'sheet.mutation.delete-conditional-rule',
+  'sheet.mutation.move-conditional-rule',
+])

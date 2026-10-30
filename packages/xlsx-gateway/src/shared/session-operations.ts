@@ -25,6 +25,7 @@ export const SESSION_OPERATION_NAMES = [
   'set_col_width',
   'set_page_setup',
   'set_data_validation',
+  'set_conditional_formats',
   'add_defined_name',
   'manage_defined_name',
   'add_defined_names',

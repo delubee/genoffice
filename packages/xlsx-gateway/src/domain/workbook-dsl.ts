@@ -1031,6 +1031,37 @@ const addConditionalFormatSchema = z.object({
   rule: cfRuleSchema,
 })
 
+// Declarative conditional formatting for a session sheet: the FULL rule set
+// in evaluation order, in the Univer rule shape the save maps to OOXML
+// (Home → Conditional Formatting panel). An empty list removes every rule.
+const setConditionalFormatsSchema = z.object({
+  op: z.literal('set_conditional_formats'),
+  sheetId: z.string().min(1),
+  rules: z
+    .array(
+      z
+        .object({
+          ranges: z
+            .array(
+              z
+                .object({
+                  startRow: z.number().int().min(0).max(MAX_GRID_ROWS - 1),
+                  endRow: z.number().int().min(0).max(MAX_GRID_ROWS - 1),
+                  startColumn: z.number().int().min(0).max(MAX_GRID_COLUMNS - 1),
+                  endColumn: z.number().int().min(0).max(MAX_GRID_COLUMNS - 1),
+                })
+                .strict(),
+            )
+            .min(1)
+            .max(100),
+          stopIfTrue: z.boolean(),
+          rule: z.record(z.string(), z.unknown()),
+        })
+        .strict(),
+    )
+    .max(500),
+})
+
 const clearConditionalFormatsSchema = z.object({
   op: z.literal('clear_conditional_formats'),
   sheetId: z.string().min(1),
@@ -1548,6 +1579,7 @@ export const workbookOperationSchema = z.discriminatedUnion('op', [
   refreshPivotSchema,
   editPivotSchema,
   filterPivotSchema,
+  setConditionalFormatsSchema,
   protectWorkbookSchema,
   setProtectedRangesSchema,
   setThreadSchema,
@@ -1708,6 +1740,7 @@ export type LayoutOperation =
   | z.infer<typeof refreshPivotSchema>
   | z.infer<typeof editPivotSchema>
   | z.infer<typeof filterPivotSchema>
+  | z.infer<typeof setConditionalFormatsSchema>
   | z.infer<typeof protectWorkbookSchema>
   | z.infer<typeof setProtectedRangesSchema>
   | z.infer<typeof setThreadSchema>
@@ -1797,6 +1830,7 @@ const LAYOUT_OPS = new Set([
   'refresh_pivot',
   'edit_pivot',
   'filter_pivot',
+  'set_conditional_formats',
   'protect_workbook',
   'set_protected_ranges',
   'set_thread',
@@ -2855,6 +2889,10 @@ export function layoutOpLabel(op: LayoutOperation): string {
       return `Edit PivotTable ${'session' in op.pivot ? op.pivot.session : op.pivot.file}`
     case 'refresh_pivot':
       return 'Refresh pivot tables'
+    case 'set_conditional_formats':
+      return op.rules.length
+        ? `Conditional formatting: ${op.rules.length} rule${op.rules.length === 1 ? '' : 's'}`
+        : 'Clear conditional formatting'
     case 'filter_pivot':
       return op.selected === null
         ? `Clear PivotTable filter ${op.pivot}`

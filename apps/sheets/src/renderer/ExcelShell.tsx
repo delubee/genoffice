@@ -46,7 +46,7 @@ import {
 } from './paste-special'
 import { PasteSpecialDialog } from './PasteSpecialDialog'
 import { ProtectSheetDialog } from './ProtectSheetDialog'
-import { numberFormatLabel, type SelectionFormat } from './selection-format'
+import type { SelectionFormat } from './selection-format'
 import type { SheetTabActions } from './sheet-tab-actions'
 import { SheetTabContextMenu } from './SheetTabContextMenu'
 
@@ -57,8 +57,8 @@ import { AiSelectionAsk } from './ai/AiSelectionAsk'
 import type { SelectionAskAnchor } from './ai/selection-ask'
 import type { ConsolidateConfig } from './consolidate'
 import { ConsolidateDialog } from './ConsolidateDialog'
-import type { FillSeriesOptions, FillSeriesType } from './fill-series'
-import type { FillSeriesContext } from './fill-series-apply'
+import type { FillSeriesOptions } from './fill-series'
+import { fillSeriesDefaultType, type FillSeriesContext } from './fill-series-apply'
 import { FillSeriesDialog } from './FillSeriesDialog'
 import {
   registerFxButtonOpener,
@@ -1260,7 +1260,4 @@ function StatusBarStatsMenu({
   )
 }
 
-function fillSeriesDefaultType(numberFormat: string | undefined): FillSeriesType {
-  return numberFormat && numberFormatLabel(numberFormat) === 'Date' ? 'date' : 'linear'
-}
 export type { PageLayoutEcho, SelectedChartRibbon, SelectedShapeRibbon } from './SheetsRibbon'

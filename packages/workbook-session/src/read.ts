@@ -356,6 +356,16 @@ export async function readCurrentRange(input: {
     ),
     rows,
     hyperlinks,
+    // File rules sit at source coordinates; a session rule set replaces them.
+    conditionalRules:
+      sheet.features?.cfEdits ||
+      state.structuralLog.some((op) => 'sheetId' in op && op.sheetId === sheet.id)
+        ? []
+        : Array.isArray(features.conditionalRules)
+          ? features.conditionalRules
+          : [],
+    sessionConditionalFormats:
+      (sheet.features?.cfEdits as { rules: unknown[] } | undefined)?.rules ?? null,
     pageSetup: features.pageSetup ?? null,
     // Effective protection for the Review dialogs; password hashes stay on the host.
     protection: (() => {

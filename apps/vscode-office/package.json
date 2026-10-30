@@ -5354,6 +5354,87 @@
                     "properties": {
                       "op": {
                         "type": "string",
+                        "const": "set_conditional_formats"
+                      },
+                      "sheetId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "rules": {
+                        "maxItems": 500,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "ranges": {
+                              "minItems": 1,
+                              "maxItems": 100,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "startRow": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 1048575
+                                  },
+                                  "endRow": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 1048575
+                                  },
+                                  "startColumn": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 16383
+                                  },
+                                  "endColumn": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 16383
+                                  }
+                                },
+                                "required": [
+                                  "startRow",
+                                  "endRow",
+                                  "startColumn",
+                                  "endColumn"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "stopIfTrue": {
+                              "type": "boolean"
+                            },
+                            "rule": {
+                              "type": "object",
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "additionalProperties": {}
+                            }
+                          },
+                          "required": [
+                            "ranges",
+                            "stopIfTrue",
+                            "rule"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "sheetId",
+                      "rules"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
                         "const": "protect_workbook"
                       },
                       "locked": {

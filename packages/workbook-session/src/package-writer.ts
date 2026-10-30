@@ -51,7 +51,11 @@ import { hashFile } from './resources'
 import { workbookStateSchema } from './schemas'
 import { workbookOperationSchema } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
 import type { SheetPageSetupState } from '@genoffice/xlsx-gateway/gateway/xlsx-page-setup'
-import type { SheetDvState, SheetNoteState } from '@genoffice/xlsx-gateway/gateway/xlsx-gateway'
+import type {
+  SheetCfState,
+  SheetDvState,
+  SheetNoteState,
+} from '@genoffice/xlsx-gateway/gateway/xlsx-gateway'
 import type { DvCellArea, DvWireRule } from '@genoffice/xlsx-gateway/gateway/xlsx-dv'
 import { captureFileBaseline, publishStagedWorkbook, type FileBaseline } from './publish'
 
@@ -221,6 +225,7 @@ export class SessionPackageWriter implements PackageWriter {
       const workbookLock = state.features?.workbookProtectionEdits as
         { lockStructure: boolean } | undefined
       const dvStates: SheetDvState[] = []
+      const cfStates: SheetCfState[] = []
       for (const sheet of state.sheets) {
         if (names.get(sheet.id) !== sheet.name)
           throw new WorkbookError(
@@ -324,6 +329,8 @@ export class SessionPackageWriter implements PackageWriter {
           )
           filterStates.push({ sheetName: sheet.name, ...filter })
         }
+        const cfEdits = sheet.features?.cfEdits as { rules: SheetCfState['rules'] } | undefined
+        if (cfEdits) cfStates.push({ sheetName: sheet.name, rules: cfEdits.rules })
         const validationEdits = sheet.features?.dataValidationEdits as
           { rules?: DvWireRule[]; remove?: DvCellArea[] } | undefined
         if (
@@ -629,6 +636,7 @@ export class SessionPackageWriter implements PackageWriter {
         noteStates.length ||
         filterStates.length ||
         dvStates.length ||
+        cfStates.length ||
         definedNamesState !== null
       )
         await writeStage({
@@ -647,6 +655,7 @@ export class SessionPackageWriter implements PackageWriter {
           noteStates,
           filterStates,
           dvStates,
+          cfStates,
           definedNamesState,
           nameReferencePlan: state.features?.definedNameReferences
             ? {
