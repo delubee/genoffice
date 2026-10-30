@@ -129,3 +129,84 @@ export const pendingListDefinitionsSchema = z
       .max(200),
   })
   .strict()
+
+const SECTION_KEYS = new Set([
+  'pageWidth',
+  'pageHeight',
+  'orientation',
+  'marginTop',
+  'marginRight',
+  'marginBottom',
+  'marginLeft',
+  'marginTopFixed',
+  'marginBottomFixed',
+  'gutter',
+  'gutterAtTop',
+  'pageBorder',
+  'pageBorderProps',
+  'columns',
+  'colSpace',
+  'colWidths',
+  'lineNumbers',
+  'bidi',
+  'headerDist',
+  'footerDist',
+  'vAlign',
+  'docGrid',
+  'textDirection',
+  'footnotePr',
+  'endnotePr',
+])
+/** sectPr values are numbers, flags and identifier-like words; nothing can carry markup. */
+const settingValue = (value: unknown, depth: number): boolean => {
+  if (value == null || typeof value === 'boolean') return true
+  if (typeof value === 'number') return Number.isFinite(value) && Math.abs(value) <= 10_000_000
+  if (typeof value === 'string') return /^[A-Za-z0-9 #._-]{0,64}$/.test(value)
+  if (depth >= 4) return false
+  if (Array.isArray(value))
+    return value.length <= 64 && value.every((item) => settingValue(item, depth + 1))
+  if (typeof value === 'object')
+    return Object.entries(value).every(
+      ([key, item]) => /^[A-Za-z]{1,40}$/.test(key) && settingValue(item, depth + 1),
+    )
+  return false
+}
+const twips = z.number().int().min(-31680).max(31680)
+export const documentSettingsSchema = z
+  .object({
+    section: z
+      .object({
+        pageWidth: z.number().int().min(1).max(63360),
+        pageHeight: z.number().int().min(1).max(63360),
+        orientation: z.enum(['portrait', 'landscape']),
+        marginTop: twips,
+        marginRight: twips,
+        marginBottom: twips,
+        marginLeft: twips,
+        pageBorder: z.boolean(),
+      })
+      .catchall(z.unknown())
+      .refine(
+        (section) =>
+          Object.entries(section).every(
+            ([key, value]) => SECTION_KEYS.has(key) && settingValue(value, 0),
+          ),
+        'Invalid section settings',
+      )
+      .optional(),
+    pageColor: z
+      .string()
+      .regex(/^[0-9a-f]{6}$/i)
+      .nullable()
+      .optional(),
+    mirrorMargins: z.boolean().optional(),
+    watermark: z
+      .string()
+      .min(1)
+      .max(255)
+      // eslint-disable-next-line no-control-regex -- C0 controls never serialize.
+      .refine((value) => !/[<>&"\x00-\x1f]/.test(value), 'Invalid watermark')
+      .nullable()
+      .optional(),
+  })
+  .strict()

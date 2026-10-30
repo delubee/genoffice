@@ -161,7 +161,10 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
           />
         )}
         <div className="office-docx-canvas" onContextMenu={openMenu}>
-          <div className="office-docx-page doc-page">
+          <div
+            className="office-docx-page doc-page"
+            style={pageStyle(runtime.settings.section, runtime.settings.pageColor)}
+          >
             <EditorContent editor={editor} />
           </div>
         </div>
@@ -209,4 +212,20 @@ function pickImageFile(): Promise<{
     input.oncancel = () => resolve(null)
     input.click()
   })
+}
+
+/** Page geometry from the final section (twips → px at 96 dpi); the page color is document content. */
+function pageStyle(
+  section: DocumentRuntime['settings']['section'],
+  pageColor: string | null | undefined,
+): React.CSSProperties | undefined {
+  if (!section) return undefined
+  const px = (twips: number) => `${Math.round(Math.abs(twips) / 15)}px`
+  return {
+    width: px(section.pageWidth),
+    minHeight: px(section.pageHeight),
+    padding: `${px(section.marginTop)} ${px(section.marginRight)} ${px(section.marginBottom)} ${px(section.marginLeft)}`,
+    boxSizing: 'border-box',
+    ...(pageColor ? { background: `#${pageColor}` } : {}),
+  }
 }

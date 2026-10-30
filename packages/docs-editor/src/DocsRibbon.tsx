@@ -88,17 +88,29 @@ export function DocsRibbon({
       void runtime
         .officeAction({ action: 'chat', scope: 'document', instruction: '' })
         .catch((error) => runtime.reportError(error)),
-    section: null,
-    onSection: unavailable('Page setup'),
+    section: runtime.settings.section ?? null,
+    onSection: (section) => void runtime.applySettings({ section }),
     activeSection: null,
     onInsertSectionBreak: unavailable('Section breaks'),
-    onPaperSizeAll: unavailable('Paper size'),
-    mirrorMargins: false,
-    onMirrorMargins: unavailable('Mirror margins'),
-    pageColor: null,
-    onPageColor: unavailable('Page color'),
-    watermark: null,
-    onWatermark: unavailable('Watermark'),
+    onPaperSizeAll: (pageWidth, pageHeight, orientation) => {
+      const section = runtime.settings.section
+      if (!section) return
+      const landscape = orientation === 'landscape'
+      void runtime.applySettings({
+        section: {
+          ...section,
+          orientation,
+          pageWidth: landscape ? pageHeight : pageWidth,
+          pageHeight: landscape ? pageWidth : pageHeight,
+        },
+      })
+    },
+    mirrorMargins: runtime.settings.mirrorMargins ?? false,
+    onMirrorMargins: (mirrorMargins) => void runtime.applySettings({ mirrorMargins }),
+    pageColor: runtime.settings.pageColor ?? null,
+    onPageColor: (pageColor) => void runtime.applySettings({ pageColor }),
+    watermark: runtime.settings.watermark ?? null,
+    onWatermark: (watermark) => void runtime.applySettings({ watermark }),
     themeFonts: null,
     onThemeFonts: unavailable('Theme fonts'),
     themeColors: null,

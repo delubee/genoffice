@@ -124,6 +124,7 @@ export const protocolMessageSchema = z.strictObject({
     'source.outline',
     'view.dispose',
     'docx.operations',
+    'docx.settings',
     'office.action',
   ]),
   payload: z.json(),

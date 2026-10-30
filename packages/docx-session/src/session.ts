@@ -4,10 +4,15 @@ import {
   saveDocx,
   type ParsedDocFull,
   numberingLevelFromCustom,
+  readPageColor,
+  readSectionSettings,
   type StyleUpsert,
   type NumberingDef,
 } from '@genoffice/docx-engine'
-import { pendingListDefinitionsSchema } from '@genoffice/docs-editor/shared/operations'
+import {
+  documentSettingsSchema,
+  pendingListDefinitionsSchema,
+} from '@genoffice/docs-editor/shared/operations'
 import { Transform, Step } from '@tiptap/pm/transform'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import {
@@ -32,6 +37,7 @@ import type {
   StepRequest,
   Commit,
   DocumentPresentation,
+  DocumentSettings,
   PendingListDefinitions,
 } from '@genoffice/docs-editor/shared/protocol'
 export type { SessionDescriptor, StepRequest, Commit } from '@genoffice/docs-editor/shared/protocol'
@@ -40,6 +46,7 @@ interface Overlays {
   numbering: PendingListDefinitions['newDefs']
   restartNums: PendingListDefinitions['restartNums']
   styles: StyleUpsert[]
+  settings: DocumentSettings
 }
 interface Root {
   doc: PMNode
@@ -73,7 +80,7 @@ export class DocxSession {
       doc: docxSchema.nodeFromJSON(json),
       stateId: randomUUID(),
       bytes: jsonBytes(json),
-      overlays: { numbering: [], restartNums: [], styles: [] },
+      overlays: { numbering: [], restartNums: [], styles: [], settings: {} },
     }
     this.savedStateId = this.root.stateId
     this.baseCSS =
@@ -160,8 +167,53 @@ export class DocxSession {
         numbering: [...numbering.entries()],
         styles: [...this.original.styles.entries()],
         docDefaults: this.original.docDefaults,
+        settings: this.settings(),
       }),
     ) as DocumentPresentation
+  }
+  /** The document settings as the view shows them: session edits over the opened file. */
+  private settings(): DocumentSettings {
+    const edits = this.root.overlays.settings
+    return {
+      section: edits.section ?? readSectionSettings(this.original),
+      pageColor: edits.pageColor !== undefined ? edits.pageColor : readPageColor(this.original),
+      mirrorMargins: edits.mirrorMargins ?? this.original.mirrorMargins ?? false,
+      watermark:
+        edits.watermark !== undefined ? edits.watermark : (this.original.watermarkText ?? null),
+    }
+  }
+  /** Layout / Design settings edits: one history entry without document steps. */
+  applySettings(input: {
+    transactionId: string
+    expectedRevision: number
+    settings: unknown
+  }): Commit {
+    const hash = createHash('sha256').update(JSON.stringify(input)).digest('hex')
+    const previous = this.operationReceipts.get(input.transactionId)
+    if (previous) {
+      if (hash !== previous.hash)
+        throw new Error('Transaction identity reused with different content')
+      return structuredClone(previous.commit)
+    }
+    if (this.readonly) throw new Error('Document is read-only')
+    if (input.expectedRevision !== this.revision) throw new Error('Stale document version')
+    const edit = documentSettingsSchema.parse(input.settings)
+    const overlays = structuredClone(this.root.overlays)
+    overlays.settings = { ...overlays.settings, ...edit } as DocumentSettings
+    const fromVersion = this.collabVersion
+    this.commitRoot(this.root.doc, overlays)
+    const commit: Commit = {
+      descriptor: this.descriptor(),
+      fromVersion,
+      changed: true,
+      steps: [],
+      clientIds: [],
+      presentation: this.presentation(),
+    }
+    this.operationReceipts.set(input.transactionId, { hash, commit: structuredClone(commit) })
+    if (this.operationReceipts.size > 512)
+      this.operationReceipts.delete(this.operationReceipts.keys().next().value!)
+    return commit
   }
   read(offset = 0, limit = 100) {
     return { descriptor: this.descriptor(), blocks: readBlocks(this.content(), offset, limit) }
@@ -438,6 +490,18 @@ export class DocxSession {
           }
         : {}),
       ...(this.root.overlays.styles.length ? { styleUpserts: this.root.overlays.styles } : {}),
+      ...(this.root.overlays.settings.section
+        ? { section: this.root.overlays.settings.section }
+        : {}),
+      ...(this.root.overlays.settings.pageColor !== undefined
+        ? { pageColor: this.root.overlays.settings.pageColor }
+        : {}),
+      ...(this.root.overlays.settings.mirrorMargins !== undefined
+        ? { mirrorMargins: this.root.overlays.settings.mirrorMargins }
+        : {}),
+      ...(this.root.overlays.settings.watermark !== undefined
+        ? { watermark: this.root.overlays.settings.watermark }
+        : {}),
     })
   }
 }

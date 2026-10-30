@@ -158,6 +158,23 @@ export class DocxEditorProvider
         return commit
       }),
     )
+    bridge.handle('docx.settings', (raw) =>
+      document.exclusive(() => {
+        const input = z
+          .object({
+            sessionId: z.string().uuid(),
+            transactionId: z.string().min(1).max(200),
+            expectedRevision: z.number().int().nonnegative(),
+            settings: z.json(),
+          })
+          .strict()
+          .parse(raw)
+        if (input.sessionId !== document.session.sessionId) throw new Error('Wrong DOCX session')
+        const commit = document.session.applySettings(input)
+        this.record(document)
+        return commit
+      }),
+    )
     bridge.handle('history.request', async (raw) => {
       if (!panel.active) throw new Error('Activate this DOCX editor before requesting history')
       const { direction } = z

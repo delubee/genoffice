@@ -99,6 +99,7 @@ void bridge
       resync: async () => (await bridge.request('view.resync', {})) as DocumentProjection,
       error: showError,
       operations: async (request) => (await bridge.request('docx.operations', request)) as Commit,
+      settings: async (request) => (await bridge.request('docx.settings', request)) as Commit,
       presentation: present,
     })
     root.render(

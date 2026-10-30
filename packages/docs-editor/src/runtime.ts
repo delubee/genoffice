@@ -11,6 +11,7 @@ import type {
   StepRequest,
   DocumentPresentation,
   PendingListDefinitions,
+  DocumentSettings,
 } from './shared/protocol'
 import type { DocxOperation } from './shared/operations'
 import type { OfficeAction } from '@genoffice/xlsx-gateway/shared/office-actions'
@@ -28,6 +29,12 @@ export interface DocumentBridge {
     operations: DocxOperation[]
   }): Promise<Commit>
   presentation?(presentation: DocumentPresentation): void
+  settings?(request: {
+    sessionId: string
+    transactionId: string
+    expectedRevision: number
+    settings: DocumentSettings
+  }): Promise<Commit>
 }
 
 /** One native undo stack; collab retains only unacknowledged local steps. */
@@ -70,6 +77,7 @@ export class DocumentRuntime {
     private readonly bridge: DocumentBridge,
   ) {
     this.descriptor = initial.descriptor
+    this.settings = initial.presentation?.settings ?? {}
     // eslint-disable-next-line @typescript-eslint/no-this-alias -- Plugin methods have their own this; retain the document authority.
     const runtime = this
     const collaboration = Extension.create({
@@ -276,6 +284,52 @@ export class DocumentRuntime {
     }
   }
 
+  /** The presented document settings (final section, page color, watermark). */
+  settings: DocumentSettings = {}
+  /** Layout / Design edits: a host history entry with no document steps. */
+  private settingsWork: Promise<void> = Promise.resolve()
+  private settingsBatch: DocumentSettings | null = null
+  /** One Ribbon gesture may report several settings: they commit as one history entry. */
+  applySettings(settings: DocumentSettings) {
+    if (this.settingsBatch) {
+      Object.assign(this.settingsBatch, settings)
+      return this.settingsWork
+    }
+    const batch: DocumentSettings = { ...settings }
+    this.settingsBatch = batch
+    this.settingsWork = this.settingsWork
+      .then(() => new Promise<void>((resolve) => setTimeout(resolve, 0)))
+      .then(() => {
+        this.settingsBatch = null
+        return this.commitSettings(batch)
+      })
+    return this.settingsWork
+  }
+  private async commitSettings(settings: DocumentSettings) {
+    try {
+      if (!this.bridge.settings) throw new Error('Page settings are unavailable in this host.')
+      if (this.hostFrozen || this.unavailable) throw new Error('DOCX editor is busy')
+      if (!(await this.flush())) throw new Error('Document is busy composing or synchronizing')
+      this.operationPending = true
+      this.updateEditability()
+      const commit = await this.bridge.settings({
+        sessionId: this.descriptor.sessionId,
+        transactionId: crypto.randomUUID(),
+        expectedRevision: this.descriptor.revision,
+        // Ribbon edits spread optional fields as undefined; the wire carries plain JSON.
+        settings: JSON.parse(JSON.stringify(settings)) as DocumentSettings,
+      })
+      if (commit.presentation) this.present(commit.presentation)
+      this.descriptor = commit.descriptor
+      this.editor.view.dispatch(this.editor.state.tr.setMeta('officeRemote', true))
+    } catch (error) {
+      this.bridge.error(String(error))
+    } finally {
+      this.operationPending = false
+      this.updateEditability()
+    }
+  }
+
   freeze(value: boolean) {
     this.hostFrozen = value
     this.updateEditability()
@@ -338,6 +392,7 @@ export class DocumentRuntime {
       restartNums: this.pendingNumbering.restartNums.filter((item) => !acknowledged(item)),
     }
     storage.defs = defs
+    this.settings = presentation.settings ?? {}
     storage.styles = new Map(presentation.styles)
     storage.docDefaults = presentation.docDefaults
   }

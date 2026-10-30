@@ -72,6 +72,11 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
   bridge.handle('view.resync', projection)
   bridge.handle('view.presentation', () => ({ ready: true }))
   bridge.handle('view.intent', (raw) => session.submit(raw as StepRequest))
+  bridge.handle('docx.settings', (raw) =>
+    session.applySettings(
+      raw as { transactionId: string; expectedRevision: number; settings: unknown },
+    ),
+  )
   bridge.handle('docx.operations', (raw) =>
     session.applyOperations(
       raw as { transactionId: string; expectedRevision: number; operations: unknown },
@@ -339,6 +344,24 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     expect(listItem.attrs!.kind).toBe('bullet')
     expect(new Map(session.presentation().numbering).has(String(listItem.attrs!.numId))).toBe(true)
     expect(await page.locator('.office-docx-error').count()).toBe(0)
+    // Layout → Margins → Narrow: a settings entry the page geometry and the save follow.
+    await page
+      .locator('.ribbon-tab', { hasText: /^Layout$/ })
+      .first()
+      .click()
+    await page.locator('[data-tip="Margins"]').first().click()
+    await page.locator('[data-rb-panel] button', { hasText: 'Narrow' }).first().click()
+    await expect.poll(() => session.presentation().settings!.section!.marginLeft).toBe(720)
+    expect(
+      await page
+        .locator('.office-docx-page')
+        .evaluate((element) => getComputedStyle(element).paddingLeft),
+    ).toBe('48px')
+    expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
+    session.history('undo')
+    expect(session.presentation().settings!.section!.marginLeft).toBe(1440)
+    session.history('redo')
+    await bridge.request('view.resync', projection())
     const beforeTheme = session.content()
     await page.evaluate(() =>
       document.documentElement.style.setProperty('--vscode-editor-background', 'rgb(20, 20, 20)'),
