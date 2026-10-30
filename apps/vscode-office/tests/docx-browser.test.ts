@@ -497,6 +497,22 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     await expect.poll(() => session.presentation().settings!.inks!.length).toBe(1)
     expect(session.presentation().settings!.inks![0]!.raster?.base64.length).toBeGreaterThan(10)
     await page.locator('[data-tip^="Select: exit drawing"]').click()
+    // Review → Compare: a picked .docx is parsed and diffed by paragraph in the view.
+    await page.locator('.ribbon-tab', { hasText: /^Review$/ }).click()
+    const compareChooser = page.waitForEvent('filechooser')
+    await page.locator('[data-tip^="Compare: pick another document"]').click()
+    await (
+      await compareChooser
+    ).setFiles({
+      name: 'other.docx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      buffer: Buffer.from(
+        await buildDocx({ bodyXml: '<w:p><w:r><w:t>Other text</w:t></w:r></w:p>' }),
+      ),
+    })
+    const comparePane = page.locator('aside.compare-pane')
+    await comparePane.waitFor()
+    await comparePane.locator('.comments-pane-close').click()
     const beforeTheme = session.content()
     await page.evaluate(() =>
       document.documentElement.style.setProperty('--vscode-editor-background', 'rgb(20, 20, 20)'),

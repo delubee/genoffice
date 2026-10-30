@@ -44,7 +44,8 @@
   - [x] Header & Footer contextual tab for the default strips: Close, Go to, Remove, page numbers (insert/here/total/remove), date/time fields, header pictures and header/footer distance; different first page, odd/even, Link to Previous and page-number formats remain explicit.
   - [x] Insert → Equation: inline and display equations accepted only when their OMML is exactly what the engine derives from the LaTeX source.
   - [x] Draw: pen / highlighter / eraser and Clear All with the desktop InkOverlay; strokes are validated settings entries (kind, color, width, bounded points, file paragraph anchors) rasterized in the view and saved as floating ink pictures; file inks restored on reopen.
-  - [ ] Compare, Page preview / PDF / print, mail merge, multi-section page setup and section breaks, Zotero, paste defaults: still explicit host limitations.
+  - [x] Review → Compare: a .docx picked in the view is parsed and diffed by paragraph; the desktop compare pane shows the result.
+  - [ ] Page preview / PDF / print, mail merge, multi-section page setup and section breaks, Zotero, paste defaults: still explicit host limitations.
   - [ ] Picture bullets.
   - [ ] Remaining: comments, notes, headers/footers, page setup, revisions, protection, drawing, mail merge, print/export.
 - [ ] Route all ribbon AI actions into native VS Code chat with document context.

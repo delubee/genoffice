@@ -12,6 +12,14 @@ import { InkOverlay } from '../../../apps/docs/src/renderer/components/InkOverla
 import { rasterizeStroke, type InkTool } from '../../../apps/docs/src/renderer/editor/ink'
 import type { InkPenSettings } from '../../../apps/docs/src/renderer/components/ribbon-tabs'
 import { ProtectDialog } from '../../../apps/docs/src/renderer/components/ProtectDialog'
+import { ComparePanel } from '../../../apps/docs/src/renderer/components/ComparePanel'
+import {
+  blockTexts,
+  compareParagraphs,
+  editorBlockTexts,
+  type CompareEntry,
+} from '../../../apps/docs/src/renderer/editor/compare'
+import { parseDocx } from '@genoffice/docx-engine'
 import {
   CellMarginsDialog,
   DeleteCellsDialog,
@@ -125,6 +133,24 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
   }
   const [zoomDialog, setZoomDialog] = useState(false)
   const [protectDialog, setProtectDialog] = useState(false)
+  const [compare, setCompare] = useState<{ otherName: string; entries: CompareEntry[] } | null>(
+    null,
+  )
+  /** Review → Compare: a .docx the user picks in the view, diffed by paragraph as the desktop does. */
+  const compareWithFile = () =>
+    void pickFile('.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+      .then(async (file) => {
+        if (!file) return
+        const other = await parseDocx(new Uint8Array(await file.arrayBuffer()))
+        setCompare({
+          otherName: file.name,
+          entries: compareParagraphs(
+            editorBlockTexts(editor.getJSON() as never, []),
+            blockTexts(other.blocks),
+          ),
+        })
+      })
+      .catch((error) => runtime.reportError(error))
   const [spellcheck, setSpellcheck] = useState(false)
   const canvas = useRef<HTMLDivElement>(null)
   /** Word's fit modes against the visible canvas and the page geometry (twips → px). */
@@ -470,6 +496,7 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
           hfEditing={hfEditing}
           onHfAction={onHfAction}
           onProtect={() => setProtectDialog(true)}
+          onCompare={compareWithFile}
           panes={{
             nav: showNav,
             styles: showStylesPane,
@@ -697,6 +724,13 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
             }
           />
         )}
+        {compare && (
+          <ComparePanel
+            otherName={compare.otherName}
+            entries={compare.entries}
+            onClose={() => setCompare(null)}
+          />
+        )}
         {protectDialog && (
           <ProtectDialog
             encrypted={false}
@@ -836,4 +870,16 @@ function pageStyle(
     boxSizing: 'border-box',
     ...(pageColor ? { background: `#${pageColor}` } : {}),
   }
+}
+
+/** A local file chosen in the view (null when cancelled). */
+function pickFile(accept: string): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = accept
+    input.onchange = () => resolve(input.files?.[0] ?? null)
+    input.oncancel = () => resolve(null)
+    input.click()
+  })
 }

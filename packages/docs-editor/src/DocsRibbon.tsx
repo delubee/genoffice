@@ -35,6 +35,7 @@ export function DocsRibbon({
   hfEditing,
   onHfAction,
   onProtect,
+  onCompare,
   onInsertNote,
   onTableDialog,
   onListDialog,
@@ -79,6 +80,7 @@ export function DocsRibbon({
   hfEditing: RibbonProps['hfEditing']
   onHfAction: RibbonProps['onHfAction']
   onProtect(): void
+  onCompare(): void
   onInsertNote(kind: 'footnote' | 'endnote'): void
   onTableDialog: RibbonProps['onTableDialog']
   onListDialog: RibbonProps['onListDialog']
@@ -261,7 +263,7 @@ export function DocsRibbon({
       runtime.settings.protection?.enforced || runtime.settings.writeProtection?.hash
     ),
     onProtectDoc: onProtect,
-    onCompare: unavailable('Compare'),
+    onCompare,
     mergeSource: null,
     onPickMergeDataSource: unavailable('Mail merge'),
     onMergeMailings: () =>
