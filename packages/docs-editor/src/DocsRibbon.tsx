@@ -31,6 +31,7 @@ export function DocsRibbon({
   comments,
   revisions,
   view,
+  onProtect,
   onInsertNote,
   onTableDialog,
   onListDialog,
@@ -62,6 +63,7 @@ export function DocsRibbon({
     spellcheck: boolean
     onSpellcheck(on: boolean): void
   }
+  onProtect(): void
   onInsertNote(kind: 'footnote' | 'endnote'): void
   onTableDialog: RibbonProps['onTableDialog']
   onListDialog: RibbonProps['onListDialog']
@@ -239,8 +241,10 @@ export function DocsRibbon({
     isProtected: false,
     commentsAllowed: true,
     trackChangesForced: false,
-    protectActive: false,
-    onProtectDoc: unavailable('Document protection'),
+    protectActive: !!(
+      runtime.settings.protection?.enforced || runtime.settings.writeProtection?.hash
+    ),
+    onProtectDoc: onProtect,
     onCompare: unavailable('Compare'),
     mergeSource: null,
     onPickMergeDataSource: unavailable('Mail merge'),

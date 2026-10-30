@@ -234,6 +234,14 @@ const hfValue = (key: string, value: unknown, depth: number): boolean => {
     )
   return false
 }
+/** Word's iterated SHA-512 password record (hash only; the password never crosses). */
+const base64 = z.string().regex(/^[A-Za-z0-9+/=]{4,200}$/)
+const passwordHash = {
+  hash: base64.optional(),
+  salt: base64.optional(),
+  spinCount: z.number().int().min(1).max(10_000_000).optional(),
+  algorithmSid: z.literal(14).optional(),
+}
 /** Theme typefaces and names: any script, never markup. */
 const themeText = z
   .string()
@@ -333,6 +341,21 @@ export const documentSettingsSchema = z
     comments: commentsSchema.optional(),
     footnotes: notesSchema.optional(),
     styles: styleUpsertsSchema.optional(),
+    protection: z
+      .object({
+        edit: z.enum(['readOnly', 'comments', 'trackedChanges', 'forms', 'none']),
+        enforced: z.boolean(),
+        ...passwordHash,
+      })
+      .strict()
+      .nullable()
+      .optional(),
+    writeProtection: z
+      .object({ recommended: z.boolean().optional(), ...passwordHash })
+      .strict()
+      .nullable()
+      .optional(),
+    removePersonalInfo: z.boolean().optional(),
     themeFonts: z
       .record(z.string().regex(/^[A-Za-z]{1,20}$/), themeText)
       .refine((fonts) => typeof fonts.major === 'string' && typeof fonts.minor === 'string')

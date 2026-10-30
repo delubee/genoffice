@@ -119,3 +119,20 @@ it('saves Design theme fonts and colors and refuses markup in typefaces', async 
   expect(xml).toContain('1F4E79')
   expect(() => apply(session, { themeFonts: { major: 'A"/><evil/>', minor: 'B' } })).toThrow()
 })
+
+it('saves Protect Document settings and reopens the document read-only', async () => {
+  const session = await DocxSession.open(
+    await buildDocx({ bodyXml: '<w:p><w:r><w:t>Final</w:t></w:r></w:p>' }),
+  )
+  apply(session, { protection: { edit: 'readOnly', enforced: true }, removePersonalInfo: true })
+  const saved = await session.save()
+  const zip = await JSZip.loadAsync(saved)
+  const settingsXml = await zip.file('word/settings.xml')!.async('string')
+  expect(settingsXml).toMatch(/<w:documentProtection\b[^>]*w:edit="readOnly"/)
+  expect(settingsXml).toContain('<w:removePersonalInformation')
+  const reopened = await DocxSession.open(saved)
+  expect(reopened.readonly).toBe(true)
+  expect(() =>
+    apply(session, { protection: { edit: 'readOnly', enforced: true, hash: '<x/>' } }),
+  ).toThrow()
+})

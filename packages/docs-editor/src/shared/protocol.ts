@@ -7,6 +7,8 @@ import type {
   StyleUpsert,
   NumberingDef,
   SectionSettings,
+  DocProtection,
+  WriteProtection,
   ThemeColors,
   ThemeFonts,
   StyleInfo,
@@ -25,6 +27,10 @@ export interface DocumentSettings {
   comments?: CommentInfo[]
   footnotes?: NoteInfo[]
   endnotes?: NoteInfo[]
+  /** Review → Protect Document (applies to the saved file) */
+  protection?: DocProtection | null
+  writeProtection?: WriteProtection | null
+  removePersonalInfo?: boolean
   /** Design → Fonts / Colors (null: the document has no theme part) */
   themeFonts?: ThemeFonts | null
   themeColors?: ThemeColors | null

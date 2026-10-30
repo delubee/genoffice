@@ -8,6 +8,7 @@ import { ParagraphDialog } from '../../../apps/docs/src/renderer/components/Para
 import type { StyleInfo } from '@genoffice/docx-engine'
 import { DocsRibbon, numberingContext } from './DocsRibbon'
 import { ZoomDialog } from '../../../apps/docs/src/renderer/components/ZoomDialog'
+import { ProtectDialog } from '../../../apps/docs/src/renderer/components/ProtectDialog'
 import {
   CellMarginsDialog,
   DeleteCellsDialog,
@@ -81,6 +82,7 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
   const [showNav, setShowNav] = useState(false)
   const [zoom, setZoom] = useState(100)
   const [zoomDialog, setZoomDialog] = useState(false)
+  const [protectDialog, setProtectDialog] = useState(false)
   const [spellcheck, setSpellcheck] = useState(false)
   const canvas = useRef<HTMLDivElement>(null)
   /** Word's fit modes against the visible canvas and the page geometry (twips → px). */
@@ -321,6 +323,7 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
           comments={reviewComments}
           revisions={revisions}
           view={view}
+          onProtect={() => setProtectDialog(true)}
           panes={{
             nav: showNav,
             styles: showStylesPane,
@@ -511,6 +514,24 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
                 .officeAction({ action: 'chat', scope: 'selection', instruction })
                 .catch((error) => runtime.reportError(error))
             }
+          />
+        )}
+        {protectDialog && (
+          <ProtectDialog
+            encrypted={false}
+            writeProtection={runtime.settings.writeProtection ?? null}
+            protection={runtime.settings.protection ?? null}
+            removePersonalInfo={runtime.settings.removePersonalInfo ?? false}
+            onCancel={() => setProtectDialog(false)}
+            onApply={(result) => {
+              setProtectDialog(false)
+              if (result.openPassword !== undefined)
+                runtime.reportError(
+                  'Password-to-open encryption is not available in the VS Code editor yet.',
+                )
+              const { openPassword: _open, ...settings } = result
+              if (Object.keys(settings).length) void runtime.applySettings(settings)
+            }}
           />
         )}
         {zoomDialog && (

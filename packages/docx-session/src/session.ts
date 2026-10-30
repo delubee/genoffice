@@ -228,6 +228,10 @@ export class DocxSession {
       watermark:
         edits.watermark !== undefined ? edits.watermark : (this.original.watermarkText ?? null),
       comments: edits.comments ?? this.original.comments,
+      protection: edits.protection !== undefined ? edits.protection : this.original.protection,
+      writeProtection:
+        edits.writeProtection !== undefined ? edits.writeProtection : this.original.writeProtection,
+      removePersonalInfo: edits.removePersonalInfo ?? this.original.removePersonalInfo,
       themeFonts: edits.themeFonts ?? this.original.themeFonts ?? null,
       themeColors: edits.themeColors ?? this.original.themeColors ?? null,
       footnotes: edits.footnotes ?? this.original.footnotes,
@@ -619,6 +623,15 @@ export class DocxSession {
         : {}),
       ...(this.root.overlays.settings.comments
         ? { comments: this.root.overlays.settings.comments }
+        : {}),
+      ...(this.root.overlays.settings.protection !== undefined
+        ? { protection: this.root.overlays.settings.protection }
+        : {}),
+      ...(this.root.overlays.settings.writeProtection !== undefined
+        ? { writeProtection: this.root.overlays.settings.writeProtection }
+        : {}),
+      ...(this.root.overlays.settings.removePersonalInfo !== undefined
+        ? { removePersonalInfo: this.root.overlays.settings.removePersonalInfo }
         : {}),
       ...(this.root.overlays.settings.themeFonts
         ? { themeFonts: this.root.overlays.settings.themeFonts }
