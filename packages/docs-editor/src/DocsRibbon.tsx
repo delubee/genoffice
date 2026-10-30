@@ -31,6 +31,8 @@ export function DocsRibbon({
   comments,
   revisions,
   view,
+  hfEditing,
+  onHfAction,
   onProtect,
   onInsertNote,
   onTableDialog,
@@ -63,6 +65,8 @@ export function DocsRibbon({
     spellcheck: boolean
     onSpellcheck(on: boolean): void
   }
+  hfEditing: RibbonProps['hfEditing']
+  onHfAction: RibbonProps['onHfAction']
   onProtect(): void
   onInsertNote(kind: 'footnote' | 'endnote'): void
   onTableDialog: RibbonProps['onTableDialog']
@@ -208,8 +212,8 @@ export function DocsRibbon({
     },
     footer: runtime.settings.footer ?? null,
     onFooter: (footer) => void runtime.applySettings({ footer }),
-    hfEditing: null,
-    onHfAction: unavailable('Header & Footer'),
+    hfEditing,
+    onHfAction,
     onHfEdit,
     showMarks,
     onShowMarks: setShowMarks,

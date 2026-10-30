@@ -1,5 +1,6 @@
 import type { EditorJSON } from '../conversion'
 import { docxSchema } from './schema'
+import { latexToOmml, mathParagraphXml } from '@genoffice/docx-engine'
 
 export const DOCX_LIMITS = {
   file: 16 * 1024 ** 2,
@@ -405,6 +406,24 @@ function generatedField(attrs: Record<string, unknown>): boolean {
     GENERATED_FIELD_XML.some((pattern) => pattern.test(attrs.genXml as string))
   )
 }
+/** Insert → Equation: OMML must be exactly what the engine derives from the LaTeX source. */
+function derivedMath(latex: unknown, check: (omml: string) => boolean): boolean {
+  if (typeof latex !== 'string' || !latex.trim() || latex.length > 10_000) return false
+  try {
+    return check(latexToOmml(latex))
+  } catch {
+    return false
+  }
+}
+function generatedEquation(attrs: Record<string, unknown>): boolean {
+  const display = attrs.formulaDisplay as { latex?: unknown } | null | undefined
+  return (
+    attrs.blockType === 'passthrough' &&
+    attrs.docxIndex == null &&
+    typeof attrs.genXml === 'string' &&
+    derivedMath(display?.latex, (omml) => attrs.genXml === mathParagraphXml(omml))
+  )
+}
 /** Insert → Pictures: a new picture block whose bytes the save writes as a fresh media part. */
 function newPicture(attrs: Record<string, unknown>): boolean {
   const image = attrs.genImage as
@@ -511,7 +530,9 @@ export function validateAndNormalize(
       } else {
         const picture =
           node.type === 'docProtected' &&
-          (newPicture(node.attrs ?? {}) || generatedField(node.attrs ?? {}))
+          (newPicture(node.attrs ?? {}) ||
+            generatedField(node.attrs ?? {}) ||
+            generatedEquation(node.attrs ?? {}))
         if (node.type === 'docProtected' && !picture)
           throw new Error('Cannot create protected objects')
         const inheritedIndex = node.attrs?.docxIndex
@@ -539,6 +560,12 @@ export function validateAndNormalize(
       const defaults = defaultsOf(node.type)
       for (const [key, value] of Object.entries(node.attrs ?? {})) {
         if (rawAttrs.has(key)) {
+          if (
+            key === 'omml' &&
+            node.type === 'docInlineMath' &&
+            derivedMath(node.attrs?.latex, (omml) => value === `<m:oMath>${omml}</m:oMath>`)
+          )
+            continue
           if (
             encode(value) !== encode(defaults[key]) &&
             !(original && hasSourceValue(original, node.type, key, value))

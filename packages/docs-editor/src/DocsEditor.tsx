@@ -41,6 +41,18 @@ import { setDocsHost } from '../../../apps/docs/src/renderer/docs-host'
 import { FindPanel } from '../../../apps/docs/src/renderer/components/FindPanel'
 import { LinkInsertModal } from '../../../apps/docs/src/renderer/components/ribbon-insert-tab'
 import { HeaderFooterArea } from '../../../apps/docs/src/renderer/components/HeaderFooterArea'
+import type {
+  HfAction,
+  HfEditingInfo,
+} from '../../../apps/docs/src/renderer/components/ribbon-hf-tab'
+import {
+  insertHfField,
+  insertHfInstrField,
+  insertHfPicture,
+  type HfEditorHandle,
+} from '../../../apps/docs/src/renderer/editor/hf-editor'
+import { hfHasPageField, hfWithoutPageMarks } from '../../../apps/docs/src/renderer/editor/hf-dom'
+import { PAGE_MARK } from '@genoffice/docx-engine'
 import { CommentsPanel } from '../../../apps/docs/src/renderer/components/CommentsPanel'
 import {
   cancelNewComment,
@@ -220,6 +232,102 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
     header: null,
     footer: null,
   })
+  const [hfOpen, setHfOpen] = useState<'header' | 'footer' | null>(null)
+  const hfHandle = useRef<HfEditorHandle | null>(null)
+  const hfEditing: HfEditingInfo | null = hfOpen
+    ? {
+        kind: hfOpen,
+        section: 0,
+        sectionCount: 1,
+        variant: 'default',
+        linked: null,
+        headerDistTwips: runtime.settings.section?.headerDist ?? 720,
+        footerDistTwips: runtime.settings.section?.footerDist ?? 720,
+        titlePg: false,
+        evenOddHf: false,
+      }
+    : null
+  /** The Header & Footer contextual tab, as the desktop's onHfAction for the default strips. */
+  const onHfAction = (action: HfAction) => {
+    const sub = hfHandle.current?.editor
+    const value = (kind: 'header' | 'footer') => runtime.settings[kind] ?? { text: '' }
+    switch (action.type) {
+      case 'close':
+        hfHandle.current?.exit()
+        break
+      case 'goto':
+      case 'edit':
+        hfHandle.current?.exit()
+        setHfEdit((current) => ({ ...current, [action.kind]: Date.now() }))
+        break
+      case 'remove':
+        hfHandle.current?.exit()
+        void runtime.applySettings({ [action.kind]: { text: '' } })
+        break
+      case 'pageNumber':
+        hfHandle.current?.exit()
+        void runtime.applySettings({
+          [action.kind]: {
+            text: PAGE_MARK,
+            pageNumber: true,
+            paras: [{ align: action.align, runs: [{ text: PAGE_MARK }] }],
+          },
+        })
+        break
+      case 'pageNumberHere':
+        if (sub) insertHfField(sub, 'PAGE')
+        break
+      case 'numPages':
+        if (sub) insertHfField(sub, 'NUMPAGES')
+        break
+      case 'removePageNumbers':
+        hfHandle.current?.exit()
+        for (const kind of ['header', 'footer'] as const)
+          if (hfHasPageField(value(kind)))
+            void runtime.applySettings({ [kind]: hfWithoutPageMarks(value(kind)) })
+        break
+      case 'field':
+        if (sub)
+          insertHfInstrField(
+            sub,
+            action.instr,
+            action.instr === 'DATE'
+              ? new Date().toLocaleDateString('zh-CN')
+              : new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+          )
+        break
+      case 'picture':
+        if (sub)
+          void pickImageFile().then(async (picked) => {
+            if (!picked || !hfHandle.current) return
+            const dataUrl = `data:${picked.mime};base64,${picked.base64}`
+            const image = new Image()
+            image.src = dataUrl
+            await image.decode()
+            insertHfPicture(sub, {
+              dataUrl,
+              widthPx: image.naturalWidth,
+              heightPx: image.naturalHeight,
+            })
+          }, runtime.reportError.bind(runtime))
+        break
+      case 'distance': {
+        const current = runtime.settings.section
+        if (current)
+          void runtime.applySettings({
+            section: {
+              ...current,
+              [action.kind === 'header' ? 'headerDist' : 'footerDist']: action.twips,
+            },
+          })
+        break
+      }
+      default:
+        runtime.reportError(
+          'Different first page, odd/even pages, Link to Previous and page number formats are not available in the VS Code editor yet.',
+        )
+    }
+  }
   const strip = (kind: 'header' | 'footer') => {
     const value = runtime.settings[kind] ?? { text: '' }
     // Word shows an empty strip only while editing it.
@@ -231,7 +339,9 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
         readOnly={!editor.isEditable}
         editRequest={hfEdit[kind]}
         onCommit={(next) => void runtime.applySettings({ [kind]: next })}
-        onEditingChange={(editing) => {
+        onEditingChange={(editing, handle) => {
+          hfHandle.current = editing ? handle : null
+          setHfOpen(editing ? kind : null)
           if (!editing) setHfEdit((current) => ({ ...current, [kind]: null }))
         }}
       />
@@ -285,8 +395,11 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
     }
   }, [editor, onReady])
   useEffect(() => {
-    const unavailable = (feature: string) => () =>
-      Promise.reject(new Error(`${feature} is not available in the VS Code editor yet.`))
+    // Report in the view rather than reject: the shared ribbon does not catch these calls.
+    const unavailable = (feature: string) => () => {
+      runtime.reportError(`${feature} is not available in the VS Code editor yet.`)
+      return Promise.resolve(undefined as never)
+    }
     setDocsHost({
       pickImage: pickImageFile,
       openNewTab: unavailable('New Window'),
@@ -333,6 +446,8 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
           comments={reviewComments}
           revisions={revisions}
           view={view}
+          hfEditing={hfEditing}
+          onHfAction={onHfAction}
           onProtect={() => setProtectDialog(true)}
           panes={{
             nav: showNav,

@@ -49,3 +49,45 @@ it('accepts generated TOC, index and caption field paragraphs and refuses anythi
   ])
     await expect(submit(forged)).rejects.toThrow()
 })
+
+it('accepts equations whose OMML is derived from their LaTeX and refuses forged math', async () => {
+  const { equationBlockJson, inlineEquationNodeJson } =
+    await import('../../../apps/docs/src/renderer/editor/equation')
+  const session = await DocxSession.open(
+    await buildDocx({ bodyXml: '<w:p><w:r><w:t>Inline </w:t></w:r></w:p>' }),
+  )
+  const insert = (node: unknown) => {
+    const doc = docxSchema.nodeFromJSON(session.content())
+    const descriptor = session.descriptor()
+    return session.submit({
+      sessionId: session.sessionId,
+      epoch: descriptor.epoch,
+      expectedRevision: descriptor.revision,
+      baseCollabVersion: descriptor.collabVersion,
+      clientId: 'browser',
+      transactionId: crypto.randomUUID(),
+      steps: new Transform(doc)
+        .insert(
+          (node as { type: string }).type === 'docProtected' ? 0 : 8,
+          docxSchema.nodeFromJSON(node as never),
+        )
+        .steps.map((step) => step.toJSON()),
+    })
+  }
+  insert(equationBlockJson('x^2 + y^2 = z^2'))
+  const forgedBlock = equationBlockJson('x') as { attrs: Record<string, unknown> }
+  expect(() =>
+    insert({ ...forgedBlock, attrs: { ...forgedBlock.attrs, genXml: '<w:p><w:evil/></w:p>' } }),
+  ).toThrow()
+  const inline = inlineEquationNodeJson('a/b') as { attrs: Record<string, unknown> }
+  expect(() =>
+    insert({ ...inline, attrs: { ...inline.attrs, omml: '<m:oMath><w:evil/></m:oMath>' } }),
+  ).toThrow()
+  insert(inline)
+  const xml = await (
+    await (await import('jszip')).default.loadAsync(await session.save())
+  )
+    .file('word/document.xml')!
+    .async('string')
+  expect(xml).toContain('<m:oMath>')
+})

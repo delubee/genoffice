@@ -391,7 +391,8 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     await headerEditor.waitFor()
     await headerEditor.click()
     await page.keyboard.type('Quarterly')
-    await page.keyboard.press('Escape')
+    // The Header & Footer contextual tab follows the strip editor; Close commits it.
+    await page.locator('[data-tip="Return to the document body"]').click()
     await expect.poll(() => session.presentation().settings!.header!.text).toContain('Quarterly')
     // Review → New Comment: the desktop composer anchors a comment with its list in one entry.
     await editor.evaluate((element) => {

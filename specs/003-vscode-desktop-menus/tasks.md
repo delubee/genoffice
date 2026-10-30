@@ -41,6 +41,9 @@
   - [x] Picture Format on file pictures: image blocks are no longer sealed placeholders; size, rotation, wrap and other picture attributes are edited as the desktop does, while anchors and raw XML stay immutable; resized extents saved. Charts, shapes and other objects stay sealed.
   - [x] Set Numbering Value (restart/continue via restart definitions) and Adjust List Indents (level edits of file or session lists, step-less entries) with the desktop dialogs; presented and saved to numbering.xml.
   - [x] References: sources (Manage Sources / Insert Citation / Bibliography) as a settings list saved to the sources part; Table of Contents, Index and Insert Caption blocks accepted only when their generated field XML matches the engine templates exactly (escaped text, in-document TOC / INDEX / SEQ instructions).
+  - [x] Header & Footer contextual tab for the default strips: Close, Go to, Remove, page numbers (insert/here/total/remove), date/time fields, header pictures and header/footer distance; different first page, odd/even, Link to Previous and page-number formats remain explicit.
+  - [x] Insert → Equation: inline and display equations accepted only when their OMML is exactly what the engine derives from the LaTeX source.
+  - [ ] Draw (ink), Compare, Page preview / PDF / print, mail merge, multi-section page setup and section breaks, Zotero, paste defaults: still explicit host limitations.
   - [ ] Picture bullets.
   - [ ] Remaining: comments, notes, headers/footers, page setup, revisions, protection, drawing, mail merge, print/export.
 - [ ] Route all ribbon AI actions into native VS Code chat with document context.
