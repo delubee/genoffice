@@ -29,6 +29,11 @@ export interface DocumentBridge {
     operations: DocxOperation[]
   }): Promise<Commit>
   presentation?(presentation: DocumentPresentation): void
+  exportFile?(request: {
+    format: 'html' | 'md'
+    content: string
+    images: { name: string; src: string }[]
+  }): Promise<{ ok: boolean; path?: string; imagesDropped?: number }>
   settings?(request: {
     sessionId: string
     transactionId: string
@@ -356,6 +361,21 @@ export class DocumentRuntime {
     } finally {
       this.operationPending = false
       this.updateEditability()
+    }
+  }
+
+  /** File → Export as HTML / Markdown through the host's save dialog. */
+  async exportFile(
+    format: 'html' | 'md',
+    content: string,
+    images: { name: string; src: string }[] = [],
+  ) {
+    try {
+      if (!this.bridge.exportFile) throw new Error('Export is unavailable in this host.')
+      return await this.bridge.exportFile({ format, content, images })
+    } catch (error) {
+      this.bridge.error(String(error))
+      return { ok: false }
     }
   }
 

@@ -185,6 +185,62 @@ export class DocxEditorProvider
         return commit
       }),
     )
+    // File → Export: the view renders HTML / Markdown with the desktop exporters; the host writes it.
+    bridge.handle('docx.export', async (raw) => {
+      const input = z
+        .object({
+          format: z.enum(['html', 'md']),
+          content: z
+            .string()
+            .min(1)
+            .max(64 * 1024 ** 2),
+          images: z
+            .array(
+              z
+                .object({
+                  name: z.string().regex(/^image[0-9]{1,5}\.(png|jpe?g|gif|bmp|webp|tiff)$/),
+                  src: z.string().max(32 * 1024 ** 2),
+                })
+                .strict(),
+            )
+            .max(2000)
+            .default([]),
+        })
+        .strict()
+        .parse(raw)
+      const base = document.uri.path
+        .split('/')
+        .pop()!
+        .replace(/\.docx$/i, '')
+      const target = await vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.joinPath(document.uri, '..', `${base}.${input.format}`),
+        filters: input.format === 'html' ? { 'Web Page': ['html', 'htm'] } : { Markdown: ['md'] },
+      })
+      if (!target) return { ok: false }
+      let content = input.content
+      let dropped = 0
+      if (input.format === 'md') {
+        const folder = `${target.path.split('/').pop()!.replace(/\.md$/i, '')}_files`
+        for (const image of input.images) {
+          const data = /^data:image\/[a-z+.-]+;base64,([A-Za-z0-9+/=]+)$/.exec(image.src)
+          if (!data) {
+            dropped++
+            continue
+          }
+          await vscode.workspace.fs.writeFile(
+            vscode.Uri.joinPath(target, '..', folder, image.name),
+            Buffer.from(data[1]!, 'base64'),
+          )
+        }
+        content = content
+          .split('__genoffice_media__/')
+          .join(
+            `${encodeURIComponent(folder).replace(/[()]/g, (c) => (c === '(' ? '%28' : '%29'))}/`,
+          )
+      }
+      await vscode.workspace.fs.writeFile(target, Buffer.from(content, 'utf8'))
+      return { ok: true, path: target.fsPath, imagesDropped: dropped }
+    })
     bridge.handle('history.request', async (raw) => {
       if (!panel.active) throw new Error('Activate this DOCX editor before requesting history')
       const { direction } = z

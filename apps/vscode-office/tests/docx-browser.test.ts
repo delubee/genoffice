@@ -81,6 +81,11 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
   bridge.handle('view.resync', projection)
   bridge.handle('view.presentation', () => ({ ready: true }))
   bridge.handle('view.intent', (raw) => session.submit(raw as StepRequest))
+  const exports: { format: string; content: string; images: { name: string }[] }[] = []
+  bridge.handle('docx.export', (raw) => {
+    exports.push(raw as (typeof exports)[number])
+    return { ok: true, path: '/tmp/export' }
+  })
   bridge.handle('docx.settings', (raw) =>
     session.applySettings(
       raw as { transactionId: string; expectedRevision: number; settings: unknown },
@@ -472,6 +477,14 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
       .click()
     await zoomDialog.getByLabel('100%', { exact: true }).check()
     await zoomDialog.getByRole('button', { name: 'OK', exact: true }).click()
+    // File → Convert to HTML / Markdown: the desktop exporters render, the host writes.
+    for (const label of ['Convert to HTML…', 'Convert to Markdown…']) {
+      await page.locator('.ribbon-tab-file').click()
+      await page.locator('.file-menu button', { hasText: label }).click()
+    }
+    await expect.poll(() => exports.map((item) => item.format)).toEqual(['html', 'md'])
+    expect(exports[0]!.content).toContain('<html')
+    expect(exports[1]!.content).toContain('Second')
     const beforeTheme = session.content()
     await page.evaluate(() =>
       document.documentElement.style.setProperty('--vscode-editor-background', 'rgb(20, 20, 20)'),

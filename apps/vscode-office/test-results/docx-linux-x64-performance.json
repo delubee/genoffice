@@ -1,8 +1,8 @@
 {
-  "fixtureBytes": 1114013,
+  "fixtureBytes": 1113922,
   "paragraphs": 200,
   "tables": 10,
-  "coldOpenMs": 1805,
-  "toolEdit100Ms": 277,
+  "coldOpenMs": 1783,
+  "toolEdit100Ms": 371,
   "vscode": "1.109.5"
 }

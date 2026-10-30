@@ -100,6 +100,8 @@ void bridge
       error: showError,
       operations: async (request) => (await bridge.request('docx.operations', request)) as Commit,
       settings: async (request) => (await bridge.request('docx.settings', request)) as Commit,
+      exportFile: async (request) =>
+        (await bridge.request('docx.export', request)) as { ok: boolean; path?: string },
       presentation: present,
     })
     root.render(

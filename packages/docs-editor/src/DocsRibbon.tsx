@@ -4,6 +4,9 @@ import { Ribbon } from '../../../apps/docs/src/renderer/components/Ribbon'
 import { computeFormatState } from '../../../apps/docs/src/renderer/components/ribbon-format-state'
 import { useShallowStable } from '../../../apps/docs/src/renderer/use-stable'
 import type { DocumentRuntime } from './runtime'
+import { buildStandaloneHtml } from '../../../apps/docs/src/renderer/html-export'
+import { documentToMarkdown } from '../../../apps/docs/src/renderer/export-markdown'
+import { getLang } from '../../../apps/docs/src/renderer/i18n/locale'
 import {
   allocateListNumId,
   createCustomListDef,
@@ -113,7 +116,25 @@ export function DocsRibbon({
     onOpen: file('open'),
     onSave: file('save'),
     onSaveAs: file('saveAs'),
-    onConvert: unavailable('Export'),
+    onConvert: (format) => {
+      if (format === 'html') {
+        const root = editor.view.dom as HTMLElement
+        const width = Number.parseFloat(
+          getComputedStyle(root).getPropertyValue('--section-content-w'),
+        )
+        void runtime.exportFile(
+          'html',
+          buildStandaloneHtml(root, {
+            title: document.title || 'Document',
+            lang: getLang(),
+            textWidthPx: Number.isFinite(width) ? width : root.clientWidth,
+          }),
+        )
+      } else if (format === 'md') {
+        const { markdown, images } = documentToMarkdown(editor)
+        void runtime.exportFile('md', markdown, images)
+      } else unavailable(format === 'pdf' ? 'PDF export' : 'Image export')()
+    },
     showAi: false,
     onToggleAi: () =>
       void runtime
