@@ -302,6 +302,11 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
     await page.getByRole('button', { name: 'Insert Right', exact: true }).click()
     expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
+    await page.locator('button.table-command-row', { hasText: 'Table Properties' }).click()
+    const properties = page.locator('.table-properties-dialog')
+    await properties.waitFor()
+    await properties.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await properties.waitFor({ state: 'hidden' })
     const table = session.content().content!.find((node) => node.type === 'docTable')!
     expect(table.content).toHaveLength(3)
     expect(table.content![0]!.content).toHaveLength(3)

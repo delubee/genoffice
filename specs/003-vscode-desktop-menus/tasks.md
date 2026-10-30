@@ -32,6 +32,8 @@
   - [x] Comments: Review → New Comment / Delete / Previous / Next / Show Comments and the context menu run the desktop review actions; the desktop Comments panel composes, replies, edits, resolves and deletes. The comment list travels with the anchor steps (one history entry) or alone as a settings entry; anchors must name listed comments; saved to comments.xml with resolved state, reopened.
   - [x] Footnotes / endnotes: References → Insert Footnote/Endnote open the desktop note prompt; the reference and the note list commit together (references must name listed notes); notes show under the page body and edit by double-click; saved to footnotes.xml / endnotes.xml.
   - [x] Styles pane and Navigation pane: the desktop panes mount from Home / View; Styles pane definitions travel with the steps that apply them (or alone), are validated (identifier-safe ids/names, plain properties), merged like the desktop upsert, resolved into live styles before presentation, and saved to styles.xml.
+  - [x] Table dialogs (Table Properties, Split/Insert/Delete Cells, Cell Margins) and Define New Bullet / Number Format / Multilevel List dialogs from the Ribbon and context menu; ListDialogs now imports the browser-only chrome Dropdown.
+  - [ ] Set Numbering Value / Adjust List Indents (existing-definition edits), picture bullets.
   - [ ] Remaining: comments, notes, headers/footers, page setup, revisions, protection, drawing, mail merge, print/export and picture editing of file images.
 - [ ] Route all ribbon AI actions into native VS Code chat with document context.
 - [ ] Implement real file, clipboard, picture, export/print and window host actions.

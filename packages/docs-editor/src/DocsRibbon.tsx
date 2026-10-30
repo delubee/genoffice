@@ -27,6 +27,8 @@ export function DocsRibbon({
   onHfEdit,
   comments,
   onInsertNote,
+  onTableDialog,
+  onListDialog,
   panes,
   quickActions,
 }: {
@@ -38,6 +40,8 @@ export function DocsRibbon({
     onStyles(show: boolean): void
   }
   onInsertNote(kind: 'footnote' | 'endnote'): void
+  onTableDialog: RibbonProps['onTableDialog']
+  onListDialog: RibbonProps['onListDialog']
   comments: {
     count: number
     open: number
@@ -71,21 +75,7 @@ export function DocsRibbon({
   const [showGrid, setShowGrid] = useState(false)
   const [splitView, setSplitView] = useState(false)
   const [tableGridlines, setTableGridlines] = useState(true)
-  // The desktop numbering actions, over the presented definitions and the view's pending set.
-  const numbering = (): NumberingContext => ({
-    editor,
-    doc: {
-      parsed: {
-        numbering: (storage as { defs?: Map<string, never> } | undefined)?.defs ?? new Map(),
-      },
-    } as unknown as DocState,
-    pendingNumbering: runtime.pendingNumbering,
-    setPendingNumbering: (update) => {
-      runtime.pendingNumbering = update(runtime.pendingNumbering) as typeof runtime.pendingNumbering
-    },
-    numIdFloorRef: runtime.numIdFloor,
-    setStatus: () => {},
-  })
+  const numbering = () => numberingContext(runtime)
   const unavailable = (feature: string) => () =>
     runtime.reportError(`${feature} is not available in the VS Code editor yet.`)
   const file = (action: 'open' | 'save' | 'saveAs') => () =>
@@ -217,8 +207,8 @@ export function DocsRibbon({
     onPagePreview: unavailable('Print preview'),
     tableGridlines,
     onToggleTableGridlines: () => setTableGridlines((value) => !value),
-    onTableDialog: unavailable('Table dialogs'),
-    onListDialog: unavailable('List dialogs'),
+    onTableDialog,
+    onListDialog,
     allocateNumId: (kind) => allocateListNumId(numbering(), kind),
     createListDef: (levels) => createCustomListDef(numbering(), levels),
     onPasteDefaults: unavailable('Paste defaults'),
@@ -232,4 +222,20 @@ export function DocsRibbon({
       <Ribbon {...props} />
     </div>
   )
+}
+
+/** The desktop numbering actions over the presented definitions and the view's pending set. */
+export function numberingContext(runtime: DocumentRuntime): NumberingContext {
+  const editor = runtime.editor
+  const storage = editor.storage.listNumbering as { defs?: Map<string, never> } | undefined
+  return {
+    editor,
+    doc: { parsed: { numbering: storage?.defs ?? new Map() } } as unknown as DocState,
+    pendingNumbering: runtime.pendingNumbering,
+    setPendingNumbering: (update) => {
+      runtime.pendingNumbering = update(runtime.pendingNumbering) as typeof runtime.pendingNumbering
+    },
+    numIdFloorRef: runtime.numIdFloor,
+    setStatus: () => {},
+  }
 }

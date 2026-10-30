@@ -6,7 +6,25 @@ import { getLang, LocaleScope, t } from '../../../apps/docs/src/renderer/i18n/lo
 import { FontDialog } from '../../../apps/docs/src/renderer/components/FontDialog'
 import { ParagraphDialog } from '../../../apps/docs/src/renderer/components/ParagraphDialog'
 import type { StyleInfo } from '@genoffice/docx-engine'
-import { DocsRibbon } from './DocsRibbon'
+import { DocsRibbon, numberingContext } from './DocsRibbon'
+import {
+  CellMarginsDialog,
+  DeleteCellsDialog,
+  InsertCellsDialog,
+  SplitCellsDialog,
+  type TableDialogKind,
+} from '../../../apps/docs/src/renderer/components/TableDialogs'
+import { TablePropertiesDialog } from '../../../apps/docs/src/renderer/components/TablePropertiesDialog'
+import { ensureCaretInTable } from '../../../apps/docs/src/renderer/editor/table-ops'
+import {
+  DefineBulletDialog,
+  DefineMultilevelDialog,
+  DefineNumberFormatDialog,
+  type ListDialogKind,
+} from '../../../apps/docs/src/renderer/components/ListDialogs'
+import { createCustomListDef } from '../../../apps/docs/src/renderer/numbering-actions'
+import { rememberListPreset } from '../../../apps/docs/src/renderer/list-presets'
+import type { CustomNumberingLevel } from '@genoffice/docx-engine'
 import { setDocsHost } from '../../../apps/docs/src/renderer/docs-host'
 import { FindPanel } from '../../../apps/docs/src/renderer/components/FindPanel'
 import { LinkInsertModal } from '../../../apps/docs/src/renderer/components/ribbon-insert-tab'
@@ -54,6 +72,35 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
   const endnotes = runtime.settings.endnotes ?? []
   const [notePrompt, setNotePrompt] = useState<NotePrompt | null>(null)
   const [showNav, setShowNav] = useState(false)
+  const [tableDialog, setTableDialog] = useState<TableDialogKind | null>(null)
+  const section = runtime.settings.section
+  /** Text column width the table dialogs fit grids into (twips → px). */
+  const contentWidthPx = section
+    ? Math.round((section.pageWidth - section.marginLeft - section.marginRight) / 15)
+    : 624
+  const [listDialog, setListDialog] = useState<ListDialogKind | null>(null)
+  /** Define New Bullet / Number Format / Multilevel List, as the desktop applies them. */
+  const applyDefinedList = (
+    levels: CustomNumberingLevel[],
+    kind: 'bullets' | 'numbers' | 'multi',
+  ) => {
+    const numId = createCustomListDef(numberingContext(runtime), levels)
+    if (!numId) return
+    rememberListPreset(kind, levels)
+    const ilvl = editor.isActive('docListItem')
+      ? Number(editor.getAttributes('docListItem').ilvl) || 0
+      : 0
+    editor
+      .chain()
+      .focus()
+      .setNode('docListItem', {
+        kind: levels[0]?.numFmt === 'bullet' ? 'bullet' : 'ordered',
+        numId,
+        ilvl,
+      })
+      .run()
+    setListDialog(null)
+  }
   const [showStylesPane, setShowStylesPane] = useState(false)
   const [pendingStyles, setPendingStyles] = useState<Record<string, StyleUpsert>>({})
   const docDefaults = (editor.storage.listNumbering as { docDefaults?: DocDefaults } | undefined)
@@ -217,6 +264,17 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
             onNav: setShowNav,
             onStyles: setShowStylesPane,
           }}
+          onTableDialog={(kind) => {
+            if (editor.isEditable && ensureCaretInTable(editor.state, editor.view.dispatch))
+              setTableDialog(kind)
+          }}
+          onListDialog={(kind) => {
+            if (kind === 'value' || kind === 'indents')
+              runtime.reportError(
+                'Editing an existing list definition is not available in the VS Code editor yet.',
+              )
+            else setListDialog(kind)
+          }}
           onInsertNote={(kind) => editor.isEditable && setNotePrompt({ kind })}
           onFind={() => openFind(false)}
           onReplace={() => openFind(true)}
@@ -249,6 +307,58 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
             onClose={() => setFind(null)}
             focusFindNonce={find.find}
             focusReplaceNonce={find.replace}
+          />
+        )}
+        {tableDialog === 'properties' && (
+          <TablePropertiesDialog
+            editor={editor}
+            sectionContentWidthPx={contentWidthPx}
+            onClose={() => setTableDialog(null)}
+          />
+        )}
+        {tableDialog === 'splitCells' && (
+          <SplitCellsDialog editor={editor} onClose={() => setTableDialog(null)} />
+        )}
+        {tableDialog === 'insertCells' && (
+          <InsertCellsDialog
+            editor={editor}
+            sectionContentWidthPx={contentWidthPx}
+            onClose={() => setTableDialog(null)}
+          />
+        )}
+        {tableDialog === 'deleteCells' && (
+          <DeleteCellsDialog editor={editor} onClose={() => setTableDialog(null)} />
+        )}
+        {tableDialog === 'cellMargins' && (
+          <CellMarginsDialog
+            editor={editor}
+            sectionContentWidthPx={contentWidthPx}
+            onClose={() => setTableDialog(null)}
+          />
+        )}
+        {listDialog === 'bullet' && (
+          <DefineBulletDialog
+            ilvl={Number(editor.getAttributes('docListItem').ilvl) || 0}
+            onApply={(levels, picture) => {
+              if (picture)
+                runtime.reportError('Picture bullets are not available in the VS Code editor yet.')
+              else applyDefinedList(levels, 'bullets')
+            }}
+            onClose={() => setListDialog(null)}
+          />
+        )}
+        {listDialog === 'number' && (
+          <DefineNumberFormatDialog
+            ilvl={Number(editor.getAttributes('docListItem').ilvl) || 0}
+            onApply={(levels) => applyDefinedList(levels, 'numbers')}
+            onClose={() => setListDialog(null)}
+          />
+        )}
+        {listDialog === 'multi' && (
+          <DefineMultilevelDialog
+            styles={[...(styles?.values() ?? [])]}
+            onApply={(levels) => applyDefinedList(levels, 'multi')}
+            onClose={() => setListDialog(null)}
           />
         )}
         {showNav && (
