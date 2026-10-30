@@ -1,5 +1,19 @@
 import type { EditorJSON } from '../conversion'
-import type { NumberingDef, StyleInfo, DocDefaults } from '@genoffice/docx-engine'
+import type {
+  CustomNumberingLevel,
+  NumberingDef,
+  StyleInfo,
+  DocDefaults,
+} from '@genoffice/docx-engine'
+/** List definitions the view allocated for these steps (Ribbon bullets / numbering / multilevel). */
+export interface PendingListDefinitions {
+  newDefs: Array<{ numId: string; kind: 'bullet' | 'ordered'; levels?: CustomNumberingLevel[] }>
+  restartNums: Array<{
+    numId: string
+    abstractNumId: string
+    startOverrides: Record<number, number>
+  }>
+}
 export interface DocumentPresentation {
   css: string
   numbering: Array<[string, NumberingDef]>
@@ -25,6 +39,7 @@ export interface StepRequest {
   baseCollabVersion: number
   clientId: string
   steps: unknown[]
+  numbering?: PendingListDefinitions
 }
 export interface Commit {
   descriptor: SessionDescriptor

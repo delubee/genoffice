@@ -24,6 +24,8 @@ const requestSchema = z
     baseCollabVersion: z.number().int().nonnegative(),
     clientId: z.string().min(1).max(200),
     steps: z.array(z.json()).max(1000),
+    // Validated in full by the session before it joins the overlay.
+    numbering: z.json().optional(),
   })
   .strict()
 

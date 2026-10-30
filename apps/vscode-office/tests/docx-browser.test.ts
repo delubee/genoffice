@@ -324,6 +324,21 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     await findPanel.waitFor()
     await findPanel.locator('input').first().press('Escape')
     await findPanel.waitFor({ state: 'hidden' })
+    // Home → Bullets allocates a list definition in the view; the host takes it with the steps.
+    await page.locator('.tiptap p').first().click()
+    await page.locator('.ribbon-tab', { hasText: /^Home$/ }).click()
+    await page.getByRole('button', { name: 'Bullets', exact: true }).first().click()
+    expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
+    const nodes: { type: string; attrs?: Record<string, unknown>; content?: unknown[] }[] = []
+    const collect = (node: { type: string; content?: unknown[] }) => {
+      nodes.push(node)
+      for (const child of node.content ?? []) collect(child as { type: string })
+    }
+    collect(session.content())
+    const listItem = nodes.find((node) => node.type === 'docListItem')!
+    expect(listItem.attrs!.kind).toBe('bullet')
+    expect(new Map(session.presentation().numbering).has(String(listItem.attrs!.numId))).toBe(true)
+    expect(await page.locator('.office-docx-error').count()).toBe(0)
     const beforeTheme = session.content()
     await page.evaluate(() =>
       document.documentElement.style.setProperty('--vscode-editor-background', 'rgb(20, 20, 20)'),

@@ -4,6 +4,12 @@ import { Ribbon } from '../../../apps/docs/src/renderer/components/Ribbon'
 import { computeFormatState } from '../../../apps/docs/src/renderer/components/ribbon-format-state'
 import { useShallowStable } from '../../../apps/docs/src/renderer/use-stable'
 import type { DocumentRuntime } from './runtime'
+import {
+  allocateListNumId,
+  createCustomListDef,
+  type NumberingContext,
+} from '../../../apps/docs/src/renderer/numbering-actions'
+import type { DocState } from '../../../apps/docs/src/renderer/doc-state'
 
 type RibbonProps = ComponentProps<typeof Ribbon>
 
@@ -43,6 +49,21 @@ export function DocsRibbon({
   const [showGrid, setShowGrid] = useState(false)
   const [splitView, setSplitView] = useState(false)
   const [tableGridlines, setTableGridlines] = useState(true)
+  // The desktop numbering actions, over the presented definitions and the view's pending set.
+  const numbering = (): NumberingContext => ({
+    editor,
+    doc: {
+      parsed: {
+        numbering: (storage as { defs?: Map<string, never> } | undefined)?.defs ?? new Map(),
+      },
+    } as unknown as DocState,
+    pendingNumbering: runtime.pendingNumbering,
+    setPendingNumbering: (update) => {
+      runtime.pendingNumbering = update(runtime.pendingNumbering) as typeof runtime.pendingNumbering
+    },
+    numIdFloorRef: runtime.numIdFloor,
+    setStatus: () => {},
+  })
   const unavailable = (feature: string) => () =>
     runtime.reportError(`${feature} is not available in the VS Code editor yet.`)
   const file = (action: 'open' | 'save' | 'saveAs') => () =>
@@ -164,6 +185,8 @@ export function DocsRibbon({
     onToggleTableGridlines: () => setTableGridlines((value) => !value),
     onTableDialog: unavailable('Table dialogs'),
     onListDialog: unavailable('List dialogs'),
+    allocateNumId: (kind) => allocateListNumId(numbering(), kind),
+    createListDef: (levels) => createCustomListDef(numbering(), levels),
     onPasteDefaults: unavailable('Paste defaults'),
   }
   return (

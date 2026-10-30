@@ -10,6 +10,7 @@ import type {
   DocumentProjection,
   StepRequest,
   DocumentPresentation,
+  PendingListDefinitions,
 } from './shared/protocol'
 import type { DocxOperation } from './shared/operations'
 import type { OfficeAction } from '@genoffice/xlsx-gateway/shared/office-actions'
@@ -43,6 +44,15 @@ export class DocumentRuntime {
     this.bridge.error(String(error))
   }
   readonly editor: Editor
+  /**
+   * List definitions the Ribbon allocated in this view (desktop numbering
+   * actions). They travel with the next steps until a commit presents them.
+   */
+  pendingNumbering: PendingListDefinitions & {
+    levelEdits: never[]
+    picBullets: never[]
+  } = { newDefs: [], restartNums: [], levelEdits: [], picBullets: [] }
+  readonly numIdFloor = { current: 0 }
   private descriptor
   private readonly clientId = crypto.randomUUID()
   private pending?: Promise<void>
@@ -134,6 +144,14 @@ export class DocumentRuntime {
       clientId: this.clientId,
       transactionId: crypto.randomUUID(),
       steps: batch.steps.map((step) => step.toJSON()),
+      ...(this.pendingNumbering.newDefs.length || this.pendingNumbering.restartNums.length
+        ? {
+            numbering: {
+              newDefs: this.pendingNumbering.newDefs,
+              restartNums: this.pendingNumbering.restartNums,
+            },
+          }
+        : {}),
     }
     this.pending = this.bridge
       .submit(request)
@@ -268,6 +286,8 @@ export class DocumentRuntime {
 
   reset(projection: DocumentProjection) {
     if (this.disposed) return
+    // A resync replaces the document: definitions only its rejected steps used are dropped.
+    this.pendingNumbering = { newDefs: [], restartNums: [], levelEdits: [], picBullets: [] }
     if (projection.presentation) this.present(projection.presentation)
     // Reconfigure creates a fresh collaboration state with no local undo stack.
     const kept = this.editor.state.plugins.filter(
@@ -305,7 +325,19 @@ export class DocumentRuntime {
   private present(presentation: DocumentPresentation) {
     this.bridge.presentation?.(presentation)
     const storage = this.editor.storage.listNumbering
-    storage.defs = new Map(presentation.numbering)
+    const previous = storage.defs as Map<string, unknown> | undefined
+    const defs = new Map(presentation.numbering)
+    // Presented definitions are acknowledged; the rest still overlay the view.
+    const acknowledged = (item: { numId: string }) => defs.has(item.numId)
+    for (const item of [...this.pendingNumbering.newDefs, ...this.pendingNumbering.restartNums])
+      if (!acknowledged(item) && previous?.has(item.numId))
+        defs.set(item.numId, previous.get(item.numId) as (typeof presentation.numbering)[number][1])
+    this.pendingNumbering = {
+      ...this.pendingNumbering,
+      newDefs: this.pendingNumbering.newDefs.filter((item) => !acknowledged(item)),
+      restartNums: this.pendingNumbering.restartNums.filter((item) => !acknowledged(item)),
+    }
+    storage.defs = defs
     storage.styles = new Map(presentation.styles)
     storage.docDefaults = presentation.docDefaults
   }

@@ -3,9 +3,11 @@ import {
   parseDocx,
   saveDocx,
   type ParsedDocFull,
+  numberingLevelFromCustom,
   type StyleUpsert,
   type NumberingDef,
 } from '@genoffice/docx-engine'
+import { pendingListDefinitionsSchema } from '@genoffice/docs-editor/shared/operations'
 import { Transform, Step } from '@tiptap/pm/transform'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import {
@@ -30,11 +32,13 @@ import type {
   StepRequest,
   Commit,
   DocumentPresentation,
+  PendingListDefinitions,
 } from '@genoffice/docs-editor/shared/protocol'
 export type { SessionDescriptor, StepRequest, Commit } from '@genoffice/docs-editor/shared/protocol'
 
 interface Overlays {
-  numbering: Array<{ numId: string; kind: 'bullet' | 'ordered' }>
+  numbering: PendingListDefinitions['newDefs']
+  restartNums: PendingListDefinitions['restartNums']
   styles: StyleUpsert[]
 }
 interface Root {
@@ -69,7 +73,7 @@ export class DocxSession {
       doc: docxSchema.nodeFromJSON(json),
       stateId: randomUUID(),
       bytes: jsonBytes(json),
-      overlays: { numbering: [], styles: [] },
+      overlays: { numbering: [], restartNums: [], styles: [] },
     }
     this.savedStateId = this.root.stateId
     this.baseCSS =
@@ -116,17 +120,32 @@ export class DocxSession {
       numbering.set(definition.numId, {
         numId: definition.numId,
         abstractNumId: `pending-${definition.numId}`,
-        levels: {
-          0: {
-            numFmt: definition.kind === 'ordered' ? 'decimal' : 'bullet',
-            lvlText: definition.kind === 'ordered' ? '%1.' : '•',
-            start: 1,
-            indentLeft: 720,
-            hanging: 360,
-          },
-        },
+        levels: definition.levels
+          ? Object.fromEntries(
+              definition.levels.map((level, index) => [index, numberingLevelFromCustom(level)]),
+            )
+          : {
+              0: {
+                numFmt: definition.kind === 'ordered' ? 'decimal' : 'bullet',
+                lvlText: definition.kind === 'ordered' ? '%1.' : '•',
+                start: 1,
+                indentLeft: 720,
+                hanging: 360,
+              },
+            },
         startOverrides: {},
       } as NumberingDef)
+    for (const restart of this.root.overlays.restartNums) {
+      const source = [...this.original.numbering.values()].find(
+        (definition) => definition.abstractNumId === restart.abstractNumId,
+      )
+      if (source)
+        numbering.set(restart.numId, {
+          ...source,
+          numId: restart.numId,
+          startOverrides: restart.startOverrides,
+        })
+    }
     // Engine models contain optional undefined properties; explicitly project
     // trusted parsed data into JSON before the strict transport sees it.
     const pendingCSS = this.root.overlays.styles
@@ -259,7 +278,48 @@ export class DocxSession {
   }
 
   submit(request: StepRequest): Commit {
-    return this.submitSteps(request, this.root.overlays)
+    if (!request.numbering) return this.submitSteps(request, this.root.overlays)
+    const commit = this.submitSteps(request, this.withListDefinitions(request.numbering))
+    commit.presentation = this.presentation()
+    return commit
+  }
+  /** Ribbon list definitions join the overlay with the steps that use them (one history entry). */
+  private withListDefinitions(input: unknown): Overlays {
+    const pending = pendingListDefinitionsSchema.parse(input)
+    const overlays = structuredClone(this.root.overlays)
+    const taken = (numId: string) =>
+      this.original.numbering.has(numId) ||
+      overlays.numbering.some((definition) => definition.numId === numId) ||
+      overlays.restartNums.some((restart) => restart.numId === numId)
+    for (const definition of pending.newDefs) {
+      const existing = overlays.numbering.find((item) => item.numId === definition.numId)
+      if (existing) {
+        if (JSON.stringify(existing) !== JSON.stringify(definition))
+          throw new Error('List definition identity reused')
+        continue
+      }
+      if (taken(definition.numId)) throw new Error('List definition identity reused')
+      overlays.numbering.push(definition)
+    }
+    for (const restart of pending.restartNums) {
+      const existing = overlays.restartNums.find((item) => item.numId === restart.numId)
+      if (existing) {
+        if (JSON.stringify(existing) !== JSON.stringify(restart))
+          throw new Error('List definition identity reused')
+        continue
+      }
+      if (taken(restart.numId)) throw new Error('List definition identity reused')
+      if (
+        ![...this.original.numbering.values()].some(
+          (definition) => definition.abstractNumId === restart.abstractNumId,
+        )
+      )
+        throw new Error('Unknown list definition')
+      overlays.restartNums.push(restart)
+    }
+    for (const numId of [...overlays.numbering, ...overlays.restartNums].map((item) => item.numId))
+      this.nextNumId = Math.max(this.nextNumId, Number(numId) + 1)
+    return overlays
   }
   private submitSteps(request: StepRequest, overlays: Overlays): Commit {
     if (request.sessionId !== this.sessionId) throw new Error('Wrong document session')
@@ -309,7 +369,8 @@ export class DocxSession {
         node.type.name === 'docListItem' &&
         node.attrs.numId &&
         !this.original.numbering.has(node.attrs.numId) &&
-        !overlays.numbering.some((definition) => definition.numId === node.attrs.numId)
+        !overlays.numbering.some((definition) => definition.numId === node.attrs.numId) &&
+        !overlays.restartNums.some((restart) => restart.numId === node.attrs.numId)
       )
         throw new Error('Unknown numbering definition')
     })
@@ -368,8 +429,13 @@ export class DocxSession {
     const plan = editorToSavePlan(this.content(), this.original.blocks)
     return saveDocx(this.original, plan.saveBlocks, {
       newPictures: plan.newPictures,
-      ...(this.root.overlays.numbering.length
-        ? { numbering: { newDefs: this.root.overlays.numbering } }
+      ...(this.root.overlays.numbering.length || this.root.overlays.restartNums.length
+        ? {
+            numbering: {
+              newDefs: this.root.overlays.numbering,
+              restartNums: this.root.overlays.restartNums,
+            },
+          }
         : {}),
       ...(this.root.overlays.styles.length ? { styleUpserts: this.root.overlays.styles } : {}),
     })
