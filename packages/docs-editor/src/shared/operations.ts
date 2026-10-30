@@ -172,6 +172,40 @@ const settingValue = (value: unknown, depth: number): boolean => {
   return false
 }
 const twips = z.number().int().min(-31680).max(31680)
+// eslint-disable-next-line no-control-regex -- C0 controls other than tab/newline never serialize.
+const commentText = (max: number) =>
+  z
+    .string()
+    .max(max)
+    .refine((value) => !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(value))
+const commentId = z.string().regex(/^[0-9]{1,9}$/)
+export const commentsSchema = z
+  .array(
+    z
+      .object({
+        id: commentId,
+        author: commentText(255),
+        initials: commentText(20).optional(),
+        date: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?Z?$/)
+          .optional(),
+        text: commentText(65536),
+        parentId: commentId.optional(),
+        done: z.boolean().optional(),
+        paraId: z
+          .string()
+          .regex(/^[0-9A-Fa-f]{8}$/)
+          .optional(),
+      })
+      .strict(),
+  )
+  .max(5000)
+  .refine(
+    (comments) => new Set(comments.map((comment) => comment.id)).size === comments.length,
+    'Duplicate comment ids',
+  )
+
 /**
  * Header/footer content regenerates its part from paragraphs and runs: values
  * are plain JSON whose text is escaped by the writer; nothing may carry raw XML.
@@ -249,6 +283,7 @@ export const documentSettingsSchema = z
       .optional(),
     mirrorMargins: z.boolean().optional(),
     header: headerFooterSchema.optional(),
+    comments: commentsSchema.optional(),
     footer: headerFooterSchema.optional(),
     watermark: z
       .string()

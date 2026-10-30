@@ -11,6 +11,22 @@ import { setDocsHost } from '../../../apps/docs/src/renderer/docs-host'
 import { FindPanel } from '../../../apps/docs/src/renderer/components/FindPanel'
 import { LinkInsertModal } from '../../../apps/docs/src/renderer/components/ribbon-insert-tab'
 import { HeaderFooterArea } from '../../../apps/docs/src/renderer/components/HeaderFooterArea'
+import { CommentsPanel } from '../../../apps/docs/src/renderer/components/CommentsPanel'
+import {
+  cancelNewComment,
+  commentThreadAtCaret,
+  deleteAllComments,
+  deleteComment,
+  deleteCommentAtCaret,
+  editComment,
+  gotoComment,
+  replyToComment,
+  resolveComment,
+  startNewComment,
+  submitNewComment,
+  type ReviewContext,
+} from '../../../apps/docs/src/renderer/review-actions'
+import { wordRangeAtCaret } from '../../../apps/docs/src/renderer/editor/comments'
 import {
   EditorContextMenu,
   type ContextMenuState,
@@ -24,6 +40,46 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
   const [find, setFind] = useState<{ find: number; replace: number } | null>(null)
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
   const [linkDialog, setLinkDialog] = useState(false)
+  const [showComments, setShowComments] = useState(false)
+  const [composing, setComposing] = useState(false)
+  const [commentFocus, setCommentFocus] = useState<{ id: string; nonce: number } | null>(null)
+  const comments = runtime.settings.comments ?? []
+  /** The desktop review actions over the session's comment list. */
+  const review = (): ReviewContext => ({
+    editor,
+    doc: null,
+    dirtyRef: { current: false },
+    setStatus: () => {},
+    notePrompt: null,
+    setNotePrompt: () => {},
+    footnotes: [],
+    endnotes: [],
+    setFootnotes: () => {},
+    setEndnotes: () => {},
+    setNotesDirty: () => {},
+    comments,
+    setComments: (update) =>
+      runtime.setComments(typeof update === 'function' ? update(comments) : update),
+    setCommentsDirty: () => {},
+    setCommentComposing: setComposing,
+    setShowComments,
+    setCommentFocus,
+    setInkAnnotations: () => {},
+    setInksDirty: () => {},
+    setCompareResult: () => {},
+  })
+  const reviewComments = {
+    count: comments.length,
+    open: comments.filter((comment) => !comment.parentId && comment.done !== true).length,
+    resolved: comments.filter((comment) => !comment.parentId && comment.done === true).length,
+    atCaret: commentThreadAtCaret(review()) !== null,
+    canComment: !editor.state.selection.empty || wordRangeAtCaret(editor) !== null,
+    onNew: () => startNewComment(review()),
+    onShow: () => setShowComments(true),
+    onDelete: () => deleteCommentAtCaret(review()),
+    onDeleteAll: (resolvedOnly: boolean) => deleteAllComments(review(), resolvedOnly),
+    onGoto: (direction: 1 | -1) => void gotoComment(review(), direction),
+  }
   const [hfEdit, setHfEdit] = useState<{ header: number | null; footer: number | null }>({
     header: null,
     footer: null,
@@ -138,6 +194,7 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
           runtime={runtime}
           onParagraphDialog={() => setParagraphDialog(true)}
           onHfEdit={(kind) => setHfEdit((current) => ({ ...current, [kind]: Date.now() }))}
+          comments={reviewComments}
           onFind={() => openFind(false)}
           onReplace={() => openFind(true)}
           quickActions={
@@ -171,6 +228,24 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
             focusReplaceNonce={find.replace}
           />
         )}
+        {showComments && (
+          <CommentsPanel
+            comments={comments}
+            docNode={editor.state.doc}
+            composing={composing}
+            onSubmitNew={(text) => submitNewComment(review(), text)}
+            onReply={(parentId, text) => replyToComment(review(), parentId, text)}
+            onEdit={(id, text) => editComment(review(), id, text)}
+            onResolve={(id, done) => resolveComment(review(), id, done)}
+            onCancelNew={() => cancelNewComment(review())}
+            onDelete={(id) => deleteComment(review(), id)}
+            onClose={() => {
+              setShowComments(false)
+              cancelNewComment(review())
+            }}
+            focus={commentFocus}
+          />
+        )}
         {linkDialog && <LinkInsertModal editor={editor} onClose={() => setLinkDialog(false)} />}
         {menu && (
           <EditorContextMenu
@@ -180,7 +255,7 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
             onFontDialog={() => setFontDialog(true)}
             onParagraphDialog={() => setParagraphDialog(true)}
             onLink={() => setLinkDialog(true)}
-            onNewComment={unavailable('Comments')}
+            onNewComment={() => startNewComment(review())}
             onViewImage={unavailable('Picture viewer')}
             onSaveImageAs={unavailable('Save picture')}
             onAiPreset={(instruction) =>

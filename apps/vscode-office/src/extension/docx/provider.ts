@@ -26,6 +26,7 @@ const requestSchema = z
     steps: z.array(z.json()).max(1000),
     // Validated in full by the session before it joins the overlay.
     numbering: z.json().optional(),
+    comments: z.json().optional(),
   })
   .strict()
 

@@ -11,6 +11,7 @@ import {
 } from '@genoffice/docx-engine'
 import {
   HF_RAW_KEYS,
+  commentsSchema,
   documentSettingsSchema,
   pendingListDefinitionsSchema,
 } from '@genoffice/docs-editor/shared/operations'
@@ -181,6 +182,7 @@ export class DocxSession {
       mirrorMargins: edits.mirrorMargins ?? this.original.mirrorMargins ?? false,
       watermark:
         edits.watermark !== undefined ? edits.watermark : (this.original.watermarkText ?? null),
+      comments: edits.comments ?? this.original.comments,
       header: edits.header ?? {
         text: this.original.headerText ?? '',
         ...(this.original.headerParas ? { paras: this.original.headerParas } : {}),
@@ -356,8 +358,14 @@ export class DocxSession {
   }
 
   submit(request: StepRequest): Commit {
-    if (!request.numbering) return this.submitSteps(request, this.root.overlays)
-    const commit = this.submitSteps(request, this.withListDefinitions(request.numbering))
+    if (!request.numbering && !request.comments)
+      return this.submitSteps(request, this.root.overlays)
+    const overlays = request.numbering
+      ? this.withListDefinitions(request.numbering)
+      : structuredClone(this.root.overlays)
+    if (request.comments)
+      overlays.settings = { ...overlays.settings, comments: commentsSchema.parse(request.comments) }
+    const commit = this.submitSteps(request, overlays)
     commit.presentation = this.presentation()
     return commit
   }
@@ -452,6 +460,16 @@ export class DocxSession {
       )
         throw new Error('Unknown numbering definition')
     })
+    // Comment anchors must name comments of the resulting list.
+    const commentIds = new Set(
+      (overlays.settings.comments ?? this.original.comments).map((comment) => comment.id),
+    )
+    canonical.descendants((node) => {
+      for (const mark of node.marks)
+        if (mark.type.name === 'comment')
+          for (const id of String(mark.attrs.ids ?? '').split(' '))
+            if (id && !commentIds.has(id)) throw new Error('Unknown comment anchor')
+    })
     // Normalize identity attributes using small mapped steps, preserving selection
     // and allowing prosemirror-collab to rebase pending browser edits correctly.
     canonical.descendants((node, pos) => {
@@ -524,6 +542,9 @@ export class DocxSession {
         : {}),
       ...(this.root.overlays.settings.mirrorMargins !== undefined
         ? { mirrorMargins: this.root.overlays.settings.mirrorMargins }
+        : {}),
+      ...(this.root.overlays.settings.comments
+        ? { comments: this.root.overlays.settings.comments }
         : {}),
       ...(this.root.overlays.settings.header ? { header: this.root.overlays.settings.header } : {}),
       ...(this.root.overlays.settings.footer ? { footer: this.root.overlays.settings.footer } : {}),

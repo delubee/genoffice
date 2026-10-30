@@ -1,5 +1,6 @@
 import type { EditorJSON } from '../conversion'
 import type {
+  CommentInfo,
   CustomNumberingLevel,
   HeaderFooter,
   NumberingDef,
@@ -16,6 +17,8 @@ export interface DocumentSettings {
   /** default page header / footer of the document */
   header?: HeaderFooter
   footer?: HeaderFooter
+  /** the full comment list (threads, replies, resolved state) */
+  comments?: CommentInfo[]
 }
 /** List definitions the view allocated for these steps (Ribbon bullets / numbering / multilevel). */
 export interface PendingListDefinitions {
@@ -53,6 +56,8 @@ export interface StepRequest {
   clientId: string
   steps: unknown[]
   numbering?: PendingListDefinitions
+  /** the comment list after these steps, when they add or remove comment anchors */
+  comments?: CommentInfo[]
 }
 export interface Commit {
   descriptor: SessionDescriptor

@@ -60,6 +60,20 @@ export class DocumentRuntime {
     picBullets: never[]
   } = { newDefs: [], restartNums: [], levelEdits: [], picBullets: [] }
   readonly numIdFloor = { current: 0 }
+  /** A comment-list change waiting for the steps that anchor it (or for its own settings entry). */
+  private pendingComments: NonNullable<DocumentSettings['comments']> | null = null
+  /** Review comment edits, as the desktop review actions make them. */
+  setComments(comments: NonNullable<DocumentSettings['comments']>) {
+    this.pendingComments = comments
+    // Anchor steps dispatched in the same gesture pump first and carry the list;
+    // a list-only change (edit, resolve) becomes its own settings entry.
+    setTimeout(() => {
+      if (!this.pendingComments || this.pending || sendableSteps(this.editor.state)) return
+      const list = this.pendingComments
+      this.pendingComments = null
+      void this.applySettings({ comments: list })
+    }, 0)
+  }
   private descriptor
   private readonly clientId = crypto.randomUUID()
   private pending?: Promise<void>
@@ -152,6 +166,7 @@ export class DocumentRuntime {
       clientId: this.clientId,
       transactionId: crypto.randomUUID(),
       steps: batch.steps.map((step) => step.toJSON()),
+      ...(this.pendingComments ? { comments: this.pendingComments } : {}),
       ...(this.pendingNumbering.newDefs.length || this.pendingNumbering.restartNums.length
         ? {
             numbering: {
@@ -161,6 +176,7 @@ export class DocumentRuntime {
           }
         : {}),
     }
+    if (request.comments) this.pendingComments = null
     this.pending = this.bridge
       .submit(request)
       .then((commit) => this.accept(commit))
@@ -342,6 +358,7 @@ export class DocumentRuntime {
     if (this.disposed) return
     // A resync replaces the document: definitions only its rejected steps used are dropped.
     this.pendingNumbering = { newDefs: [], restartNums: [], levelEdits: [], picBullets: [] }
+    this.pendingComments = null
     if (projection.presentation) this.present(projection.presentation)
     // Reconfigure creates a fresh collaboration state with no local undo stack.
     const kept = this.editor.state.plugins.filter(

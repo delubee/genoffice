@@ -51,7 +51,7 @@ const rawAttrs = new Set([
   'genChart',
 ])
 /** Marks whose meaning lives in another package part (only kept, never created). */
-const sourceMarks = new Set(['refField', 'instrField', 'ctrlCheckbox', 'comment', 'redaction'])
+const sourceMarks = new Set(['refField', 'instrField', 'ctrlCheckbox', 'redaction'])
 const mutableAttrs = new Set([
   'align',
   'indentLeft',
@@ -448,6 +448,12 @@ export function validateAndNormalize(
       if (sourceMarks.has(mark.type) && !original) throw new Error('Unsupported mark')
       for (const [key, value] of Object.entries(mark.attrs ?? {})) {
         if (value == null || fromSource(key, value)) continue
+        // Comment anchors name comment ids; the session admits only ids of its comment list.
+        if (mark.type === 'comment' && key === 'ids') {
+          if (typeof value !== 'string' || !/^[0-9]{1,9}( [0-9]{1,9})*$/.test(value))
+            throw new Error('Invalid comment anchor')
+          continue
+        }
         if (rawAttrs.has(key)) throw new Error(`Untrusted mark attribute: ${key}`)
         assertShape(key, value)
         if (textStyleAttrs.has(key) && mark.type === 'docTextStyle') assertAttrValue(key, value)

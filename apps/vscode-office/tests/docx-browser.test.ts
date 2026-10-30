@@ -10,6 +10,15 @@ import { buildDocx } from '../../../packages/docx-engine/tests/helpers/build-doc
 import { JsonBridge } from '@genoffice/xlsx-gateway/shared/session-bridge'
 import type { StepRequest } from '@genoffice/docs-editor/shared/protocol'
 
+interface TiptapLike {
+  state: {
+    doc: {
+      descendants(visit: (node: { isText: boolean; text?: string }, pos: number) => void): void
+    }
+  }
+  commands: { setTextSelection(range: { from: number; to: number }): void }
+}
+
 it('opens the built DOCX page, acknowledges typing/splits and preserves shared history across save', async () => {
   const session = await DocxSession.open(
     await buildDocx({ bodyXml: '<w:p><w:r><w:t>Hello</w:t></w:r></w:p>' }),
@@ -366,12 +375,38 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     await page.locator('.ribbon-tab', { hasText: /^Insert$/ }).click()
     await page.locator('.rb-big', { hasText: /^Header$/ }).click()
     await page.locator('[data-rb-panel] button', { hasText: 'Edit Header' }).click()
-    const headerEditor = page.locator('.page-hf-header .page-hf-edit-surface [contenteditable="true"]').first()
+    const headerEditor = page
+      .locator('.page-hf-header .page-hf-edit-surface [contenteditable="true"]')
+      .first()
     await headerEditor.waitFor()
     await headerEditor.click()
     await page.keyboard.type('Quarterly')
     await page.keyboard.press('Escape')
     await expect.poll(() => session.presentation().settings!.header!.text).toContain('Quarterly')
+    // Review → New Comment: the desktop composer anchors a comment with its list in one entry.
+    await editor.evaluate((element) => {
+      const tiptap = (element as unknown as { editor: TiptapLike }).editor
+      let from = -1
+      tiptap.state.doc.descendants((node, pos) => {
+        if (from < 0 && node.isText && node.text?.includes('Second'))
+          from = pos + node.text.indexOf('Second')
+      })
+      tiptap.commands.setTextSelection({ from, to: from + 6 })
+    })
+    await page.locator('.ribbon-tab', { hasText: /^Review$/ }).click()
+    await page
+      .locator('.rb-big', { hasText: /^New Comment$/ })
+      .first()
+      .click()
+    await page.getByPlaceholder('Type a comment…').fill('Please verify')
+    await page
+      .locator('.comments-panel button.primary, button.primary', { hasText: /^Comment$/ })
+      .first()
+      .click()
+    expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
+    await expect
+      .poll(() => session.presentation().settings!.comments!.map((c) => c.text))
+      .toEqual(['Please verify'])
     const beforeTheme = session.content()
     await page.evaluate(() =>
       document.documentElement.style.setProperty('--vscode-editor-background', 'rgb(20, 20, 20)'),
@@ -420,7 +455,7 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     await page.keyboard.press('Escape')
     expect(await page.getByRole('dialog').count()).toBe(0)
     expect(session.content()).toEqual(beforeTheme)
-    while (session.descriptor().revision < 60) {
+    for (let step = 0; step < 500; step++) {
       try {
         session.history('undo')
       } catch (error) {

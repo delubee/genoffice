@@ -25,9 +25,22 @@ export function DocsRibbon({
   onFind,
   onReplace,
   onHfEdit,
+  comments,
   quickActions,
 }: {
   runtime: DocumentRuntime
+  comments: {
+    count: number
+    open: number
+    resolved: number
+    atCaret: boolean
+    canComment: boolean
+    onNew(): void
+    onShow(): void
+    onDelete(): void
+    onDeleteAll(resolvedOnly: boolean): void
+    onGoto(direction: 1 | -1): void
+  }
   onParagraphDialog(): void
   onHfEdit(kind: 'header' | 'footer'): void
   onFind(): void
@@ -155,16 +168,16 @@ export function DocsRibbon({
     onShowNav: setShowNav,
     showStylesPane,
     onShowStylesPane: setShowStylesPane,
-    commentCount: 0,
-    openCommentCount: 0,
-    resolvedCommentCount: 0,
-    onShowComments: unavailable('Comments'),
-    canComment: false,
-    onNewComment: unavailable('Comments'),
-    commentAtCaret: false,
-    onDeleteComment: unavailable('Comments'),
-    onDeleteAllComments: unavailable('Comments'),
-    onGotoComment: unavailable('Comments'),
+    commentCount: comments.count,
+    openCommentCount: comments.open,
+    resolvedCommentCount: comments.resolved,
+    onShowComments: comments.onShow,
+    canComment: comments.canComment,
+    onNewComment: comments.onNew,
+    commentAtCaret: comments.atCaret,
+    onDeleteComment: comments.onDelete,
+    onDeleteAllComments: comments.onDeleteAll,
+    onGotoComment: comments.onGoto,
     trackChanges: false,
     onTrackChanges: unavailable('Track Changes'),
     spellcheck: false,
