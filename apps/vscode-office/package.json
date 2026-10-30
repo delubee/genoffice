@@ -6846,6 +6846,11 @@
           "default": "word",
           "description": "DOCX editor appearance. Document colors and formatting are preserved.",
           "scope": "resource"
+        },
+        "genoffice.authorName": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Author name for new comments, notes and tracked changes in workbooks and Word documents. Empty uses git `user.name`, then the operating-system account name."
         }
       }
     },

@@ -1,3 +1,4 @@
+import { authorName } from './author-name'
 import type { WorkbookViewCommand } from '@genoffice/xlsx-gateway/shared/workbook-view-command'
 import * as vscode from 'vscode'
 import { nativeOfficeActions } from './office-actions'
@@ -324,6 +325,7 @@ export class WorkbookEditorProvider
       cspSource: webview.cspSource,
       language: vscode.env.language,
       sessionId: document.sessionId,
+      author: await authorName(),
       appearance: workbookAppearance(
         vscode.workspace.getConfiguration('genoffice.workbook', document.uri).get('appearance'),
       ),

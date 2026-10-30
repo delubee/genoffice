@@ -10,6 +10,10 @@ import type { WorkbookRuntime } from '@genoffice/sheets-editor/runtime'
 import type { EditorHost } from '@genoffice/sheets-editor/ports'
 import { formatAddress } from '@genoffice/xlsx-gateway/domain/cell-address'
 import './theme.css'
+import { threadStore } from '../../../sheets/src/renderer/threaded-comments'
+
+// New threaded comments and notes carry the VS Code user's name, as the desktop's settings name.
+threadStore.setAuthor(document.documentElement.dataset.author ?? '')
 declare const acquireVsCodeApi: () => { postMessage(message: unknown): void }
 
 const sessionId = document.documentElement.dataset.sessionId

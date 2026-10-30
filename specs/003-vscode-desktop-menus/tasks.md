@@ -644,7 +644,8 @@ Review protection foundation (2026-10-29):
 - [x] Review tab R1: actual desktop band; Workbook Statistics over the canonical root; Translate routes to native chat; actual Protect/Unprotect Sheet dialog with verified passwords; Protect Workbook (`protect_workbook`) and Allow Edit Ranges (`set_protected_ranges`) with history, save and reopen; protection echo from host features.
 - [x] Review tab R2 notes: Univer note preset in the plugin; projected file/session notes in the desktop "Author:" form; popup edits commit as `set_note` when the popup closes or before Save/flushing commands; New/Show-Hide/Show All/Delete/Previous/Next.
 - [x] Review tab R2 comments: canonical `set_thread`; shared thread store and desktop Comments pane, marker and hover card; post/reply/resolve/delete/edit as canonical edits; Convert to Notes keeps the author; threaded parts saved and reopened.
-- [ ] Note pictures pane (note-pictures-pane-toggle) and VS Code author identity for new comments (currently the desktop fallback author).
+- [x] Author identity: the host resolves `genoffice.authorName`, else git user.name, else the OS account, and passes it to both views (Sheets threaded comments, Docs comments and tracked changes).
+- [ ] Note pictures pane (note-pictures-pane-toggle).
 - [x] Insert > Checkbox: canonical checkbox validation on the selection.
 - [x] Insert > Icons and Equation: actual desktop dialogs; rendered PNGs become canonical pictures (data URLs decoded directly under the webview CSP).
 - [x] `set_data_validation` was never in the session operation whitelist, so plugin validation edits (editor and Checkbox) were rejected by the session; added and verified natively.

@@ -1,3 +1,4 @@
+import { authorName } from '../author-name'
 import * as vscode from 'vscode'
 import { nativeOfficeActions } from '../office-actions'
 import { randomBytes } from 'node:crypto'
@@ -272,6 +273,7 @@ export class DocxEditorProvider
       cspSource: panel.webview.cspSource,
       language: vscode.env.language,
       sessionId: document.session.sessionId,
+      author: await authorName(),
       resource: (path) => panel.webview.asWebviewUri(vscode.Uri.file(path)).toString(),
     }).replace('<html ', `<html data-docx-appearance="${appearance()}" `)
     if (this.restored.delete(document)) this.changes.fire({ document })

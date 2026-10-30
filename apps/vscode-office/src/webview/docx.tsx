@@ -8,12 +8,14 @@ import type {
 } from '@genoffice/docs-editor/shared/protocol'
 import { JsonBridge } from '@genoffice/xlsx-gateway/shared/session-bridge'
 import { setModuleLang } from '../../../docs/src/renderer/i18n/locale'
+import { setAuthorName } from '../../../docs/src/renderer/author-name'
 import { normalizeLang } from '@genoffice/i18n'
 import './docx-theme.css'
 
 declare const acquireVsCodeApi: () => { postMessage(message: unknown): void }
 const api = acquireVsCodeApi()
 const sessionId = document.documentElement.dataset.sessionId
+setAuthorName(document.documentElement.dataset.author ?? '')
 if (!sessionId) throw new Error('Missing DOCX session identity')
 const bridge = new JsonBridge(sessionId, {
   post: (message) => api.postMessage(message),
