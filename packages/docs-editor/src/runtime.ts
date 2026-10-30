@@ -61,9 +61,19 @@ export class DocumentRuntime {
    * actions). They travel with the next steps until a commit presents them.
    */
   pendingNumbering: PendingListDefinitions & {
-    levelEdits: never[]
+    levelEdits: NonNullable<PendingListDefinitions['levelEdits']>
     picBullets: never[]
   } = { newDefs: [], restartNums: [], levelEdits: [], picBullets: [] }
+  /** Definition-only list edits (Adjust List Indents) commit as their own entry. */
+  flushNumbering() {
+    setTimeout(() => {
+      const { newDefs, restartNums, levelEdits } = this.pendingNumbering
+      if (this.pending || sendableSteps(this.editor.state)) return
+      if (!newDefs.length && !restartNums.length && !levelEdits.length) return
+      this.pendingNumbering = { ...this.pendingNumbering, levelEdits: [] }
+      void this.applySettings({ numbering: { newDefs, restartNums, levelEdits } })
+    }, 0)
+  }
   readonly numIdFloor = { current: 0 }
   /** Review list changes (comments, notes) waiting for the steps that anchor them, or their own entry. */
   private pendingLists: Pick<
@@ -185,16 +195,21 @@ export class DocumentRuntime {
       transactionId: crypto.randomUUID(),
       steps: batch.steps.map((step) => step.toJSON()),
       ...this.pendingLists,
-      ...(this.pendingNumbering.newDefs.length || this.pendingNumbering.restartNums.length
+      ...(this.pendingNumbering.newDefs.length ||
+      this.pendingNumbering.restartNums.length ||
+      this.pendingNumbering.levelEdits.length
         ? {
             numbering: {
               newDefs: this.pendingNumbering.newDefs,
               restartNums: this.pendingNumbering.restartNums,
+              levelEdits: this.pendingNumbering.levelEdits,
             },
           }
         : {}),
     }
     if (this.pendingLists) this.pendingLists = null
+    if (request.numbering?.levelEdits?.length)
+      this.pendingNumbering = { ...this.pendingNumbering, levelEdits: [] }
     this.pending = this.bridge
       .submit(request)
       .then((commit) => this.accept(commit))

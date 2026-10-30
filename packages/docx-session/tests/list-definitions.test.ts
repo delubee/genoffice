@@ -80,3 +80,42 @@ it('refuses list definitions that would inject XML or take an existing identity'
   ])
     expect(() => submitWith(session, listOf(session, '9'), numbering)).toThrow()
 })
+
+it('adjusts list indents of a session list as its own entry and refuses unknown lists', async () => {
+  const session = await DocxSession.open(
+    await buildDocx({ bodyXml: '<w:p><w:r><w:t>Item</w:t></w:r></w:p>' }),
+  )
+  submitWith(session, listOf(session, '7'), {
+    newDefs: [
+      {
+        numId: '7',
+        kind: 'ordered',
+        levels: [{ numFmt: 'decimal', lvlText: '%1.', indentLeft: 720, hanging: 360 }],
+      },
+    ],
+    restartNums: [],
+  })
+  const edit = (abstractNumId: string) =>
+    session.applySettings({
+      transactionId: crypto.randomUUID(),
+      expectedRevision: session.descriptor().revision,
+      settings: {
+        numbering: {
+          newDefs: [],
+          restartNums: [],
+          levelEdits: [
+            {
+              abstractNumId,
+              ilvl: 0,
+              level: { numFmt: 'decimal', lvlText: '%1)', indentLeft: 1440, hanging: 360 },
+            },
+          ],
+        },
+      },
+    })
+  expect(() => edit('99')).toThrow('Unknown list definition')
+  edit('pending-7')
+  expect(new Map(session.presentation().numbering).get('7')?.levels[0]?.lvlText).toBe('%1)')
+  const zip = await JSZip.loadAsync(await session.save())
+  expect(await zip.file('word/numbering.xml')!.async('string')).toContain('w:val="%1)"')
+})

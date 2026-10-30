@@ -127,6 +127,18 @@ export const pendingListDefinitionsSchema = z
           .strict(),
       )
       .max(200),
+    levelEdits: z
+      .array(
+        z
+          .object({
+            abstractNumId: z.string().regex(/^(pending-)?[0-9]{1,9}$/),
+            ilvl: z.number().int().min(0).max(8),
+            level: levelSchema,
+          })
+          .strict(),
+      )
+      .max(200)
+      .optional(),
   })
   .strict()
 
@@ -341,6 +353,7 @@ export const documentSettingsSchema = z
     comments: commentsSchema.optional(),
     footnotes: notesSchema.optional(),
     styles: styleUpsertsSchema.optional(),
+    numbering: z.lazy(() => pendingListDefinitionsSchema).optional(),
     protection: z
       .object({
         edit: z.enum(['readOnly', 'comments', 'trackedChanges', 'forms', 'none']),

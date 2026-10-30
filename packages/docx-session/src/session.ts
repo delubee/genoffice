@@ -51,6 +51,7 @@ export type { SessionDescriptor, StepRequest, Commit } from '@genoffice/docs-edi
 interface Overlays {
   numbering: PendingListDefinitions['newDefs']
   restartNums: PendingListDefinitions['restartNums']
+  levelEdits: NonNullable<PendingListDefinitions['levelEdits']>
   styles: StyleUpsert[]
   settings: DocumentSettings
 }
@@ -88,7 +89,7 @@ export class DocxSession {
       doc: docxSchema.nodeFromJSON(json),
       stateId: randomUUID(),
       bytes: jsonBytes(json),
-      overlays: { numbering: [], restartNums: [], styles: [], settings: {} },
+      overlays: { numbering: [], restartNums: [], levelEdits: [], styles: [], settings: {} },
     }
     this.savedStateId = this.root.stateId
     this.baseCSS = docStyleCss(original)
@@ -187,6 +188,13 @@ export class DocxSession {
             },
         startOverrides: {},
       } as NumberingDef)
+    for (const edit of this.root.overlays.levelEdits)
+      for (const [numId, definition] of numbering)
+        if (definition.abstractNumId === edit.abstractNumId)
+          numbering.set(numId, {
+            ...definition,
+            levels: { ...definition.levels, [edit.ilvl]: numberingLevelFromCustom(edit.level) },
+          })
     for (const restart of this.root.overlays.restartNums) {
       const source = [...this.original.numbering.values()].find(
         (definition) => definition.abstractNumId === restart.abstractNumId,
@@ -280,8 +288,14 @@ export class DocxSession {
     }
     check([edit.header?.paras, edit.footer?.paras])
     const overlays = structuredClone(this.root.overlays)
-    const { styles, ...settings } = edit
+    const { styles, numbering, ...settings } = edit
     if (styles) this.withStyles(overlays, styles)
+    if (numbering) {
+      const merged = this.withListDefinitions(numbering, overlays)
+      overlays.numbering = merged.numbering
+      overlays.restartNums = merged.restartNums
+      overlays.levelEdits = merged.levelEdits
+    }
     overlays.settings = { ...overlays.settings, ...settings } as DocumentSettings
     const fromVersion = this.collabVersion
     this.commitRoot(this.root.doc, overlays)
@@ -438,9 +452,9 @@ export class DocxSession {
     return commit
   }
   /** Ribbon list definitions join the overlay with the steps that use them (one history entry). */
-  private withListDefinitions(input: unknown): Overlays {
+  private withListDefinitions(input: unknown, base: Overlays = this.root.overlays): Overlays {
     const pending = pendingListDefinitionsSchema.parse(input)
-    const overlays = structuredClone(this.root.overlays)
+    const overlays = structuredClone(base)
     const taken = (numId: string) =>
       this.original.numbering.has(numId) ||
       overlays.numbering.some((definition) => definition.numId === numId) ||
@@ -448,8 +462,11 @@ export class DocxSession {
     for (const definition of pending.newDefs) {
       const existing = overlays.numbering.find((item) => item.numId === definition.numId)
       if (existing) {
-        if (JSON.stringify(existing) !== JSON.stringify(definition))
-          throw new Error('List definition identity reused')
+        // The view refines a definition it created this session (levels edited).
+        if (existing.kind !== definition.kind) throw new Error('List definition identity reused')
+        overlays.numbering = overlays.numbering.map((item) =>
+          item === existing ? definition : item,
+        )
         continue
       }
       if (taken(definition.numId)) throw new Error('List definition identity reused')
@@ -470,6 +487,38 @@ export class DocxSession {
       )
         throw new Error('Unknown list definition')
       overlays.restartNums.push(restart)
+    }
+    for (const edit of pending.levelEdits ?? []) {
+      if (edit.abstractNumId.startsWith('pending-')) {
+        const numId = edit.abstractNumId.slice('pending-'.length)
+        const definition = overlays.numbering.find((item) => item.numId === numId)
+        if (!definition) throw new Error('Unknown list definition')
+        const levels = [...(definition.levels ?? [])]
+        while (levels.length <= edit.ilvl)
+          levels.push({
+            numFmt: definition.kind === 'bullet' ? 'bullet' : 'decimal',
+            lvlText: definition.kind === 'bullet' ? '•' : `%${levels.length + 1}.`,
+            indentLeft: 720 * (levels.length + 1),
+            hanging: 360,
+          })
+        levels[edit.ilvl] = edit.level
+        overlays.numbering = overlays.numbering.map((item) =>
+          item === definition ? { ...item, levels } : item,
+        )
+        continue
+      }
+      if (
+        ![...this.original.numbering.values()].some(
+          (definition) => definition.abstractNumId === edit.abstractNumId,
+        )
+      )
+        throw new Error('Unknown list definition')
+      overlays.levelEdits = [
+        ...overlays.levelEdits.filter(
+          (item) => !(item.abstractNumId === edit.abstractNumId && item.ilvl === edit.ilvl),
+        ),
+        edit,
+      ]
     }
     for (const numId of [...overlays.numbering, ...overlays.restartNums].map((item) => item.numId))
       this.nextNumId = Math.max(this.nextNumId, Number(numId) + 1)
@@ -603,11 +652,14 @@ export class DocxSession {
     const plan = editorToSavePlan(this.content(), this.original.blocks)
     return saveDocx(this.original, plan.saveBlocks, {
       newPictures: plan.newPictures,
-      ...(this.root.overlays.numbering.length || this.root.overlays.restartNums.length
+      ...(this.root.overlays.numbering.length ||
+      this.root.overlays.restartNums.length ||
+      this.root.overlays.levelEdits.length
         ? {
             numbering: {
               newDefs: this.root.overlays.numbering,
               restartNums: this.root.overlays.restartNums,
+              levelEdits: this.root.overlays.levelEdits,
             },
           }
         : {}),

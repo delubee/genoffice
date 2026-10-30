@@ -19,12 +19,22 @@ import {
 import { TablePropertiesDialog } from '../../../apps/docs/src/renderer/components/TablePropertiesDialog'
 import { ensureCaretInTable } from '../../../apps/docs/src/renderer/editor/table-ops'
 import {
+  AdjustListIndentsDialog,
   DefineBulletDialog,
   DefineMultilevelDialog,
   DefineNumberFormatDialog,
+  SetNumberingValueDialog,
   type ListDialogKind,
 } from '../../../apps/docs/src/renderer/components/ListDialogs'
-import { createCustomListDef } from '../../../apps/docs/src/renderer/numbering-actions'
+import {
+  createCustomListDef,
+  currentListTarget,
+  currentListValue,
+  editListLevel,
+  hasPreviousList,
+  setNumberingValue,
+} from '../../../apps/docs/src/renderer/numbering-actions'
+import { customLevelFromNumberingLevel } from '@genoffice/docx-engine'
 import { rememberListPreset } from '../../../apps/docs/src/renderer/list-presets'
 import type { CustomNumberingLevel } from '@genoffice/docx-engine'
 import { setDocsHost } from '../../../apps/docs/src/renderer/docs-host'
@@ -334,13 +344,8 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
             if (editor.isEditable && ensureCaretInTable(editor.state, editor.view.dispatch))
               setTableDialog(kind)
           }}
-          onListDialog={(kind) => {
-            if (kind === 'value' || kind === 'indents')
-              runtime.reportError(
-                'Editing an existing list definition is not available in the VS Code editor yet.',
-              )
-            else setListDialog(kind)
-          }}
+          onListDialog={setListDialog}
+
           onInsertNote={(kind) => editor.isEditable && setNotePrompt({ kind })}
           onFind={() => openFind(false)}
           onReplace={() => openFind(true)}
@@ -402,6 +407,46 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
             onClose={() => setTableDialog(null)}
           />
         )}
+        {listDialog === 'value' &&
+          (() => {
+            const target = currentListTarget(numberingContext(runtime))
+            if (!target) return null
+            return (
+              <SetNumberingValueDialog
+                numFmt={target.level?.numFmt ?? 'decimal'}
+                lvlText={target.level?.lvlText ?? '%1.'}
+                currentValue={currentListValue(editor, target.numId, target.ilvl)}
+                canContinue={hasPreviousList(editor, target.numId)}
+                onApply={(mode, value) => {
+                  setNumberingValue(numberingContext(runtime), { mode, value })
+                  setListDialog(null)
+                  editor.commands.focus()
+                }}
+                onClose={() => setListDialog(null)}
+              />
+            )
+          })()}
+        {listDialog === 'indents' &&
+          (() => {
+            const target = currentListTarget(numberingContext(runtime))
+            if (!target) return null
+            return (
+              <AdjustListIndentsDialog
+                level={
+                  target.level
+                    ? customLevelFromNumberingLevel(target.level)
+                    : { numFmt: 'decimal', lvlText: '%1.', indentLeft: 720, hanging: 360 }
+                }
+                onApply={(patch) => {
+                  editListLevel(numberingContext(runtime), patch)
+                  runtime.flushNumbering()
+                  setListDialog(null)
+                  editor.commands.focus()
+                }}
+                onClose={() => setListDialog(null)}
+              />
+            )
+          })()}
         {listDialog === 'bullet' && (
           <DefineBulletDialog
             ilvl={Number(editor.getAttributes('docListItem').ilvl) || 0}

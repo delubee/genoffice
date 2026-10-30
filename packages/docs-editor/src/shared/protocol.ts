@@ -36,6 +36,8 @@ export interface DocumentSettings {
   themeColors?: ThemeColors | null
   /** style definition edits (merged into the session's pending styles) */
   styles?: StyleUpsert[]
+  /** list definition edits without document steps */
+  numbering?: PendingListDefinitions
 }
 /** List definitions the view allocated for these steps (Ribbon bullets / numbering / multilevel). */
 export interface PendingListDefinitions {
@@ -45,6 +47,8 @@ export interface PendingListDefinitions {
     abstractNumId: string
     startOverrides: Record<number, number>
   }>
+  /** one level of an existing (or session) list rewritten: Adjust List Indents */
+  levelEdits?: Array<{ abstractNumId: string; ilvl: number; level: CustomNumberingLevel }>
 }
 export interface DocumentPresentation {
   css: string

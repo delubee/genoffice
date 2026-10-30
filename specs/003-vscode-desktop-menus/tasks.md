@@ -39,7 +39,8 @@
   - [x] Insert → Field: the desktop field insertion with whitelisted, in-document field types (PAGE, NUMPAGES, DATE, TIME, FILENAME, AUTHOR, MERGEFIELD …); INCLUDETEXT / INCLUDEPICTURE / DDE / LINK and markup are refused by the policy.
   - [x] Review → Protect Document: the desktop dialog sets editing restriction, password-to-modify (hash only) and remove-personal-information as settings entries; saved to settings.xml, reopened read-only when enforced. Password-to-open encryption remains explicit.
   - [x] Picture Format on file pictures: image blocks are no longer sealed placeholders; size, rotation, wrap and other picture attributes are edited as the desktop does, while anchors and raw XML stay immutable; resized extents saved. Charts, shapes and other objects stay sealed.
-  - [ ] Set Numbering Value / Adjust List Indents (existing-definition edits), picture bullets.
+  - [x] Set Numbering Value (restart/continue via restart definitions) and Adjust List Indents (level edits of file or session lists, step-less entries) with the desktop dialogs; presented and saved to numbering.xml.
+  - [ ] Picture bullets.
   - [ ] Remaining: comments, notes, headers/footers, page setup, revisions, protection, drawing, mail merge, print/export.
 - [ ] Route all ribbon AI actions into native VS Code chat with document context.
 - [ ] Implement real file, clipboard, picture, export/print and window host actions.
