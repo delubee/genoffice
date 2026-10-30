@@ -26,6 +26,7 @@ export function DocsRibbon({
   onReplace,
   onHfEdit,
   comments,
+  revisions,
   onInsertNote,
   onTableDialog,
   onListDialog,
@@ -38,6 +39,16 @@ export function DocsRibbon({
     styles: boolean
     onNav(show: boolean): void
     onStyles(show: boolean): void
+  }
+  revisions: {
+    tracking: boolean
+    count: number
+    display: RibbonProps['revisionDisplay']
+    onTrack(on: boolean): void
+    onDisplay(mode: RibbonProps['revisionDisplay']): void
+    onAccept(all: boolean): void
+    onReject(all: boolean): void
+    onGoto(direction: 1 | -1): void
   }
   onInsertNote(kind: 'footnote' | 'endnote'): void
   onTableDialog: RibbonProps['onTableDialog']
@@ -175,16 +186,16 @@ export function DocsRibbon({
     onDeleteComment: comments.onDelete,
     onDeleteAllComments: comments.onDeleteAll,
     onGotoComment: comments.onGoto,
-    trackChanges: false,
-    onTrackChanges: unavailable('Track Changes'),
+    trackChanges: revisions.tracking,
+    onTrackChanges: revisions.onTrack,
     spellcheck: false,
     onSpellcheck: unavailable('Spelling'),
-    revisionDisplay: 'all',
-    onRevisionDisplay: unavailable('Revision display'),
-    revisionCount: 0,
-    onAcceptRevision: unavailable('Revisions'),
-    onRejectRevision: unavailable('Revisions'),
-    onGotoRevision: unavailable('Revisions'),
+    revisionDisplay: revisions.display,
+    onRevisionDisplay: revisions.onDisplay,
+    revisionCount: revisions.count,
+    onAcceptRevision: revisions.onAccept,
+    onRejectRevision: revisions.onReject,
+    onGotoRevision: revisions.onGoto,
     isProtected: false,
     commentsAllowed: true,
     trackChangesForced: false,

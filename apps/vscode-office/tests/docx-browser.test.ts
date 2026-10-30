@@ -439,6 +439,19 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     await page.locator('.rb-styles-pane').click()
     await page.locator('aside.styles-pane').waitFor()
     await page.locator('aside.styles-pane .nav-pane-close').click()
+    // Review → Track Changes records typing as tracked insertions.
+    await page.locator('.ribbon-tab', { hasText: /^Review$/ }).click()
+    const track = page.locator('[data-tip^="Track Changes: record all edits"]').first()
+    await track.click()
+    await editor.evaluate((element) =>
+      (
+        element as unknown as { editor: { commands: { focus(at: string): void } } }
+      ).editor.commands.focus('end'),
+    )
+    await page.keyboard.type('tracked')
+    expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
+    expect(JSON.stringify(session.content())).toContain('"type":"ins"')
+    await track.click()
     const beforeTheme = session.content()
     await page.evaluate(() =>
       document.documentElement.style.setProperty('--vscode-editor-background', 'rgb(20, 20, 20)'),

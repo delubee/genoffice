@@ -19,7 +19,6 @@ const identity = Extension.create({
 })
 const excluded = new Set([
   'undoRedo',
-  'trackChanges',
   'tableHandle',
   'multiSelect',
   'aiQueueAnchors',

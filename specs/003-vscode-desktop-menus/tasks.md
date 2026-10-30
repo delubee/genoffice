@@ -33,6 +33,7 @@
   - [x] Footnotes / endnotes: References → Insert Footnote/Endnote open the desktop note prompt; the reference and the note list commit together (references must name listed notes); notes show under the page body and edit by double-click; saved to footnotes.xml / endnotes.xml.
   - [x] Styles pane and Navigation pane: the desktop panes mount from Home / View; Styles pane definitions travel with the steps that apply them (or alone), are validated (identifier-safe ids/names, plain properties), merged like the desktop upsert, resolved into live styles before presentation, and saved to styles.xml.
   - [x] Table dialogs (Table Properties, Split/Insert/Delete Cells, Cell Margins) and Define New Bullet / Number Format / Multilevel List dialogs from the Ribbon and context menu; ListDialogs now imports the browser-only chrome Dropdown.
+  - [x] Track Changes: the desktop recorder runs in the view (ins/del marks with author/date), Accept/Reject (current/all) run the desktop revision actions, Previous/Next select the revision; revision records may be cleared, never authored; saved as w:ins/w:del.
   - [ ] Set Numbering Value / Adjust List Indents (existing-definition edits), picture bullets.
   - [ ] Remaining: comments, notes, headers/footers, page setup, revisions, protection, drawing, mail merge, print/export and picture editing of file images.
 - [ ] Route all ribbon AI actions into native VS Code chat with document context.

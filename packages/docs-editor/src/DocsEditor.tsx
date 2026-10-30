@@ -50,7 +50,13 @@ import { StylesPane } from '../../../apps/docs/src/renderer/components/StylesPan
 import { NavPane } from '../../../apps/docs/src/renderer/components/NavPane'
 import { computeFormatState } from '../../../apps/docs/src/renderer/components/ribbon-format-state'
 import type { DocDefaults, StyleUpsert } from '@genoffice/docx-engine'
-import { submitNote, type NotePrompt } from '../../../apps/docs/src/renderer/review-actions'
+import {
+  handleRevision,
+  submitNote,
+  type NotePrompt,
+} from '../../../apps/docs/src/renderer/review-actions'
+import { collectRevisions, nextRevision } from '../../../apps/docs/src/renderer/editor/revisions'
+import type { RevisionDisplayMode } from '../../../apps/docs/src/renderer/editor/revision-view'
 import {
   EditorContextMenu,
   type ContextMenuState,
@@ -72,6 +78,31 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
   const endnotes = runtime.settings.endnotes ?? []
   const [notePrompt, setNotePrompt] = useState<NotePrompt | null>(null)
   const [showNav, setShowNav] = useState(false)
+  const [revisionDisplay, setRevisionDisplay] = useState<RevisionDisplayMode>('all')
+  const recorder = editor.storage.trackChanges as { enabled: boolean } | undefined
+  const revisions = {
+    tracking: recorder?.enabled ?? false,
+    count: collectRevisions(editor.state.doc).length,
+    display: revisionDisplay,
+    onTrack: (on: boolean) => {
+      if (recorder) recorder.enabled = on
+      setRevisionDisplay((mode) => mode)
+      editor.view.dispatch(editor.state.tr.setMeta('trackChangesToggled', on))
+    },
+    onDisplay: setRevisionDisplay,
+    onAccept: (all: boolean) => handleRevision(review(), 'accept', all),
+    onReject: (all: boolean) => handleRevision(review(), 'reject', all),
+    onGoto: (direction: 1 | -1) => {
+      const target = nextRevision(editor, direction)
+      if (target)
+        editor
+          .chain()
+          .focus()
+          .setTextSelection({ from: target.from, to: target.to })
+          .scrollIntoView()
+          .run()
+    },
+  }
   const [tableDialog, setTableDialog] = useState<TableDialogKind | null>(null)
   const section = runtime.settings.section
   /** Text column width the table dialogs fit grids into (twips → px). */
@@ -258,6 +289,7 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
           onParagraphDialog={() => setParagraphDialog(true)}
           onHfEdit={(kind) => setHfEdit((current) => ({ ...current, [kind]: Date.now() }))}
           comments={reviewComments}
+          revisions={revisions}
           panes={{
             nav: showNav,
             styles: showStylesPane,

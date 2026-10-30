@@ -50,6 +50,15 @@ const rawAttrs = new Set([
   'genImage',
   'genChart',
 ])
+/** Revision records the Review tab may clear (accept / reject); never author. */
+const revisionAttrs = new Set([
+  'blockRevision',
+  'rowRevision',
+  'cellRevision',
+  'pPrChange',
+  'paraMarkIns',
+  'paraMarkDel',
+])
 /** Marks whose meaning lives in another package part (only kept, never created). */
 const sourceMarks = new Set(['refField', 'instrField', 'ctrlCheckbox', 'redaction'])
 const mutableAttrs = new Set([
@@ -380,7 +389,9 @@ export function validateAndNormalize(
           if (rawAttrs.has(key)) {
             if (
               !unchanged &&
-              !(original.attrs?.[key] === undefined && encode(value) === encode(defaults[key]))
+              !(original.attrs?.[key] === undefined && encode(value) === encode(defaults[key])) &&
+              // Accepting or rejecting a revision clears its record.
+              !(revisionAttrs.has(key) && encode(value) === encode(defaults[key]))
             )
               throw new Error(`Immutable attribute: ${key}`)
             continue
