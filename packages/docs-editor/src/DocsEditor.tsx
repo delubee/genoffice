@@ -9,6 +9,8 @@ import type { StyleInfo } from '@genoffice/docx-engine'
 import { DocsRibbon } from './DocsRibbon'
 import { setDocsHost } from '../../../apps/docs/src/renderer/docs-host'
 import { FindPanel } from '../../../apps/docs/src/renderer/components/FindPanel'
+import { LinkInsertModal } from '../../../apps/docs/src/renderer/components/ribbon-insert-tab'
+import { HeaderFooterArea } from '../../../apps/docs/src/renderer/components/HeaderFooterArea'
 import {
   EditorContextMenu,
   type ContextMenuState,
@@ -21,6 +23,28 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
   const [paragraphDialog, setParagraphDialog] = useState(false)
   const [find, setFind] = useState<{ find: number; replace: number } | null>(null)
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
+  const [linkDialog, setLinkDialog] = useState(false)
+  const [hfEdit, setHfEdit] = useState<{ header: number | null; footer: number | null }>({
+    header: null,
+    footer: null,
+  })
+  const strip = (kind: 'header' | 'footer') => {
+    const value = runtime.settings[kind] ?? { text: '' }
+    // Word shows an empty strip only while editing it.
+    if (!value.text && !value.paras?.length && hfEdit[kind] == null) return null
+    return (
+      <HeaderFooterArea
+        kind={kind}
+        value={value}
+        readOnly={!editor.isEditable}
+        editRequest={hfEdit[kind]}
+        onCommit={(next) => void runtime.applySettings({ [kind]: next })}
+        onEditingChange={(editing) => {
+          if (!editing) setHfEdit((current) => ({ ...current, [kind]: null }))
+        }}
+      />
+    )
+  }
   const unavailable = (feature: string) => () =>
     runtime.reportError(`${feature} is not available in the VS Code editor yet.`)
   /** Right-click on the page, as the desktop: a click outside the selection moves the caret there. */
@@ -92,6 +116,10 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
         event.preventDefault()
         event.stopPropagation()
         openFind(event.key.toLowerCase() === 'h')
+      } else if (!event.altKey && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        event.stopPropagation()
+        setLinkDialog(true)
       } else if (!event.altKey && event.key.toLowerCase() === 'd') {
         event.preventDefault()
         setFontDialog(true)
@@ -109,6 +137,7 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
         <DocsRibbon
           runtime={runtime}
           onParagraphDialog={() => setParagraphDialog(true)}
+          onHfEdit={(kind) => setHfEdit((current) => ({ ...current, [kind]: Date.now() }))}
           onFind={() => openFind(false)}
           onReplace={() => openFind(true)}
           quickActions={
@@ -142,6 +171,7 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
             focusReplaceNonce={find.replace}
           />
         )}
+        {linkDialog && <LinkInsertModal editor={editor} onClose={() => setLinkDialog(false)} />}
         {menu && (
           <EditorContextMenu
             editor={editor}
@@ -149,7 +179,7 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
             onClose={() => setMenu(null)}
             onFontDialog={() => setFontDialog(true)}
             onParagraphDialog={() => setParagraphDialog(true)}
-            onLink={unavailable('Links')}
+            onLink={() => setLinkDialog(true)}
             onNewComment={unavailable('Comments')}
             onViewImage={unavailable('Picture viewer')}
             onSaveImageAs={unavailable('Save picture')}
@@ -165,7 +195,9 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
             className="office-docx-page doc-page"
             style={pageStyle(runtime.settings.section, runtime.settings.pageColor)}
           >
+            {strip('header')}
             <EditorContent editor={editor} />
+            {strip('footer')}
           </div>
         </div>
         {fontDialog && <FontDialog editor={editor} onClose={() => setFontDialog(false)} />}

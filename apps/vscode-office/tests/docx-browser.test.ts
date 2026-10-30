@@ -134,7 +134,7 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
   try {
     const address = server.address() as { port: number }
     await page.goto(`http://127.0.0.1:${address.port}/docx.html`)
-    const editor = page.locator('.tiptap')
+    const editor = page.locator('.tiptap:not(.page-hf .tiptap)')
     await editor.waitFor()
     expect(await editor.textContent()).toBe('Hello')
     await editor.click()
@@ -362,6 +362,16 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     expect(session.presentation().settings!.section!.marginLeft).toBe(1440)
     session.history('redo')
     await bridge.request('view.resync', projection())
+    // Insert → Header → Edit Header: the desktop strip editor commits a header settings entry.
+    await page.locator('.ribbon-tab', { hasText: /^Insert$/ }).click()
+    await page.locator('.rb-big', { hasText: /^Header$/ }).click()
+    await page.locator('[data-rb-panel] button', { hasText: 'Edit Header' }).click()
+    const headerEditor = page.locator('.page-hf-header .page-hf-edit-surface [contenteditable="true"]').first()
+    await headerEditor.waitFor()
+    await headerEditor.click()
+    await page.keyboard.type('Quarterly')
+    await page.keyboard.press('Escape')
+    await expect.poll(() => session.presentation().settings!.header!.text).toContain('Quarterly')
     const beforeTheme = session.content()
     await page.evaluate(() =>
       document.documentElement.style.setProperty('--vscode-editor-background', 'rgb(20, 20, 20)'),

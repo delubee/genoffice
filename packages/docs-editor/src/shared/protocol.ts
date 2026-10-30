@@ -1,6 +1,7 @@
 import type { EditorJSON } from '../conversion'
 import type {
   CustomNumberingLevel,
+  HeaderFooter,
   NumberingDef,
   SectionSettings,
   StyleInfo,
@@ -12,6 +13,9 @@ export interface DocumentSettings {
   pageColor?: string | null
   mirrorMargins?: boolean
   watermark?: string | null
+  /** default page header / footer of the document */
+  header?: HeaderFooter
+  footer?: HeaderFooter
 }
 /** List definitions the view allocated for these steps (Ribbon bullets / numbering / multilevel). */
 export interface PendingListDefinitions {

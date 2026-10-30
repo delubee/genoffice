@@ -172,6 +172,54 @@ const settingValue = (value: unknown, depth: number): boolean => {
   return false
 }
 const twips = z.number().int().min(-31680).max(31680)
+/**
+ * Header/footer content regenerates its part from paragraphs and runs: values
+ * are plain JSON whose text is escaped by the writer; nothing may carry raw XML.
+ */
+/** Run fields the writer emits verbatim; the session admits only values taken from the file. */
+export const HF_RAW_KEYS = new Set(['rawRPr', 'fldBeginXml', 'sdtCheckboxXml', 'xml'])
+const hfValue = (key: string, value: unknown, depth: number): boolean => {
+  if (HF_RAW_KEYS.has(key)) return value == null || typeof value === 'string'
+  if (value == null || typeof value === 'boolean') return true
+  if (typeof value === 'number') return Number.isFinite(value) && Math.abs(value) <= 10_000_000
+  if (typeof value === 'string')
+    return (
+      value.length <= 65536 &&
+      // eslint-disable-next-line no-control-regex -- C0 controls other than tab/newline never serialize.
+      !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(value) &&
+      (key === 'text' || !/[<>]/.test(value))
+    )
+  if (depth >= 8) return false
+  if (Array.isArray(value))
+    return value.length <= 2000 && value.every((item) => hfValue(key, item, depth + 1))
+  if (typeof value === 'object')
+    return Object.entries(value).every(
+      ([name, item]) => /^[A-Za-z0-9_]{1,60}$/.test(name) && hfValue(name, item, depth + 1),
+    )
+  return false
+}
+const headerFooterSchema = z
+  .object({
+    text: z.string().max(65536),
+    pageNumber: z.boolean().optional(),
+    paras: z.array(z.record(z.string(), z.unknown())).max(200).optional(),
+    newPictures: z
+      .record(
+        z.string().regex(/^[A-Za-z0-9_-]{1,80}$/),
+        z
+          .object({
+            base64: z.string().regex(/^[A-Za-z0-9+/=]+$/),
+            mime: z.enum(['image/png', 'image/jpeg', 'image/gif']),
+          })
+          .strict(),
+      )
+      .optional(),
+  })
+  .strict()
+  .refine(
+    (value) => hfValue('header', { ...value, newPictures: undefined }, 0),
+    'Invalid header or footer',
+  )
 export const documentSettingsSchema = z
   .object({
     section: z
@@ -200,6 +248,8 @@ export const documentSettingsSchema = z
       .nullable()
       .optional(),
     mirrorMargins: z.boolean().optional(),
+    header: headerFooterSchema.optional(),
+    footer: headerFooterSchema.optional(),
     watermark: z
       .string()
       .min(1)

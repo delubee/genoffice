@@ -10,6 +10,7 @@ import {
   type NumberingDef,
 } from '@genoffice/docx-engine'
 import {
+  HF_RAW_KEYS,
   documentSettingsSchema,
   pendingListDefinitionsSchema,
 } from '@genoffice/docs-editor/shared/operations'
@@ -180,6 +181,14 @@ export class DocxSession {
       mirrorMargins: edits.mirrorMargins ?? this.original.mirrorMargins ?? false,
       watermark:
         edits.watermark !== undefined ? edits.watermark : (this.original.watermarkText ?? null),
+      header: edits.header ?? {
+        text: this.original.headerText ?? '',
+        ...(this.original.headerParas ? { paras: this.original.headerParas } : {}),
+      },
+      footer: edits.footer ?? {
+        text: this.original.footerText ?? '',
+        ...(this.original.footerParas ? { paras: this.original.footerParas } : {}),
+      },
     }
   }
   /** Layout / Design settings edits: one history entry without document steps. */
@@ -198,6 +207,23 @@ export class DocxSession {
     if (this.readonly) throw new Error('Document is read-only')
     if (input.expectedRevision !== this.revision) throw new Error('Stale document version')
     const edit = documentSettingsSchema.parse(input.settings)
+    // Verbatim run XML in a header/footer may only be the file's own.
+    const fileRaw = new Set<string>()
+    const collect = (value: unknown, key = '') => {
+      if (HF_RAW_KEYS.has(key) && typeof value === 'string') fileRaw.add(value)
+      else if (Array.isArray(value)) for (const item of value) collect(item)
+      else if (value && typeof value === 'object')
+        for (const [name, item] of Object.entries(value)) collect(item, name)
+    }
+    collect([this.original.headerParas, this.original.footerParas])
+    const check = (value: unknown, key = '') => {
+      if (HF_RAW_KEYS.has(key) && typeof value === 'string' && !fileRaw.has(value))
+        throw new Error('Untrusted header or footer content')
+      if (Array.isArray(value)) for (const item of value) check(item)
+      else if (value && typeof value === 'object')
+        for (const [name, item] of Object.entries(value)) check(item, name)
+    }
+    check([edit.header?.paras, edit.footer?.paras])
     const overlays = structuredClone(this.root.overlays)
     overlays.settings = { ...overlays.settings, ...edit } as DocumentSettings
     const fromVersion = this.collabVersion
@@ -499,6 +525,8 @@ export class DocxSession {
       ...(this.root.overlays.settings.mirrorMargins !== undefined
         ? { mirrorMargins: this.root.overlays.settings.mirrorMargins }
         : {}),
+      ...(this.root.overlays.settings.header ? { header: this.root.overlays.settings.header } : {}),
+      ...(this.root.overlays.settings.footer ? { footer: this.root.overlays.settings.footer } : {}),
       ...(this.root.overlays.settings.watermark !== undefined
         ? { watermark: this.root.overlays.settings.watermark }
         : {}),

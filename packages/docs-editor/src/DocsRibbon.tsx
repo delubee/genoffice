@@ -24,10 +24,12 @@ export function DocsRibbon({
   onParagraphDialog,
   onFind,
   onReplace,
+  onHfEdit,
   quickActions,
 }: {
   runtime: DocumentRuntime
   onParagraphDialog(): void
+  onHfEdit(kind: 'header' | 'footer'): void
   onFind(): void
   onReplace(): void
   quickActions?: ReactNode
@@ -136,15 +138,15 @@ export function DocsRibbon({
       void runtime
         .officeAction({ action: 'chat', scope: 'document', instruction })
         .catch((error) => runtime.reportError(error)),
-    header: null,
-    onHeader: unavailable('Headers'),
+    header: runtime.settings.header ?? null,
+    onHeader: (header) => void runtime.applySettings({ header }),
     onPageNumFormat: unavailable('Page numbers'),
     onInsertField: unavailable('Fields'),
-    footer: null,
-    onFooter: unavailable('Footers'),
+    footer: runtime.settings.footer ?? null,
+    onFooter: (footer) => void runtime.applySettings({ footer }),
     hfEditing: null,
     onHfAction: unavailable('Header & Footer'),
-    onHfEdit: unavailable('Header & Footer'),
+    onHfEdit,
     showMarks,
     onShowMarks: setShowMarks,
     showRuler,
