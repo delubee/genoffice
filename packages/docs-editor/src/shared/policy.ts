@@ -61,6 +61,35 @@ const revisionAttrs = new Set([
 ])
 /** Marks whose meaning lives in another package part (only kept, never created). */
 const sourceMarks = new Set(['refField', 'instrField', 'ctrlCheckbox', 'redaction'])
+/**
+ * Insert → Field types the view may author: computed in place, never reaching
+ * outside the document (no INCLUDETEXT / INCLUDEPICTURE / DDE / LINK / HYPERLINK).
+ */
+const SAFE_FIELDS = new Set([
+  'PAGE',
+  'NUMPAGES',
+  'SECTIONPAGES',
+  'SECTION',
+  'DATE',
+  'TIME',
+  'CREATEDATE',
+  'SAVEDATE',
+  'PRINTDATE',
+  'FILENAME',
+  'AUTHOR',
+  'TITLE',
+  'SUBJECT',
+  'NUMWORDS',
+  'NUMCHARS',
+  'MERGEFIELD',
+])
+const authoredField = (mark: { type: string; attrs?: Record<string, unknown> }) =>
+  mark.type === 'instrField' &&
+  typeof mark.attrs?.instr === 'string' &&
+  mark.attrs.instr.length <= 255 &&
+  !/[<>&]/.test(mark.attrs.instr) &&
+  SAFE_FIELDS.has(mark.attrs.instr.trim().split(/\s+/)[0]?.toUpperCase() ?? '') &&
+  ['beginXml', 'fieldId', 'fieldPart'].every((key) => mark.attrs?.[key] == null)
 const mutableAttrs = new Set([
   'align',
   'indentLeft',
@@ -449,6 +478,8 @@ export function validateAndNormalize(
       if (!docxSchema.marks[mark.type]) throw new Error('Unsupported mark')
       const fromSource = (key: string, value: unknown) =>
         !!original && value != null && hasSourceValue(original, mark.type, key, value)
+      // A whitelisted field is authored whole; its instruction needs no source.
+      if (authoredField(mark)) continue
       if (
         sourceMarks.has(mark.type) &&
         !Object.keys(mark.attrs ?? {}).every(

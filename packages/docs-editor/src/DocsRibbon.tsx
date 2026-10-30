@@ -191,7 +191,18 @@ export function DocsRibbon({
     header: runtime.settings.header ?? null,
     onHeader: (header) => void runtime.applySettings({ header }),
     onPageNumFormat: unavailable('Page numbers'),
-    onInsertField: unavailable('Fields'),
+    onInsertField: (instr) => {
+      editor
+        .chain()
+        .focus()
+        .insertContent({
+          type: 'text',
+          text: fieldValue(instr) || ' ',
+          marks: [{ type: 'instrField', attrs: { instr } }],
+        })
+        .unsetMark('instrField')
+        .run()
+    },
     footer: runtime.settings.footer ?? null,
     onFooter: (footer) => void runtime.applySettings({ footer }),
     hfEditing: null,
@@ -273,5 +284,26 @@ export function numberingContext(runtime: DocumentRuntime): NumberingContext {
     },
     numIdFloorRef: runtime.numIdFloor,
     setStatus: () => {},
+  }
+}
+
+/** The displayed result of a newly inserted field, as the desktop computes it (no pagination in the view). */
+function fieldValue(instr: string): string {
+  const keyword = instr.trim().split(/\s+/)[0]?.toUpperCase()
+  const now = new Date()
+  switch (keyword) {
+    case 'DATE':
+    case 'CREATEDATE':
+    case 'SAVEDATE':
+      return now.toLocaleDateString('zh-CN')
+    case 'TIME':
+      return now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+    case 'NUMPAGES':
+    case 'PAGE':
+      return '1'
+    case 'FILENAME':
+      return document.title
+    default:
+      return ''
   }
 }

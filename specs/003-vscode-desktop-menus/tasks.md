@@ -36,6 +36,7 @@
   - [x] Track Changes: the desktop recorder runs in the view (ins/del marks with author/date), Accept/Reject (current/all) run the desktop revision actions, Previous/Next select the revision; revision records may be cleared, never authored; saved as w:ins/w:del.
   - [x] Design theme fonts/colors as settings entries (presented through the theme CSS, saved to the theme part); View zoom applied to the page with the desktop Zoom dialog and fit modes; Spelling toggles the browser's native check on the editor.
   - [x] File → Convert to HTML / Markdown through a typed `docx.export` port: the desktop exporters render in the view, the host writes via a VS Code save dialog (Markdown pictures into `<name>_files`). PDF / image export and printing remain explicit (no print pipeline in the webview).
+  - [x] Insert → Field: the desktop field insertion with whitelisted, in-document field types (PAGE, NUMPAGES, DATE, TIME, FILENAME, AUTHOR, MERGEFIELD …); INCLUDETEXT / INCLUDEPICTURE / DDE / LINK and markup are refused by the policy.
   - [ ] Set Numbering Value / Adjust List Indents (existing-definition edits), picture bullets.
   - [ ] Remaining: comments, notes, headers/footers, page setup, revisions, protection, drawing, mail merge, print/export and picture editing of file images.
 - [ ] Route all ribbon AI actions into native VS Code chat with document context.
