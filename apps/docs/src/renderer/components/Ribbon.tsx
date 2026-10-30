@@ -1,4 +1,5 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { docsHost } from '../docs-host'
 import { createPortal } from 'react-dom'
 import type { Lang } from '@genoffice/i18n'
 
@@ -1143,7 +1144,7 @@ function RibbonInner({
   }
 
   const replacePicture = async () => {
-    const picked = await window.desktop.pickImage()
+    const picked = await docsHost().pickImage()
     if (!picked) return
     await applyPictureBytes(`data:${picked.mime};base64,${picked.base64}`)
   }

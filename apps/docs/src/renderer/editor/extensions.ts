@@ -1,4 +1,5 @@
 import { ScriptFonts } from './script-fonts'
+import { docsHost } from '../docs-host'
 import { MultiSelect } from './multi-select'
 import { Editor, Extension, Node } from '@tiptap/core'
 import { SHAPE_INLINE_WRAP } from './floating-z-order'
@@ -4720,7 +4721,7 @@ export const ImageCopyExtension = Extension.create({
           return false
         }
       }
-      const write = window.desktop?.copyImageToClipboard?.(dataUrl, imageMetaJson(node.attrs))
+      const write = docsHost().copyImageToClipboard?.(dataUrl, imageMetaJson(node.attrs))
       // no bridge: keep the default HTML-only copy instead of an empty clipboard
       if (!write) return false
       event.preventDefault()

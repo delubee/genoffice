@@ -293,6 +293,27 @@ function assertShape(key: string, value: unknown, depth = 0): void {
   throw new Error(`Invalid ${key}`)
 }
 
+/** Insert → Pictures: a new picture block whose bytes the save writes as a fresh media part. */
+function newPicture(attrs: Record<string, unknown>): boolean {
+  const image = attrs.genImage as
+    { base64?: unknown; mime?: unknown; widthPx?: unknown; heightPx?: unknown } | null | undefined
+  return (
+    attrs.blockType === 'image' &&
+    attrs.docxIndex == null &&
+    !!image &&
+    typeof image.base64 === 'string' &&
+    /^[A-Za-z0-9+/=]+$/.test(image.base64) &&
+    ['image/png', 'image/jpeg', 'image/gif'].includes(String(image.mime)) &&
+    typeof image.widthPx === 'number' &&
+    typeof image.heightPx === 'number' &&
+    image.widthPx > 0 &&
+    image.heightPx > 0 &&
+    image.widthPx <= 20000 &&
+    image.heightPx <= 20000 &&
+    attrs.imageDataUrl === `data:${String(image.mime)};base64,${image.base64}`
+  )
+}
+
 /**
  * Source metadata and raw XML are immutable; every other schema value may be
  * authored within its shape bounds, as the desktop editor writes it.
@@ -374,7 +395,9 @@ export function validateAndNormalize(
         )
           throw new Error('Unsupported block conversion')
       } else {
-        if (node.type === 'docProtected') throw new Error('Cannot create protected objects')
+        const picture = node.type === 'docProtected' && newPicture(node.attrs ?? {})
+        if (node.type === 'docProtected' && !picture)
+          throw new Error('Cannot create protected objects')
         const inheritedIndex = node.attrs?.docxIndex
         const inherited = [...originals.values()].find(
           (source) =>
@@ -385,8 +408,10 @@ export function validateAndNormalize(
         // A new owner never takes over source XML: anchors and raw values reset.
         const defaults = defaultsOf(node.type)
         node.attrs = { ...node.attrs, officeId: makeId(), officeLocked: false }
-        for (const key of rawAttrs) if (key in node.attrs) node.attrs[key] = defaults[key] ?? null
-        if (needsProtection(node)) throw new Error('Unsupported new content')
+        for (const key of rawAttrs)
+          if (key in node.attrs && !(picture && key === 'genImage'))
+            node.attrs[key] = defaults[key] ?? null
+        if (!picture && needsProtection(node)) throw new Error('Unsupported new content')
         for (const [key, value] of Object.entries(node.attrs)) {
           if (rawAttrs.has(key) || key === 'officeId' || key === 'officeLocked') continue
           assertShape(key, value)

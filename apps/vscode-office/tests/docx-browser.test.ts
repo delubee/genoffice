@@ -291,6 +291,39 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     const table = session.content().content!.find((node) => node.type === 'docTable')!
     expect(table.content).toHaveLength(3)
     expect(table.content![0]!.content).toHaveLength(3)
+    // Insert → Pictures reads a local file in the view and saves a new media part.
+    await editor.evaluate((element) =>
+      (
+        element as unknown as { editor: { commands: { focus(at: string): void } } }
+      ).editor.commands.focus('end'),
+    )
+    await page.locator('.ribbon-tab', { hasText: /^Insert$/ }).click()
+    const chooser = page.waitForEvent('filechooser')
+    await page.locator('[data-tip="Insert a picture"]').first().click()
+    await (
+      await chooser
+    ).setFiles({
+      name: 'dot.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+        'base64',
+      ),
+    })
+    await page.waitForFunction(() => document.querySelector('.tiptap [data-office-protected]'))
+    expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
+    expect(session.content().content!.some((node) => node.attrs?.blockType === 'image')).toBe(true)
+    // The editor context menu and Ctrl+F open the shared desktop dialog and panel.
+    await page.locator('.tiptap p').first().click({ button: 'right' })
+    await page.locator('.ctx-menu .ctx-item', { hasText: /^Font/ }).first().click()
+    await page.getByRole('dialog', { name: 'Font', exact: true }).waitFor()
+    await page.keyboard.press('Escape')
+    await page.locator('.tiptap p').first().click()
+    await page.keyboard.press('Control+KeyF')
+    const findPanel = page.locator('.find-panel')
+    await findPanel.waitFor()
+    await findPanel.locator('input').first().press('Escape')
+    await findPanel.waitFor({ state: 'hidden' })
     const beforeTheme = session.content()
     await page.evaluate(() =>
       document.documentElement.style.setProperty('--vscode-editor-background', 'rgb(20, 20, 20)'),

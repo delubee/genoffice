@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { docsHost } from '../docs-host'
 import type { Editor, JSONContent } from '@tiptap/core'
 import type { Node as PmNode } from '@tiptap/pm/model'
 import { TextSelection, type Transaction } from '@tiptap/pm/state'
@@ -422,7 +423,7 @@ export async function insertImageFromDataUrl(
 }
 
 export async function insertImageViaDialog(editor: Editor): Promise<void> {
-  const picked = await window.desktop.pickImage()
+  const picked = await docsHost().pickImage()
   if (!picked) return
   await insertImageFromDataUrl(
     editor,
@@ -1312,7 +1313,7 @@ export function ViewTab({
   const winMenuRef = useRef<HTMLDivElement>(null)
 
   const toggleWinMenu = async () => {
-    if (!winMenuOpen) setWindows(await window.desktop.listDocsTabs())
+    if (!winMenuOpen) setWindows(await docsHost().listDocsTabs())
     setWinMenuOpen((v) => !v)
   }
 
@@ -1539,7 +1540,7 @@ export function ViewTab({
           <button
             className="rb-big"
             data-tip={t('ribbonNewTabTip')}
-            onClick={() => void window.desktop.openNewTab(filePath)}
+            onClick={() => void docsHost().openNewTab(filePath)}
           >
             <span className="rb-big-icon">
               <IconNewWindow size={BIG} />
@@ -1575,7 +1576,7 @@ export function ViewTab({
                   <button
                     key={w.id}
                     onClick={() => {
-                      void window.desktop.focusDocsTab(w.id)
+                      void docsHost().focusDocsTab(w.id)
                       setWinMenuOpen(false)
                     }}
                   >

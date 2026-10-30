@@ -16,10 +16,14 @@ type RibbonProps = ComponentProps<typeof Ribbon>
 export function DocsRibbon({
   runtime,
   onParagraphDialog,
+  onFind,
+  onReplace,
   quickActions,
 }: {
   runtime: DocumentRuntime
   onParagraphDialog(): void
+  onFind(): void
+  onReplace(): void
   quickActions?: ReactNode
 }) {
   const editor = runtime.editor
@@ -52,8 +56,8 @@ export function DocsRibbon({
     styles: storage?.styles,
     docDefaults: storage?.docDefaults,
     onParagraphDialog,
-    onFind: unavailable('Find'),
-    onReplace: unavailable('Replace'),
+    onFind,
+    onReplace,
     onOpen: file('open'),
     onSave: file('save'),
     onSaveAs: file('saveAs'),

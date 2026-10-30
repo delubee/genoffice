@@ -24,7 +24,8 @@
 - [ ] Integrate the actual Docs ribbon, dialogs and supporting panes in the plugin.
   - [x] The desktop `Ribbon` is mounted on the DOCX runtime (DocsRibbon.tsx): editor commands, styles gallery, Insert table picker, Table Layout, font name/size and file/chat quick actions verified in the built browser page; view toggles are local; host capabilities without a VS Code port report explicitly (page setup, headers/footers, notes, comments, revisions, protection, mail merge, find, export).
   - [x] Desktop dialog shortcuts Ctrl+D (Font) and Ctrl+Alt+M (Paragraph) at the window, as the desktop shell.
-  - [ ] Editor context menu, Find panel, Styles pane, nav pane and the remaining dialogs/host ports.
+  - [x] Desktop editor context menu (Font…/Paragraph… and editor entries), Find/Replace panel with Ctrl+F/H, and Insert → Pictures through a typed Docs host port (docs-host.ts; desktop keeps its preload bridge, the view reads the file in the webview). New pictures are accepted by the policy only in the desktop's exact shape and save as new media parts.
+  - [ ] Styles pane, nav pane, links, comments, notes, headers/footers, page setup, revisions, protection, drawing, mail merge, print/export and picture editing of file images.
 - [ ] Route all ribbon AI actions into native VS Code chat with document context.
 - [ ] Implement real file, clipboard, picture, export/print and window host actions.
 - [ ] Verify native Open/Save As dialogs and real-model chat/skill flows after complete ribbon integration.
