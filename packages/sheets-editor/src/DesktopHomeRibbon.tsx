@@ -502,6 +502,7 @@ export function DesktopHomeRibbon({
   commandRef.current = command
   useEffect(() => {
     if (!runtime) return
+    runtime.commandSink = (value) => commandRef.current(value)
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return
       const guards = runtime.shortcutGuards(event)
@@ -518,7 +519,10 @@ export function DesktopHomeRibbon({
       )
     }
     window.addEventListener('keydown', onKeyDown, true)
-    return () => window.removeEventListener('keydown', onKeyDown, true)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true)
+      runtime.commandSink = undefined
+    }
   }, [runtime])
   const unused = (): never => {
     throw new Error('A non-Home ribbon callback was invoked in the Home adapter.')

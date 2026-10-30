@@ -39,7 +39,7 @@ import { getLang, t, tFor, type StringKey } from './i18n/locale'
 import { NUMBER_FORMAT_LABEL, numberFormatCategories } from './number-format'
 import { collectPickListValues, filterCriteriaForText } from './pick-from-list'
 import type { UniverRuntime } from './univer-state'
-import { visualPasteDisabled$ } from './visual-arrange-actions'
+import { visualPasteDisabled$ } from './visual-paste-state'
 import type { Observable } from 'rxjs'
 
 export const SHELL_COMMAND_ID = 'genoffice.ctx.shell-command'
@@ -448,7 +448,8 @@ export function installCellContextMenu(runtime: UniverRuntime): IDisposable {
   )
   disposables.push(
     { dispose: () => localeSubscription.unsubscribe() },
-    { dispose: window.desktopApi.onLanguageChanged((lang) => loadMenuLocale(localeService, lang)) },
+    // The VS Code view has no desktop bridge; its locale is fixed per view.
+    { dispose: onDesktopLanguageChanged((lang) => loadMenuLocale(localeService, lang)) },
   )
   const header = schemaFor(headerContextMenuLayout())
   injector.get(IMenuManagerService).mergeMenu({
@@ -461,4 +462,13 @@ export function installCellContextMenu(runtime: UniverRuntime): IDisposable {
       for (const disposable of disposables) disposable.dispose()
     },
   }
+}
+
+function onDesktopLanguageChanged(listener: (lang: Lang) => void): () => void {
+  const bridge = (
+    window as {
+      desktopApi?: { onLanguageChanged(listener: (lang: Lang) => void): () => void }
+    }
+  ).desktopApi
+  return bridge ? bridge.onLanguageChanged(listener) : () => {}
 }

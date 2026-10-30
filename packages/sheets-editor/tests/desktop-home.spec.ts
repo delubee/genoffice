@@ -1137,3 +1137,73 @@ test('Conditional Formatting opens the shared rule manager and saves panel rules
     .toBe(1)
   expect(errors).toEqual([])
 })
+
+test('Excel keyboard layer hides rows and opens Insert Cells through session edits', async ({
+  page,
+}) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(String(error)))
+  await page.goto(base)
+  await page.evaluate(async () => {
+    const { mountManualToolbar } = await import(
+      /* @vite-ignore */ String('/packages/sheets-editor/tests/fixtures/manual-toolbar.tsx')
+    )
+    ;(window as any).toolbar = await mountManualToolbar(true)
+  })
+  const canvas = page.locator('canvas[id^="univer-sheet-main-canvas"]')
+  await canvas.click({ position: { x: 200, y: 200 } })
+  await page.evaluate(() => (window as any).toolbar.select('A2'))
+  const revision = () => page.evaluate(() => (window as any).toolbar.revision())
+  const before = await revision()
+  await page.keyboard.press('Control+Digit9')
+  await expect.poll(revision).toBe(before + 1)
+  const edits = await page.evaluate(
+    () => (window as any).toolbar.snapshot().sheets[0].features.visibilityEdits,
+  )
+  expect(edits).toEqual([{ axis: 'rows', start: 1, count: 1, hidden: true }])
+  await page.evaluate(() => (window as any).toolbar.select('B3'))
+  await page.keyboard.press('Control+Shift+Equal')
+  await expect(page.getByRole('dialog', { name: 'Insert', exact: true })).toBeVisible()
+  expect(errors).toEqual([])
+})
+
+test('the desktop cell context menu routes built-in and shared entries to session edits and dialogs', async ({
+  page,
+}) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(String(error)))
+  await page.goto(base)
+  await page.evaluate(async () => {
+    const { mountManualToolbar } = await import(
+      /* @vite-ignore */ String('/packages/sheets-editor/tests/fixtures/manual-toolbar.tsx')
+    )
+    ;(window as any).toolbar = await mountManualToolbar(true)
+  })
+  const canvas = page.locator('canvas[id^="univer-sheet-main-canvas"]')
+  await canvas.click({ position: { x: 120, y: 50 }, button: 'right' })
+  await page.locator('section.univer-popup button', { hasText: 'Format Cells…' }).click()
+  const format = page.getByRole('dialog', { name: 'Format Cells', exact: true })
+  await expect(format).toBeVisible()
+  await format.getByRole('button', { name: 'Cancel', exact: true }).click()
+  const revision = () => page.evaluate(() => (window as any).toolbar.revision())
+  const snapshot = () => page.evaluate(() => (window as any).toolbar.snapshot())
+  const run = (id: string, params?: unknown) =>
+    page.evaluate(([id, params]) => (window as any).toolbar.facade().executeCommand(id, params), [
+      id,
+      params,
+    ] as const)
+  await page.evaluate(() => (window as any).toolbar.select('A2'))
+  let before = await revision()
+  expect(await run('sheet.command.insert-multi-rows-above', { value: 2 })).toBe(true)
+  await expect.poll(revision).toBe(before + 1)
+  expect((await snapshot()).sheets[0].cells.A4?.rawValue).toBe('North')
+  await page.evaluate(() => (window as any).toolbar.select('A4:B4'))
+  before = await revision()
+  expect(await run('sheet.command.clear-selection-content')).toBe(true)
+  await expect.poll(revision).toBe(before + 1)
+  expect((await snapshot()).sheets[0].cells.A4?.rawValue ?? null).toBe(null)
+  before = await revision()
+  expect(await run('sheet.command.hide-row-confirm')).toBe(true)
+  await expect.poll(revision).toBe(before + 1)
+  expect(errors).toEqual([])
+})

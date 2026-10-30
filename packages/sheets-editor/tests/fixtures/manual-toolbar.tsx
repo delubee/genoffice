@@ -24,6 +24,7 @@ import { computeCandidateState } from '@genoffice/xlsx-gateway/domain/session-ca
 import type { EditorHost } from '../../src/ports'
 import '../../../../apps/vscode-office/src/webview/theme.css'
 import { ThemeService } from '@univerjs/core'
+import * as uiModule from '@univerjs/ui'
 
 /** In-memory authority for UI tests; native sidecar/save are tested separately. */
 export async function mountManualToolbar(
@@ -604,6 +605,21 @@ export async function mountManualToolbar(
     },
     reveal: (range: string) => projection.goToReference(range, { focus: false }),
     facade: () => facade,
+    /** Leaf commands of the cell context menu, for menu parity audits. */
+    contextMenuCommands() {
+      const { IMenuManagerService, ContextMenuPosition } = uiModule
+      const injector = (projection as unknown as { runtime: { univer: any } }).runtime.univer.__getInjector()
+      const out: { key: string; id: string; title?: string; params?: unknown }[] = []
+      const walk = (items: any[]) => {
+        for (const item of items ?? []) {
+          if (item.item?.id) out.push({ key: item.key, id: item.item.commandId ?? item.item.id, title: item.item.title, params: item.item.params })
+          walk(item.children)
+        }
+      }
+      for (const position of [ContextMenuPosition.MAIN_AREA, ContextMenuPosition.ROW_HEADER, ContextMenuPosition.COL_HEADER])
+        walk(injector.get(IMenuManagerService).getMenuByPositionKey(position))
+      return out
+    },
     select(range: string) {
       const sheet = facade.getActiveWorkbook().getActiveSheet()
       sheet.setActiveRange(sheet.getRange(range))

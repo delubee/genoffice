@@ -195,6 +195,15 @@ import {
 } from '../../../apps/sheets/src/renderer/global-shortcuts'
 import { getScrollAnchor } from '../../../apps/sheets/src/renderer/scroll-anchor'
 import { nextSheetName } from '../../../apps/sheets/src/renderer/sheet-default-name'
+import { registerExcelShortcuts } from '../../../apps/sheets/src/renderer/excel-shortcuts'
+import { PASTE_SPECIAL_OPEN_SHELL_COMMAND } from '../../../apps/sheets/src/renderer/paste-special-model'
+import {
+  installCellContextMenu,
+  registerPasteSpecialOpener,
+  setContextMenuCommandSink,
+} from '../../../apps/sheets/src/renderer/cell-context-menu'
+import { registerExcelJumpNav } from '../../../apps/sheets/src/renderer/excel-jump-nav'
+import { registerEditorWordJump } from '../../../apps/sheets/src/renderer/editor-word-jump'
 import {
   FILL_SERIES_OPEN_ENDED_LIMIT,
   planFillSeries,
@@ -1597,6 +1606,123 @@ export class WorkbookRuntime implements EditorProjection {
     else await this.enqueueStaged([operations], frozen)
     return null
   }
+  /**
+   * Univer's built-in context-menu commands act on the local model; in the
+   * view they become the same canonical edits and dialogs as the ribbon.
+   */
+  private installContextMenuCommands() {
+    const commands = this.runtime.univer.__getInjector().get(ICommandService)
+    const sink = (command: string) => () => (this.commandSink?.(command), true)
+    const cells =
+      (mode: 'insert' | 'delete', choice: Parameters<WorkbookRuntime['cellsCommand']>[1]) => () => {
+        void this.cellsCommand(mode, choice).catch(this.report)
+        return true
+      }
+    const insert =
+      (axis: 'rows' | 'cols', after: boolean) =>
+      (_accessor: unknown, params?: { value?: number }) => {
+        void this.insertAxis(axis, after, params?.value).catch(this.report)
+        return true
+      }
+    const handlers: Record<string, (accessor: unknown, params?: { value?: number }) => boolean> = {
+      'sheet.command.clear-selection-content': sink('clear-contents'),
+      'sheet.command.clear-selection-format': sink('clear-formats'),
+      'sheet.command.clear-selection-all': sink('clear-all'),
+      'sheet.command.insert-row-before': insert('rows', false),
+      'sheet.command.insert-multi-rows-above': insert('rows', false),
+      'sheet.command.insert-multi-rows-after': insert('rows', true),
+      'sheet.command.insert-col-before': insert('cols', false),
+      'sheet.command.insert-multi-cols-before': insert('cols', false),
+      'sheet.command.insert-multi-cols-right': insert('cols', true),
+      'sheet.command.insert-range-move-right-confirm': cells('insert', 'shift-horizontal'),
+      'sheet.command.insert-range-move-down-confirm': cells('insert', 'shift-vertical'),
+      'sheet.command.delete-range-move-left-confirm': cells('delete', 'shift-horizontal'),
+      'sheet.command.delete-range-move-up-confirm': cells('delete', 'shift-vertical'),
+      'sheet.command.remove-row-confirm': cells('delete', 'entire-row'),
+      'sheet.command.remove-col-confirm': cells('delete', 'entire-column'),
+      'sheet.command.set-selection-frozen': sink('freeze-here'),
+      'sheet.command.set-row-frozen': sink('freeze-here'),
+      'sheet.command.set-col-frozen': sink('freeze-here'),
+      'sheet.command.set-first-row-frozen': sink('freeze-top-row'),
+      'sheet.command.set-first-column-frozen': sink('freeze-first-col'),
+      'sheet.command.cancel-frozen': sink('unfreeze'),
+      'sheet.command.hide-row-confirm': () => this.axisVisibility('rows', true),
+      'sheet.command.hide-col-confirm': () => this.axisVisibility('cols', true),
+      'sheet.command.set-selected-rows-visible': () => this.axisVisibility('rows', false),
+      'sheet.command.set-selected-cols-visible': () => this.axisVisibility('cols', false),
+      'sheet.command.set-row-is-auto-height': sink('autofit-row-height'),
+      'sheet.command.set-col-auto-width': sink('autofit-col-width'),
+    }
+    for (const [id, handler] of Object.entries(handlers)) {
+      commands.unregisterCommand(id)
+      this.disposables.push(
+        commands.registerCommand({
+          id,
+          type: CommandType.COMMAND,
+          handler: handler as (accessor: never, params?: never) => boolean,
+        }),
+      )
+    }
+  }
+  /** Context menu Insert ▸ rows/columns above, below, left or right of the selection. */
+  private async insertAxis(axis: 'rows' | 'cols', after: boolean, count?: number) {
+    if (!(await this.flushEditor())) throw new Error('Finish editing before inserting.')
+    const target = this.ribbonTarget
+    if (!target) throw new Error(t('appSelectCellFirst'))
+    const bounds = parseRange(target.address)
+    const size =
+      count ??
+      (axis === 'rows'
+        ? bounds.endRow - bounds.startRow + 1
+        : bounds.endColumn - bounds.startColumn + 1)
+    const at =
+      axis === 'rows'
+        ? after
+          ? bounds.endRow + 1
+          : bounds.startRow
+        : after
+          ? bounds.endColumn + 1
+          : bounds.startColumn
+    await this.enqueue([
+      axis === 'rows'
+        ? { op: 'insert_rows', sheetId: target.sheetId, row: at + 1, count: size }
+        : { op: 'insert_cols', sheetId: target.sheetId, column: columnLabel(at), count: size },
+    ])
+  }
+  /** Ctrl+9 / Ctrl+0 (+Shift): hide or show the selected rows or columns, as Excel. */
+  private axisVisibility(axis: 'rows' | 'cols', hidden: boolean) {
+    const target = this.ribbonTarget
+    const sheet = this.runtime.univerAPI.getActiveWorkbook()?.getActiveSheet()
+    if (!target || !sheet) return false
+    const bounds = parseRange(target.address)
+    const start = axis === 'rows' ? bounds.startRow : bounds.startColumn
+    const end = axis === 'rows' ? bounds.endRow : bounds.endColumn
+    // Excel refuses to hide every row or column.
+    if (
+      hidden &&
+      start === 0 &&
+      end >= (axis === 'rows' ? sheet.getMaxRows() : sheet.getMaxColumns()) - 1
+    )
+      return false
+    const operation: WorkbookOperation =
+      axis === 'rows'
+        ? {
+            op: 'set_rows_hidden',
+            sheetId: target.sheetId,
+            row: start + 1,
+            count: end - start + 1,
+            hidden,
+          }
+        : {
+            op: 'set_cols_hidden',
+            sheetId: target.sheetId,
+            column: columnLabel(start),
+            count: end - start + 1,
+            hidden,
+          }
+    void this.enqueue([operation]).catch(this.report)
+    return true
+  }
   /** Shift+F11: a new SheetN at the end, as the desktop's insert-sheet. */
   async insertSheet() {
     if (!(await this.flushEditor())) throw new Error('Finish editing before inserting a sheet.')
@@ -1685,6 +1811,8 @@ export class WorkbookRuntime implements EditorProjection {
       horizontal ? clamp(anchorColumn + direction * page, maxColumn) : anchor.column,
     )
   }
+  /** The ribbon's command dispatcher, for Univer-side shortcuts that open shared dialogs. */
+  commandSink?: (command: string) => void
   private painter: { mode: 'once' | 'lock'; snapshot: SpecialPasteSnapshot } | null = null
   get formatPainterActive() {
     return this.painter !== null
@@ -4601,7 +4729,7 @@ export class WorkbookRuntime implements EditorProjection {
           container,
           header: true,
           toolbar: false,
-          contextMenu: false,
+          contextMenu: true,
           formulaBar: true,
           footer: { sheetBar: true, statisticBar: true, menus: false, zoomSlider: false },
         }),
@@ -4613,6 +4741,40 @@ export class WorkbookRuntime implements EditorProjection {
         UniverSheetsTablePreset(),
         UniverSheetsConditionalFormattingPreset(),
       ],
+    })
+    // The desktop's Excel keyboard layer: data-edge jumps, editor word jumps,
+    // sheet-tab switching, Ctrl+Home/End, whole row/column selection,
+    // hide/unhide and Insert/Delete Cells (forwarded below as session edits).
+    registerExcelJumpNav(this.runtime)
+    registerEditorWordJump(this.runtime)
+    registerExcelShortcuts(this.runtime, (sheetId) => {
+      const sheet = this.state?.sheets.find((item) => item.id === sheetId)
+      return sheet && sheet.rows > 0 && sheet.columns > 0
+        ? { row: sheet.rows - 1, column: sheet.columns - 1 }
+        : null
+    })
+    // Visibility and Insert/Delete Cells chords act through session edits and
+    // the shared dialog instead of Univer's local commands.
+    const keyCommands = this.runtime.univer.__getInjector().get(ICommandService)
+    const keyHandlers: Record<string, () => boolean> = {
+      'genoffice.command.hide-selected-rows': () => this.axisVisibility('rows', true),
+      'genoffice.command.unhide-selected-rows': () => this.axisVisibility('rows', false),
+      'genoffice.command.hide-selected-cols': () => this.axisVisibility('cols', true),
+      'genoffice.command.unhide-selected-cols': () => this.axisVisibility('cols', false),
+      'genoffice.command.insert-cells': () => (this.commandSink?.('insert-cells'), true),
+      'genoffice.command.delete-cells': () => (this.commandSink?.('delete-cells'), true),
+    }
+    for (const [id, handler] of Object.entries(keyHandlers)) {
+      keyCommands.unregisterCommand(id)
+      keyCommands.registerCommand({ id, type: CommandType.COMMAND, handler })
+    }
+    // The desktop's cell / header context menu; dialog entries reach the ribbon dispatcher.
+    this.disposables.push(installCellContextMenu(this.runtime))
+    setContextMenuCommandSink((command) => this.commandSink?.(command))
+    this.disposables.push({
+      dispose: registerPasteSpecialOpener(() =>
+        this.commandSink?.(PASTE_SPECIAL_OPEN_SHELL_COMMAND),
+      ),
     })
     const gutterHost = container.parentElement
     if (gutterHost?.classList.contains('workbook-content')) {
@@ -4927,7 +5089,10 @@ export class WorkbookRuntime implements EditorProjection {
       .get(LifecycleService)
       .onStage(LifecycleStages.Rendered)
       .then(() => {
-        if (!this.closed) this.installFilterPopupCommands()
+        if (!this.closed) {
+          this.installFilterPopupCommands()
+          this.installContextMenuCommands()
+        }
       })
       .catch((error) => {
         if (!this.closed) this.report(error)
@@ -5043,6 +5208,35 @@ export class WorkbookRuntime implements EditorProjection {
               )
                 throw new Error('invalid_formula_projection')
           return
+        }
+        if (HIDE_COMMANDS.has(command.id)) {
+          const params = command.params as { subUnitId?: string; ranges?: GridRange[] }
+          const sheetId =
+            params.subUnitId ??
+            this.runtime.univerAPI.getActiveWorkbook()?.getActiveSheet()?.getSheetId()
+          if (!sheetId || !this.state?.sheets.some((sheet) => sheet.id === sheetId))
+            throw new Error('invalid_manual_target')
+          const rows = command.id.includes('row')
+          const hidden = command.id.endsWith('-hidden')
+          const operations: WorkbookOperation[] = (params.ranges ?? []).map((range) =>
+            rows
+              ? {
+                  op: 'set_rows_hidden',
+                  sheetId,
+                  row: range.startRow + 1,
+                  count: range.endRow - range.startRow + 1,
+                  hidden,
+                }
+              : {
+                  op: 'set_cols_hidden',
+                  sheetId,
+                  column: columnLabel(range.startColumn),
+                  count: range.endColumn - range.startColumn + 1,
+                  hidden,
+                },
+          )
+          void this.enqueue(operations).catch(this.report)
+          throw new Error('manual_intent_forwarded')
         }
         if (command.id === 'sheet.command.set-style') {
           const workbook = this.runtime.univerAPI.getActiveWorkbook(),
@@ -8212,4 +8406,12 @@ const CF_MUTATIONS = new Set([
   'sheet.mutation.set-conditional-rule',
   'sheet.mutation.delete-conditional-rule',
   'sheet.mutation.move-conditional-rule',
+])
+
+/** Univer's row/column visibility commands (Ctrl+9 / Ctrl+0 and their Shift variants). */
+const HIDE_COMMANDS = new Set([
+  'sheet.command.set-rows-hidden',
+  'sheet.command.set-specific-rows-visible',
+  'sheet.command.set-col-hidden',
+  'sheet.command.set-col-visible-on-cols',
 ])

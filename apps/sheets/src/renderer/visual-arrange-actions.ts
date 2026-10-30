@@ -5,7 +5,6 @@
  * place) and lands on the Univer undo stack as one step.
  */
 import { ADDABLE_SHAPE_TYPES } from '@genoffice/xlsx-gateway/shared/shape-types'
-import { BehaviorSubject } from 'rxjs'
 import type { WorkbookVisualObject } from '../shared/desktop-api'
 import {
   isSheetRemoved,
@@ -78,9 +77,8 @@ export interface VisualFrameInfo {
 }
 
 let clipboard: WorkbookVisualObject | null = null
-/// True while nothing is on the visual clipboard; the cell context menu's
-/// Paste Picture/Shape entry disables on it.
-export const visualPasteDisabled$ = new BehaviorSubject(true)
+import { visualPasteDisabled$ } from './visual-paste-state'
+export { visualPasteDisabled$ }
 
 /// The visual as it currently renders: file object with pending edits, or
 /// the session add.
