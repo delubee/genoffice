@@ -31,6 +31,7 @@ export function DocsRibbon({
   comments,
   revisions,
   view,
+  draw,
   hfEditing,
   onHfAction,
   onProtect,
@@ -64,6 +65,16 @@ export function DocsRibbon({
     onZoomDialog(): void
     spellcheck: boolean
     onSpellcheck(on: boolean): void
+  }
+  draw: {
+    tool: RibbonProps['inkTool']
+    onTool: RibbonProps['onInkTool']
+    pen: RibbonProps['inkPen']
+    onPen: RibbonProps['onInkPen']
+    highlighter: RibbonProps['inkHighlighter']
+    onHighlighter: RibbonProps['onInkHighlighter']
+    count: number
+    onClearAll(): void
   }
   hfEditing: RibbonProps['hfEditing']
   onHfAction: RibbonProps['onHfAction']
@@ -173,14 +184,14 @@ export function DocsRibbon({
     onThemeFonts: (themeFonts) => void runtime.applySettings({ themeFonts }),
     themeColors: runtime.settings.themeColors ?? null,
     onThemeColors: (themeColors) => void runtime.applySettings({ themeColors }),
-    inkTool: 'select',
-    onInkTool: unavailable('Drawing'),
-    inkPen: { color: 'C00000', width: 2 },
-    onInkPen: unavailable('Drawing'),
-    inkHighlighter: { color: 'FFFF00', width: 10 },
-    onInkHighlighter: unavailable('Drawing'),
-    inkCount: 0,
-    onInkClearAll: unavailable('Drawing'),
+    inkTool: draw.tool,
+    onInkTool: draw.onTool,
+    inkPen: draw.pen,
+    onInkPen: draw.onPen,
+    inkHighlighter: draw.highlighter,
+    onInkHighlighter: draw.onHighlighter,
+    inkCount: draw.count,
+    onInkClearAll: draw.onClearAll,
     onInsertNote,
     sources: runtime.settings.sources ?? [],
     onAddSource: (source) =>

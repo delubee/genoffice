@@ -82,6 +82,7 @@ body,
   padding: 24px;
 }
 .office-docx-page {
+  position: relative;
   box-sizing: border-box;
   width: 794px;
   min-height: 1123px;

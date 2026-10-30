@@ -37,6 +37,11 @@ import {
   validateAndNormalize,
 } from '@genoffice/docs-editor/shared/policy'
 import { operationSteps } from './operations'
+import {
+  annotationsFromParsed,
+  buildInkImages,
+  type InkStroke,
+} from '../../../apps/docs/src/renderer/editor/ink'
 import { readBlocks, type SelectionScope } from './read'
 import type {
   SessionDescriptor,
@@ -236,6 +241,7 @@ export class DocxSession {
       watermark:
         edits.watermark !== undefined ? edits.watermark : (this.original.watermarkText ?? null),
       comments: edits.comments ?? this.original.comments,
+      inks: edits.inks ?? annotationsFromParsed(this.original.inks ?? []),
       sources: edits.sources ?? this.original.sources,
       protection: edits.protection !== undefined ? edits.protection : this.original.protection,
       writeProtection:
@@ -271,6 +277,12 @@ export class DocxSession {
     if (this.readonly) throw new Error('Document is read-only')
     if (input.expectedRevision !== this.revision) throw new Error('Stale document version')
     const edit = documentSettingsSchema.parse(input.settings)
+    // Ink anchors to paragraphs of the opened file (the save re-anchors by docxIndex).
+    if (edit.inks) {
+      const anchors = new Set(this.original.blocks.map((block) => block.docxIndex))
+      for (const ink of edit.inks)
+        if (!anchors.has(ink.anchorIndex)) throw new Error('Unknown ink anchor')
+    }
     // Verbatim run XML in a header/footer may only be the file's own.
     const fileRaw = new Set<string>()
     const collect = (value: unknown, key = '') => {
@@ -651,6 +663,23 @@ export class DocxSession {
 
   async save(): Promise<Uint8Array> {
     const plan = editorToSavePlan(this.content(), this.original.blocks)
+    // The view rasterizes drawn strokes; restored file inks carry their own PNG.
+    const inkSettings = this.root.overlays.settings.inks
+    const rasters = new Map<
+      InkStroke,
+      NonNullable<NonNullable<typeof inkSettings>[number]['raster']>
+    >()
+    for (const ink of inkSettings ?? [])
+      if (ink.stroke && ink.raster) rasters.set(ink.stroke, ink.raster)
+    const inks = inkSettings
+      ? buildInkImages(
+          inkSettings.filter((ink) => !ink.stroke || ink.raster),
+          plan.saveBlockIndexByDocx,
+          (stroke) => rasters.get(stroke)!,
+        )
+      : this.original.inks?.length
+        ? buildInkImages(annotationsFromParsed(this.original.inks), plan.saveBlockIndexByDocx)
+        : undefined
     return saveDocx(this.original, plan.saveBlocks, {
       newPictures: plan.newPictures,
       ...(this.root.overlays.numbering.length ||
@@ -677,6 +706,7 @@ export class DocxSession {
       ...(this.root.overlays.settings.comments
         ? { comments: this.root.overlays.settings.comments }
         : {}),
+      ...(inks ? { inks } : {}),
       ...(this.root.overlays.settings.sources
         ? { sources: this.root.overlays.settings.sources }
         : {}),

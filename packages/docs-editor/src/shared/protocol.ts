@@ -15,6 +15,31 @@ import type {
   StyleInfo,
   DocDefaults,
 } from '@genoffice/docx-engine'
+/** Draw → ink annotation; `raster` is the view's rendering of a drawn stroke for the save. */
+export interface InkSetting {
+  id: string
+  anchorIndex: number
+  stroke?: {
+    tool: 'pen' | 'highlighter'
+    color: string
+    width: number
+    points: { x: number; y: number }[]
+  }
+  image?: {
+    dataUrl: string
+    offsetXPx: number
+    offsetYPx: number
+    widthPx: number
+    heightPx: number
+  }
+  raster?: {
+    base64: string
+    widthPx: number
+    heightPx: number
+    offsetXPx: number
+    offsetYPx: number
+  }
+}
 /** Document settings the Layout and Design tabs edit (final section, page color, watermark). */
 export interface DocumentSettings {
   section?: SectionSettings
@@ -28,6 +53,8 @@ export interface DocumentSettings {
   comments?: CommentInfo[]
   footnotes?: NoteInfo[]
   endnotes?: NoteInfo[]
+  /** Draw → ink annotations over the page */
+  inks?: InkSetting[]
   /** References → Manage Sources (bibliography sources) */
   sources?: SourceInfo[]
   /** Review → Protect Document (applies to the saved file) */

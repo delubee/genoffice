@@ -254,6 +254,13 @@ const passwordHash = {
   spinCount: z.number().int().min(1).max(10_000_000).optional(),
   algorithmSid: z.literal(14).optional(),
 }
+const inkCoordinate = z.number().finite().min(-100_000).max(100_000)
+const inkBox = {
+  offsetXPx: inkCoordinate,
+  offsetYPx: inkCoordinate,
+  widthPx: z.number().finite().min(0).max(100_000),
+  heightPx: z.number().finite().min(0).max(100_000),
+}
 /** Theme typefaces and names: any script, never markup. */
 const themeText = z
   .string()
@@ -369,6 +376,40 @@ export const documentSettingsSchema = z
       .nullable()
       .optional(),
     removePersonalInfo: z.boolean().optional(),
+    inks: z
+      .array(
+        z
+          .object({
+            id: z.string().regex(/^ink[A-Za-z0-9_-]{1,60}$/),
+            anchorIndex: z.number().int().min(0).max(10_000_000),
+            stroke: z
+              .object({
+                tool: z.enum(['pen', 'highlighter']),
+                color: z.string().regex(/^[0-9A-Fa-f]{6}$/),
+                width: z.number().min(0.1).max(200),
+                points: z
+                  .array(z.object({ x: inkCoordinate, y: inkCoordinate }).strict())
+                  .min(1)
+                  .max(20_000),
+              })
+              .strict()
+              .optional(),
+            image: z
+              .object({
+                dataUrl: z.string().regex(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/),
+                ...inkBox,
+              })
+              .strict()
+              .optional(),
+            raster: z
+              .object({ base64: z.string().regex(/^[A-Za-z0-9+/=]+$/), ...inkBox })
+              .strict()
+              .optional(),
+          })
+          .strict(),
+      )
+      .max(2000)
+      .optional(),
     sources: z
       .array(
         z

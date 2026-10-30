@@ -153,3 +153,33 @@ it('saves References sources for citations and bibliographies', async () => {
   expect(reopened.presentation().settings!.sources).toEqual([expect.objectContaining(source)])
   expect(() => apply(session, { sources: [{ ...source, tag: '<x/>' }] })).toThrow()
 })
+
+it('saves drawn ink as floating pictures from the view raster and refuses unknown anchors', async () => {
+  const session = await DocxSession.open(
+    await buildDocx({ bodyXml: '<w:p><w:r><w:t>Sketch</w:t></w:r></w:p>' }),
+  )
+  const png =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+  const ink = {
+    id: 'ink1-a',
+    anchorIndex: 0,
+    stroke: {
+      tool: 'pen',
+      color: 'C00000',
+      width: 2,
+      points: [
+        { x: 1, y: 1 },
+        { x: 20, y: 10 },
+      ],
+    },
+    raster: { base64: png, widthPx: 21, heightPx: 11, offsetXPx: 0, offsetYPx: 0 },
+  }
+  expect(() => apply(session, { inks: [{ ...ink, anchorIndex: 99 }] })).toThrow(
+    'Unknown ink anchor',
+  )
+  apply(session, { inks: [ink] })
+  const zip = await JSZip.loadAsync(await session.save())
+  expect(Object.keys(zip.files).some((name) => /^word\/media\/.+\.png$/.test(name))).toBe(true)
+  const reopened = await DocxSession.open(await session.save())
+  expect(reopened.presentation().settings!.inks).toHaveLength(1)
+})

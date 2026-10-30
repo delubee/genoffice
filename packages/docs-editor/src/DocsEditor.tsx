@@ -8,6 +8,9 @@ import { ParagraphDialog } from '../../../apps/docs/src/renderer/components/Para
 import type { StyleInfo } from '@genoffice/docx-engine'
 import { DocsRibbon, numberingContext } from './DocsRibbon'
 import { ZoomDialog } from '../../../apps/docs/src/renderer/components/ZoomDialog'
+import { InkOverlay } from '../../../apps/docs/src/renderer/components/InkOverlay'
+import { rasterizeStroke, type InkTool } from '../../../apps/docs/src/renderer/editor/ink'
+import type { InkPenSettings } from '../../../apps/docs/src/renderer/components/ribbon-tabs'
 import { ProtectDialog } from '../../../apps/docs/src/renderer/components/ProtectDialog'
 import {
   CellMarginsDialog,
@@ -103,6 +106,23 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
   const [notePrompt, setNotePrompt] = useState<NotePrompt | null>(null)
   const [showNav, setShowNav] = useState(false)
   const [zoom, setZoom] = useState(100)
+  const [inkTool, setInkTool] = useState<InkTool>('select')
+  const [inkPen, setInkPen] = useState<InkPenSettings>({ color: 'C00000', width: 2 })
+  const [inkHighlighter, setInkHighlighter] = useState<InkPenSettings>({
+    color: 'FFFF00',
+    width: 10,
+  })
+  const inks = runtime.settings.inks ?? []
+  const draw = {
+    tool: inkTool,
+    onTool: setInkTool,
+    pen: inkPen,
+    onPen: setInkPen,
+    highlighter: inkHighlighter,
+    onHighlighter: setInkHighlighter,
+    count: inks.length,
+    onClearAll: () => void runtime.applySettings({ inks: [] }),
+  }
   const [zoomDialog, setZoomDialog] = useState(false)
   const [protectDialog, setProtectDialog] = useState(false)
   const [spellcheck, setSpellcheck] = useState(false)
@@ -409,7 +429,7 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
       print: unavailable('Printing'),
     })
     return () => setDocsHost(null)
-  }, [])
+  }, [runtime])
   useEffect(() => {
     // Word dialog shortcuts at the window, as the desktop: Font Ctrl+D, Paragraph Ctrl+Alt+M.
     const onKeyDown = (event: KeyboardEvent) => {
@@ -446,6 +466,7 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
           comments={reviewComments}
           revisions={revisions}
           view={view}
+          draw={draw}
           hfEditing={hfEditing}
           onHfAction={onHfAction}
           onProtect={() => setProtectDialog(true)}
@@ -710,6 +731,28 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
               zoom: zoom / 100,
             }}
           >
+            {inkTool !== 'select' || inks.length ? (
+              <InkOverlay
+                tool={editor.isEditable ? inkTool : 'select'}
+                color={inkTool === 'highlighter' ? inkHighlighter.color : inkPen.color}
+                width={inkTool === 'highlighter' ? inkHighlighter.width : inkPen.width}
+                zoom={zoom}
+                annotations={inks}
+                onAdd={(annotation) =>
+                  void runtime.applySettings({
+                    inks: [
+                      ...inks,
+                      annotation.stroke
+                        ? { ...annotation, raster: rasterizeStroke(annotation.stroke) }
+                        : annotation,
+                    ],
+                  })
+                }
+                onRemove={(ids) =>
+                  void runtime.applySettings({ inks: inks.filter((ink) => !ids.includes(ink.id)) })
+                }
+              />
+            ) : null}
             {strip('header')}
             <EditorContent editor={editor} />
             {strip('footer')}

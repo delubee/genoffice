@@ -486,6 +486,17 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     await expect.poll(() => exports.map((item) => item.format)).toEqual(['html', 'md'])
     expect(exports[0]!.content).toContain('<html')
     expect(exports[1]!.content).toContain('Second')
+    // Draw → Pen: a stroke on the page becomes an ink settings entry rasterized by the view.
+    await page.locator('.ribbon-tab', { hasText: /^Draw$/ }).click()
+    await page.locator('[data-tip^="Pen: draw on the document"]').click()
+    const box = (await page.locator('.office-docx-page').boundingBox())!
+    await page.mouse.move(box.x + 120, box.y + 120)
+    await page.mouse.down()
+    await page.mouse.move(box.x + 180, box.y + 150, { steps: 6 })
+    await page.mouse.up()
+    await expect.poll(() => session.presentation().settings!.inks!.length).toBe(1)
+    expect(session.presentation().settings!.inks![0]!.raster?.base64.length).toBeGreaterThan(10)
+    await page.locator('[data-tip^="Select: exit drawing"]').click()
     const beforeTheme = session.content()
     await page.evaluate(() =>
       document.documentElement.style.setProperty('--vscode-editor-background', 'rgb(20, 20, 20)'),
