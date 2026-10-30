@@ -91,9 +91,7 @@ export class DocxSession {
       overlays: { numbering: [], restartNums: [], styles: [], settings: {} },
     }
     this.savedStateId = this.root.stateId
-    this.baseCSS =
-      docStyleCss(original) +
-      docThemeCss(original.themeFonts, original.themeColors, Boolean(docBodyFont(original)))
+    this.baseCSS = docStyleCss(original)
     for (const numId of original.numbering.keys())
       this.nextNumId = Math.max(this.nextNumId, (Number(numId) || 0) + 1)
   }
@@ -129,6 +127,15 @@ export class DocxSession {
   markConflict() {
     this.conflict = true
   }
+  /** Theme fonts / colors as edited in the Design tab, over the file's theme. */
+  private themeCss() {
+    const edits = this.root.overlays.settings
+    return docThemeCss(
+      edits.themeFonts ?? this.original.themeFonts,
+      edits.themeColors ?? this.original.themeColors,
+      Boolean(docBodyFont(this.original)),
+    )
+  }
   /** Resolve styles.xml with the pending definitions before presenting them. */
   async stylesReady(): Promise<void> {
     const upserts = this.root.overlays.styles
@@ -138,13 +145,7 @@ export class DocxSession {
     this.liveStyles = {
       key,
       styles,
-      css:
-        docStyleCss({ ...this.original, styles }) +
-        docThemeCss(
-          this.original.themeFonts,
-          this.original.themeColors,
-          Boolean(docBodyFont(this.original)),
-        ),
+      css: docStyleCss({ ...this.original, styles }),
     }
   }
   /** Style definitions join the overlay merged as the desktop's upsert does. */
@@ -209,7 +210,7 @@ export class DocxSession {
       .join('\n')
     return JSON.parse(
       JSON.stringify({
-        css: (live ? live.css : this.baseCSS) + pendingCSS,
+        css: (live ? live.css : this.baseCSS) + this.themeCss() + pendingCSS,
         numbering: [...numbering.entries()],
         styles: [...(live ? live.styles : this.original.styles).entries()],
         docDefaults: this.original.docDefaults,
@@ -227,6 +228,8 @@ export class DocxSession {
       watermark:
         edits.watermark !== undefined ? edits.watermark : (this.original.watermarkText ?? null),
       comments: edits.comments ?? this.original.comments,
+      themeFonts: edits.themeFonts ?? this.original.themeFonts ?? null,
+      themeColors: edits.themeColors ?? this.original.themeColors ?? null,
       footnotes: edits.footnotes ?? this.original.footnotes,
       endnotes: edits.endnotes ?? this.original.endnotes,
       header: edits.header ?? {
@@ -616,6 +619,12 @@ export class DocxSession {
         : {}),
       ...(this.root.overlays.settings.comments
         ? { comments: this.root.overlays.settings.comments }
+        : {}),
+      ...(this.root.overlays.settings.themeFonts
+        ? { themeFonts: this.root.overlays.settings.themeFonts }
+        : {}),
+      ...(this.root.overlays.settings.themeColors
+        ? { themeColors: this.root.overlays.settings.themeColors }
         : {}),
       ...(this.root.overlays.settings.footnotes
         ? { footnotes: this.root.overlays.settings.footnotes }

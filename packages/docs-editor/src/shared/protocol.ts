@@ -7,6 +7,8 @@ import type {
   StyleUpsert,
   NumberingDef,
   SectionSettings,
+  ThemeColors,
+  ThemeFonts,
   StyleInfo,
   DocDefaults,
 } from '@genoffice/docx-engine'
@@ -23,6 +25,9 @@ export interface DocumentSettings {
   comments?: CommentInfo[]
   footnotes?: NoteInfo[]
   endnotes?: NoteInfo[]
+  /** Design → Fonts / Colors (null: the document has no theme part) */
+  themeFonts?: ThemeFonts | null
+  themeColors?: ThemeColors | null
   /** style definition edits (merged into the session's pending styles) */
   styles?: StyleUpsert[]
 }

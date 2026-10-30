@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { OfficeFileActions, OFFICE_ACTION_LABELS } from '@genoffice/ui/chrome'
 import { EditorContent } from '@tiptap/react'
 import type { DocumentRuntime } from './runtime'
@@ -7,6 +7,7 @@ import { FontDialog } from '../../../apps/docs/src/renderer/components/FontDialo
 import { ParagraphDialog } from '../../../apps/docs/src/renderer/components/ParagraphDialog'
 import type { StyleInfo } from '@genoffice/docx-engine'
 import { DocsRibbon, numberingContext } from './DocsRibbon'
+import { ZoomDialog } from '../../../apps/docs/src/renderer/components/ZoomDialog'
 import {
   CellMarginsDialog,
   DeleteCellsDialog,
@@ -78,6 +79,35 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
   const endnotes = runtime.settings.endnotes ?? []
   const [notePrompt, setNotePrompt] = useState<NotePrompt | null>(null)
   const [showNav, setShowNav] = useState(false)
+  const [zoom, setZoom] = useState(100)
+  const [zoomDialog, setZoomDialog] = useState(false)
+  const [spellcheck, setSpellcheck] = useState(false)
+  const canvas = useRef<HTMLDivElement>(null)
+  /** Word's fit modes against the visible canvas and the page geometry (twips → px). */
+  const fitZoom = (mode: 'width' | 'page' | 'multi' | 'text') => {
+    const box = canvas.current?.getBoundingClientRect()
+    const page = runtime.settings.section
+    if (!box || !page) return 100
+    const width =
+      (mode === 'text' ? page.pageWidth - page.marginLeft - page.marginRight : page.pageWidth) / 15
+    const height = page.pageHeight / 15
+    const fit =
+      mode === 'width' || mode === 'text'
+        ? (box.width - 48) / width
+        : Math.min((box.width - 48) / width, (box.height - 48) / height)
+    return Math.max(10, Math.min(500, Math.round(fit * 100)))
+  }
+  const view = {
+    zoom,
+    onZoom: setZoom,
+    onZoomFit: (mode: 'width' | 'page' | 'multi') => setZoom(fitZoom(mode)),
+    onZoomDialog: () => setZoomDialog(true),
+    spellcheck,
+    onSpellcheck: (on: boolean) => {
+      editor.view.dom.spellcheck = on
+      setSpellcheck(on)
+    },
+  }
   const [revisionDisplay, setRevisionDisplay] = useState<RevisionDisplayMode>('all')
   const recorder = editor.storage.trackChanges as { enabled: boolean } | undefined
   const revisions = {
@@ -290,6 +320,7 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
           onHfEdit={(kind) => setHfEdit((current) => ({ ...current, [kind]: Date.now() }))}
           comments={reviewComments}
           revisions={revisions}
+          view={view}
           panes={{
             nav: showNav,
             styles: showStylesPane,
@@ -482,10 +513,21 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
             }
           />
         )}
-        <div className="office-docx-canvas" onContextMenu={openMenu}>
+        {zoomDialog && (
+          <ZoomDialog
+            zoom={zoom}
+            fitValue={fitZoom}
+            onApply={(target) => setZoom(typeof target === 'number' ? target : fitZoom(target))}
+            onClose={() => setZoomDialog(false)}
+          />
+        )}
+        <div className="office-docx-canvas" ref={canvas} onContextMenu={openMenu}>
           <div
             className="office-docx-page doc-page"
-            style={pageStyle(runtime.settings.section, runtime.settings.pageColor)}
+            style={{
+              ...pageStyle(runtime.settings.section, runtime.settings.pageColor),
+              zoom: zoom / 100,
+            }}
           >
             {strip('header')}
             <EditorContent editor={editor} />

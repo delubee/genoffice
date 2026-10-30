@@ -102,3 +102,20 @@ it('saves header and footer edits as regenerated parts and refuses forged run XM
   ).toThrow()
   expect(session.descriptor().revision).toBe(revision)
 })
+
+it('saves Design theme fonts and colors and refuses markup in typefaces', async () => {
+  const session = await DocxSession.open(
+    await buildDocx({ bodyXml: '<w:p><w:r><w:t>Theme</w:t></w:r></w:p>' }),
+  )
+  apply(session, {
+    themeFonts: { major: 'Georgia', minor: 'Verdana' },
+    themeColors: { name: 'Custom', accent1: '1F4E79' },
+  })
+  expect(session.presentation().css).toContain('Verdana')
+  const zip = await JSZip.loadAsync(await session.save())
+  const theme = Object.keys(zip.files).find((name) => /^word\/theme\/theme\d+\.xml$/.test(name))!
+  const xml = await zip.file(theme)!.async('string')
+  expect(xml).toContain('typeface="Georgia"')
+  expect(xml).toContain('1F4E79')
+  expect(() => apply(session, { themeFonts: { major: 'A"/><evil/>', minor: 'B' } })).toThrow()
+})

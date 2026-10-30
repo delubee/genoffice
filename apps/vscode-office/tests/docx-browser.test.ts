@@ -452,6 +452,26 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
     expect(JSON.stringify(session.content())).toContain('"type":"ins"')
     await track.click()
+    // View → Zoom… applies the desktop dialog's 200% to the page.
+    await page.setViewportSize({ width: 1800, height: 900 })
+    await page.locator('.ribbon-tab', { hasText: /^View$/ }).click()
+    await page
+      .locator('[data-tip="Open the Zoom dialog to choose a zoom level or fit mode"]')
+      .first()
+      .click()
+    const zoomDialog = page.locator('.zoom-dialog')
+    await zoomDialog.getByLabel('200%', { exact: true }).check()
+    await zoomDialog.getByRole('button', { name: 'OK', exact: true }).click()
+    expect(
+      await page.locator('.office-docx-page').evaluate((element) => getComputedStyle(element).zoom),
+    ).toBe('2')
+    await page.locator('.ribbon-tab', { hasText: /^View$/ }).click()
+    await page
+      .locator('[data-tip="Open the Zoom dialog to choose a zoom level or fit mode"]')
+      .first()
+      .click()
+    await zoomDialog.getByLabel('100%', { exact: true }).check()
+    await zoomDialog.getByRole('button', { name: 'OK', exact: true }).click()
     const beforeTheme = session.content()
     await page.evaluate(() =>
       document.documentElement.style.setProperty('--vscode-editor-background', 'rgb(20, 20, 20)'),

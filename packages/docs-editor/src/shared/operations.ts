@@ -234,6 +234,11 @@ const hfValue = (key: string, value: unknown, depth: number): boolean => {
     )
   return false
 }
+/** Theme typefaces and names: any script, never markup. */
+const themeText = z
+  .string()
+  .max(100)
+  .refine((value) => !/[<>&"]/.test(value) && !C0_CONTROLS.test(value))
 /** Styles pane definitions: identifiers plus plain run/paragraph properties. */
 const styleIdPattern = /^[A-Za-z0-9_.-]{1,253}$/
 export const styleUpsertsSchema = z
@@ -328,6 +333,16 @@ export const documentSettingsSchema = z
     comments: commentsSchema.optional(),
     footnotes: notesSchema.optional(),
     styles: styleUpsertsSchema.optional(),
+    themeFonts: z
+      .record(z.string().regex(/^[A-Za-z]{1,20}$/), themeText)
+      .refine((fonts) => typeof fonts.major === 'string' && typeof fonts.minor === 'string')
+      .optional(),
+    themeColors: z
+      .record(
+        z.string().regex(/^[A-Za-z0-9]{1,20}$/),
+        z.union([z.string().regex(/^[0-9A-Fa-f]{6}$/), themeText]),
+      )
+      .optional(),
     endnotes: notesSchema.optional(),
     footer: headerFooterSchema.optional(),
     watermark: z

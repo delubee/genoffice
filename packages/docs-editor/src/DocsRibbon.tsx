@@ -27,6 +27,7 @@ export function DocsRibbon({
   onHfEdit,
   comments,
   revisions,
+  view,
   onInsertNote,
   onTableDialog,
   onListDialog,
@@ -49,6 +50,14 @@ export function DocsRibbon({
     onAccept(all: boolean): void
     onReject(all: boolean): void
     onGoto(direction: 1 | -1): void
+  }
+  view: {
+    zoom: number
+    onZoom(zoom: number): void
+    onZoomFit(mode: 'width' | 'page' | 'multi'): void
+    onZoomDialog(): void
+    spellcheck: boolean
+    onSpellcheck(on: boolean): void
   }
   onInsertNote(kind: 'footnote' | 'endnote'): void
   onTableDialog: RibbonProps['onTableDialog']
@@ -77,7 +86,6 @@ export function DocsRibbon({
   const formatState = useShallowStable(
     computeFormatState(editor, storage?.styles, storage?.docDefaults),
   )
-  const [zoom, setZoom] = useState(100)
   const [showMarks, setShowMarks] = useState(false)
   const [showRuler, setShowRuler] = useState(false)
   const [darkPage, setDarkPage] = useState(false)
@@ -134,10 +142,10 @@ export function DocsRibbon({
     onPageColor: (pageColor) => void runtime.applySettings({ pageColor }),
     watermark: runtime.settings.watermark ?? null,
     onWatermark: (watermark) => void runtime.applySettings({ watermark }),
-    themeFonts: null,
-    onThemeFonts: unavailable('Theme fonts'),
-    themeColors: null,
-    onThemeColors: unavailable('Theme colors'),
+    themeFonts: runtime.settings.themeFonts ?? null,
+    onThemeFonts: (themeFonts) => void runtime.applySettings({ themeFonts }),
+    themeColors: runtime.settings.themeColors ?? null,
+    onThemeColors: (themeColors) => void runtime.applySettings({ themeColors }),
     inkTool: 'select',
     onInkTool: unavailable('Drawing'),
     inkPen: { color: 'C00000', width: 2 },
@@ -149,10 +157,10 @@ export function DocsRibbon({
     onInsertNote,
     sources: [],
     onAddSource: unavailable('Citations'),
-    zoom,
-    onZoom: setZoom,
-    onZoomFit: () => setZoom(100),
-    onZoomDialog: unavailable('Zoom dialog'),
+    zoom: view.zoom,
+    onZoom: view.onZoom,
+    onZoomFit: view.onZoomFit,
+    onZoomDialog: view.onZoomDialog,
     darkPage,
     onDarkPage: setDarkPage,
     onAiPreset: (instruction) =>
@@ -188,8 +196,8 @@ export function DocsRibbon({
     onGotoComment: comments.onGoto,
     trackChanges: revisions.tracking,
     onTrackChanges: revisions.onTrack,
-    spellcheck: false,
-    onSpellcheck: unavailable('Spelling'),
+    spellcheck: view.spellcheck,
+    onSpellcheck: view.onSpellcheck,
     revisionDisplay: revisions.display,
     onRevisionDisplay: revisions.onDisplay,
     revisionCount: revisions.count,
@@ -225,11 +233,7 @@ export function DocsRibbon({
     onPasteDefaults: unavailable('Paste defaults'),
   }
   return (
-    <div
-      className="office-docx-ribbon"
-      data-show-marks={showMarks || undefined}
-      style={{ ['--office-docx-zoom' as string]: String(zoom / 100) }}
-    >
+    <div className="office-docx-ribbon" data-show-marks={showMarks || undefined}>
       <Ribbon {...props} />
     </div>
   )
