@@ -105,6 +105,16 @@ body,
 .office-docx-page p {
   margin: 0 0 8pt;
 }
+/* Footnote / endnote text on the page (document content: authored colors, not theme tokens). */
+.office-docx-notes {
+  margin: 12pt 0 0;
+  padding: 6pt 0 0 18pt;
+  border-top: 0.5pt solid #000;
+  font-size: 9pt;
+}
+.office-docx-endnotes {
+  list-style-type: lower-roman;
+}
 .office-docx-page table {
   border-collapse: collapse;
   width: 100%;

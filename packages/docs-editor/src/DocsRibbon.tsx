@@ -26,9 +26,11 @@ export function DocsRibbon({
   onReplace,
   onHfEdit,
   comments,
+  onInsertNote,
   quickActions,
 }: {
   runtime: DocumentRuntime
+  onInsertNote(kind: 'footnote' | 'endnote'): void
   comments: {
     count: number
     open: number
@@ -138,7 +140,7 @@ export function DocsRibbon({
     onInkHighlighter: unavailable('Drawing'),
     inkCount: 0,
     onInkClearAll: unavailable('Drawing'),
-    onInsertNote: unavailable('Footnotes and endnotes'),
+    onInsertNote,
     sources: [],
     onAddSource: unavailable('Citations'),
     zoom,

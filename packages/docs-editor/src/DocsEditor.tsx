@@ -27,6 +27,8 @@ import {
   type ReviewContext,
 } from '../../../apps/docs/src/renderer/review-actions'
 import { wordRangeAtCaret } from '../../../apps/docs/src/renderer/editor/comments'
+import { PromptModal } from '../../../apps/docs/src/renderer/components/PromptModal'
+import { submitNote, type NotePrompt } from '../../../apps/docs/src/renderer/review-actions'
 import {
   EditorContextMenu,
   type ContextMenuState,
@@ -44,18 +46,23 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
   const [composing, setComposing] = useState(false)
   const [commentFocus, setCommentFocus] = useState<{ id: string; nonce: number } | null>(null)
   const comments = runtime.settings.comments ?? []
+  const footnotes = runtime.settings.footnotes ?? []
+  const endnotes = runtime.settings.endnotes ?? []
+  const [notePrompt, setNotePrompt] = useState<NotePrompt | null>(null)
   /** The desktop review actions over the session's comment list. */
   const review = (): ReviewContext => ({
     editor,
     doc: null,
     dirtyRef: { current: false },
     setStatus: () => {},
-    notePrompt: null,
-    setNotePrompt: () => {},
-    footnotes: [],
-    endnotes: [],
-    setFootnotes: () => {},
-    setEndnotes: () => {},
+    notePrompt,
+    setNotePrompt,
+    footnotes,
+    endnotes,
+    setFootnotes: (update) =>
+      runtime.setReviewList('footnotes', typeof update === 'function' ? update(footnotes) : update),
+    setEndnotes: (update) =>
+      runtime.setReviewList('endnotes', typeof update === 'function' ? update(endnotes) : update),
     setNotesDirty: () => {},
     comments,
     setComments: (update) =>
@@ -195,6 +202,7 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
           onParagraphDialog={() => setParagraphDialog(true)}
           onHfEdit={(kind) => setHfEdit((current) => ({ ...current, [kind]: Date.now() }))}
           comments={reviewComments}
+          onInsertNote={(kind) => editor.isEditable && setNotePrompt({ kind })}
           onFind={() => openFind(false)}
           onReplace={() => openFind(true)}
           quickActions={
@@ -226,6 +234,32 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
             onClose={() => setFind(null)}
             focusFindNonce={find.find}
             focusReplaceNonce={find.replace}
+          />
+        )}
+        {notePrompt && (
+          <PromptModal
+            title={t(
+              notePrompt.id !== undefined
+                ? notePrompt.kind === 'footnote'
+                  ? 'appEditFootnote'
+                  : 'appEditEndnote'
+                : notePrompt.kind === 'footnote'
+                  ? 'appInsertFootnote'
+                  : 'appInsertEndnote',
+            )}
+            placeholder={t(
+              notePrompt.kind === 'footnote' ? 'appFootnotePlaceholder' : 'appEndnotePlaceholder',
+            )}
+            initial={
+              notePrompt.id !== undefined
+                ? ((notePrompt.kind === 'footnote' ? footnotes : endnotes).find(
+                    (note) => note.id === notePrompt.id,
+                  )?.text ?? '')
+                : ''
+            }
+            multiline
+            onSubmit={(text) => submitNote(review(), text)}
+            onClose={() => setNotePrompt(null)}
           />
         )}
         {showComments && (
@@ -273,6 +307,24 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
             {strip('header')}
             <EditorContent editor={editor} />
             {strip('footer')}
+            {(['footnote', 'endnote'] as const).map((kind) => {
+              const list = kind === 'footnote' ? footnotes : endnotes
+              if (!list.length) return null
+              return (
+                <ol key={kind} className={`office-docx-notes office-docx-${kind}s`}>
+                  {list.map((note) => (
+                    <li
+                      key={note.id}
+                      onDoubleClick={() =>
+                        editor.isEditable && setNotePrompt({ kind, id: note.id })
+                      }
+                    >
+                      {note.text}
+                    </li>
+                  ))}
+                </ol>
+              )
+            })}
           </div>
         </div>
         {fontDialog && <FontDialog editor={editor} onClose={() => setFontDialog(false)} />}

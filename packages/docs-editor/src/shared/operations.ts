@@ -234,6 +234,19 @@ const hfValue = (key: string, value: unknown, depth: number): boolean => {
     )
   return false
 }
+/** Footnote / endnote bodies: plain JSON runs whose text the writer escapes. */
+export const notesSchema = z
+  .array(
+    z
+      .object({ id: z.string().regex(/^-?[0-9]{1,9}$/), text: z.string().max(65536) })
+      .catchall(z.unknown())
+      .refine((note) => hfValue('note', note, 0), 'Invalid note'),
+  )
+  .max(5000)
+  .refine(
+    (notes) => new Set(notes.map((note) => note.id)).size === notes.length,
+    'Duplicate note ids',
+  )
 const headerFooterSchema = z
   .object({
     text: z.string().max(65536),
@@ -286,6 +299,8 @@ export const documentSettingsSchema = z
     mirrorMargins: z.boolean().optional(),
     header: headerFooterSchema.optional(),
     comments: commentsSchema.optional(),
+    footnotes: notesSchema.optional(),
+    endnotes: notesSchema.optional(),
     footer: headerFooterSchema.optional(),
     watermark: z
       .string()

@@ -27,6 +27,8 @@ const requestSchema = z
     // Validated in full by the session before it joins the overlay.
     numbering: z.json().optional(),
     comments: z.json().optional(),
+    footnotes: z.json().optional(),
+    endnotes: z.json().optional(),
   })
   .strict()
 

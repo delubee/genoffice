@@ -12,6 +12,7 @@ import {
 import {
   HF_RAW_KEYS,
   commentsSchema,
+  notesSchema,
   documentSettingsSchema,
   pendingListDefinitionsSchema,
 } from '@genoffice/docs-editor/shared/operations'
@@ -183,6 +184,8 @@ export class DocxSession {
       watermark:
         edits.watermark !== undefined ? edits.watermark : (this.original.watermarkText ?? null),
       comments: edits.comments ?? this.original.comments,
+      footnotes: edits.footnotes ?? this.original.footnotes,
+      endnotes: edits.endnotes ?? this.original.endnotes,
       header: edits.header ?? {
         text: this.original.headerText ?? '',
         ...(this.original.headerParas ? { paras: this.original.headerParas } : {}),
@@ -358,13 +361,19 @@ export class DocxSession {
   }
 
   submit(request: StepRequest): Commit {
-    if (!request.numbering && !request.comments)
+    if (!request.numbering && !request.comments && !request.footnotes && !request.endnotes)
       return this.submitSteps(request, this.root.overlays)
     const overlays = request.numbering
       ? this.withListDefinitions(request.numbering)
       : structuredClone(this.root.overlays)
     if (request.comments)
       overlays.settings = { ...overlays.settings, comments: commentsSchema.parse(request.comments) }
+    for (const kind of ['footnotes', 'endnotes'] as const)
+      if (request[kind])
+        overlays.settings = {
+          ...overlays.settings,
+          [kind]: notesSchema.parse(request[kind]),
+        } as DocumentSettings
     const commit = this.submitSteps(request, overlays)
     commit.presentation = this.presentation()
     return commit
@@ -464,7 +473,17 @@ export class DocxSession {
     const commentIds = new Set(
       (overlays.settings.comments ?? this.original.comments).map((comment) => comment.id),
     )
+    const noteIds = {
+      footnote: new Set((overlays.settings.footnotes ?? this.original.footnotes).map((n) => n.id)),
+      endnote: new Set((overlays.settings.endnotes ?? this.original.endnotes).map((n) => n.id)),
+    }
     canonical.descendants((node) => {
+      // Note references must name notes of the resulting lists.
+      if (
+        node.type.name === 'docNoteRef' &&
+        !noteIds[node.attrs.kind === 'endnote' ? 'endnote' : 'footnote'].has(String(node.attrs.id))
+      )
+        throw new Error('Unknown note reference')
       for (const mark of node.marks)
         if (mark.type.name === 'comment')
           for (const id of String(mark.attrs.ids ?? '').split(' '))
@@ -545,6 +564,12 @@ export class DocxSession {
         : {}),
       ...(this.root.overlays.settings.comments
         ? { comments: this.root.overlays.settings.comments }
+        : {}),
+      ...(this.root.overlays.settings.footnotes
+        ? { footnotes: this.root.overlays.settings.footnotes }
+        : {}),
+      ...(this.root.overlays.settings.endnotes
+        ? { endnotes: this.root.overlays.settings.endnotes }
         : {}),
       ...(this.root.overlays.settings.header ? { header: this.root.overlays.settings.header } : {}),
       ...(this.root.overlays.settings.footer ? { footer: this.root.overlays.settings.footer } : {}),

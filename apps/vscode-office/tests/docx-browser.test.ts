@@ -407,6 +407,21 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     await expect
       .poll(() => session.presentation().settings!.comments!.map((c) => c.text))
       .toEqual(['Please verify'])
+    // References → Insert Footnote: the desktop prompt adds the reference and its note in one entry.
+    await editor.evaluate((element) =>
+      (
+        element as unknown as { editor: { commands: { focus(at: string): void } } }
+      ).editor.commands.focus('end'),
+    )
+    await page.locator('.ribbon-tab', { hasText: /^References$/ }).click()
+    await page.locator('[data-tip="Add a footnote at the bottom of the page"]').first().click()
+    await page.getByPlaceholder('Footnote text…').fill('Annual report')
+    await page.locator('.btn-primary', { hasText: 'OK' }).click()
+    expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
+    await expect
+      .poll(() => session.presentation().settings!.footnotes!.map((n) => n.text))
+      .toEqual(['Annual report'])
+    await page.locator('.office-docx-footnotes li', { hasText: 'Annual report' }).waitFor()
     const beforeTheme = session.content()
     await page.evaluate(() =>
       document.documentElement.style.setProperty('--vscode-editor-background', 'rgb(20, 20, 20)'),

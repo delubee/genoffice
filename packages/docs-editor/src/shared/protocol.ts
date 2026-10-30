@@ -3,6 +3,7 @@ import type {
   CommentInfo,
   CustomNumberingLevel,
   HeaderFooter,
+  NoteInfo,
   NumberingDef,
   SectionSettings,
   StyleInfo,
@@ -19,6 +20,8 @@ export interface DocumentSettings {
   footer?: HeaderFooter
   /** the full comment list (threads, replies, resolved state) */
   comments?: CommentInfo[]
+  footnotes?: NoteInfo[]
+  endnotes?: NoteInfo[]
 }
 /** List definitions the view allocated for these steps (Ribbon bullets / numbering / multilevel). */
 export interface PendingListDefinitions {
@@ -58,6 +61,8 @@ export interface StepRequest {
   numbering?: PendingListDefinitions
   /** the comment list after these steps, when they add or remove comment anchors */
   comments?: CommentInfo[]
+  footnotes?: NoteInfo[]
+  endnotes?: NoteInfo[]
 }
 export interface Commit {
   descriptor: SessionDescriptor
