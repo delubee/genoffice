@@ -60,3 +60,34 @@ it('refuses forged picture blocks that claim source XML or mismatched bytes', as
   ])
     expect(() => submit(new Transform(doc).insert(doc.content.size, forged))).toThrow()
 })
+
+it('resizes a file picture through Picture Format and saves the new extent', async () => {
+  const first = await DocxSession.open(
+    await buildDocx({ bodyXml: '<w:p><w:r><w:t>Before picture</w:t></w:r></w:p>' }),
+  )
+  const doc = docxSchema.nodeFromJSON(first.content())
+  submitter(first)(new Transform(doc).insert(doc.content.size, picture()))
+  const session = await DocxSession.open(await first.save())
+  const reopened = docxSchema.nodeFromJSON(session.content())
+  let at = -1
+  reopened.descendants((node, pos) => {
+    if (at < 0 && node.type.name === 'docProtected' && node.attrs.blockType === 'image') at = pos
+  })
+  expect(at).toBeGreaterThanOrEqual(0)
+  const node = reopened.nodeAt(at)!
+  expect(node.attrs.officeLocked).toBe(false)
+  submitter(session)(
+    new Transform(reopened).setNodeMarkup(at, undefined, {
+      ...node.attrs,
+      imageWidthPx: 80,
+      imageHeightPx: 60,
+    }),
+  )
+  const xml = await (
+    await JSZip.loadAsync(await session.save())
+  )
+    .file('word/document.xml')!
+    .async('string')
+  // 80 px at 96 dpi = 762000 EMU
+  expect(xml).toMatch(/<wp:extent cx="762000" cy="571500"/)
+})

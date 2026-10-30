@@ -14,7 +14,7 @@ const fixture = () =>
           attrs: { docxIndex: 0 },
           content: [{ type: 'text', text: 'Editable' }],
         },
-        { type: 'docProtected', attrs: { docxIndex: 1, blockType: 'image', label: 'Picture' } },
+        { type: 'docProtected', attrs: { docxIndex: 1, blockType: 'chart', label: 'Chart' } },
       ],
     },
     id,
@@ -143,5 +143,27 @@ describe('DOCX host policy', () => {
     } as never)
     const normalized = validateAndNormalize(before, fresh, id)
     expect(normalized.content![2]!.attrs!.docxIndex).toBeNull()
+  })
+  it('lets Picture Format resize a file picture but never move its source anchor', () => {
+    const before = prepareDocument(
+      {
+        type: 'doc',
+        content: [
+          {
+            type: 'docProtected',
+            attrs: { docxIndex: 0, blockType: 'image', label: 'Picture', imageWidthPx: 100 },
+          },
+        ],
+      },
+      id,
+    )
+    expect(before.content![0]!.attrs!.officeLocked).toBe(false)
+    const resized = structuredClone(before)
+    resized.content![0]!.attrs!.imageWidthPx = 240
+    resized.content![0]!.attrs!.imageRotDeg = 90
+    expect(validateAndNormalize(before, resized, id).content![0]!.attrs!.imageWidthPx).toBe(240)
+    const moved = structuredClone(before)
+    moved.content![0]!.attrs!.docxIndex = 7
+    expect(() => validateAndNormalize(before, moved, id)).toThrow('Immutable')
   })
 })

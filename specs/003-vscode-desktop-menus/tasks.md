@@ -38,8 +38,9 @@
   - [x] File → Convert to HTML / Markdown through a typed `docx.export` port: the desktop exporters render in the view, the host writes via a VS Code save dialog (Markdown pictures into `<name>_files`). PDF / image export and printing remain explicit (no print pipeline in the webview).
   - [x] Insert → Field: the desktop field insertion with whitelisted, in-document field types (PAGE, NUMPAGES, DATE, TIME, FILENAME, AUTHOR, MERGEFIELD …); INCLUDETEXT / INCLUDEPICTURE / DDE / LINK and markup are refused by the policy.
   - [x] Review → Protect Document: the desktop dialog sets editing restriction, password-to-modify (hash only) and remove-personal-information as settings entries; saved to settings.xml, reopened read-only when enforced. Password-to-open encryption remains explicit.
+  - [x] Picture Format on file pictures: image blocks are no longer sealed placeholders; size, rotation, wrap and other picture attributes are edited as the desktop does, while anchors and raw XML stay immutable; resized extents saved. Charts, shapes and other objects stay sealed.
   - [ ] Set Numbering Value / Adjust List Indents (existing-definition edits), picture bullets.
-  - [ ] Remaining: comments, notes, headers/footers, page setup, revisions, protection, drawing, mail merge, print/export and picture editing of file images.
+  - [ ] Remaining: comments, notes, headers/footers, page setup, revisions, protection, drawing, mail merge, print/export.
 - [ ] Route all ribbon AI actions into native VS Code chat with document context.
 - [ ] Implement real file, clipboard, picture, export/print and window host actions.
 - [ ] Verify native Open/Save As dialogs and real-model chat/skill flows after complete ribbon integration.

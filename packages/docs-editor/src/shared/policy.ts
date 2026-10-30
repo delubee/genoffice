@@ -201,7 +201,12 @@ export function prepareDocument(input: EditorJSON, makeId: () => string): Editor
       throw new Error('Unsupported content cannot be safely anchored to the original DOCX')
   walk(doc, (node) => {
     if (tracked.has(node.type))
-      node.attrs = { ...node.attrs, officeId: makeId(), officeLocked: node.type === 'docProtected' }
+      node.attrs = {
+        ...node.attrs,
+        officeId: makeId(),
+        // Pictures take Picture Format edits through their attributes; other objects stay sealed.
+        officeLocked: node.type === 'docProtected' && node.attrs?.blockType !== 'image',
+      }
   })
   return docxSchema.nodeFromJSON(doc).toJSON() as EditorJSON
 }

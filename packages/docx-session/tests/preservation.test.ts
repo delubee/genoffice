@@ -62,7 +62,8 @@ it('keeps real image bytes, header/footer parts and private runs when editing a 
   const session = await DocxSession.open(bytes)
   const read = session.read()
   expect(JSON.stringify(read)).not.toContain('PRIVATE_SENTINEL')
-  expect(read.blocks.filter((block) => block.protected)).toHaveLength(2)
+  // The redacted run stays sealed; the picture is editable through Picture Format.
+  expect(read.blocks.filter((block) => block.protected)).toHaveLength(1)
   session.applyOperations({
     transactionId: 'edit-safe-paragraph',
     expectedRevision: 0,
