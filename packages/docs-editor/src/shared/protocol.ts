@@ -7,6 +7,7 @@ import type {
   StyleUpsert,
   NumberingDef,
   SectionSettings,
+  SourceInfo,
   DocProtection,
   WriteProtection,
   ThemeColors,
@@ -27,6 +28,8 @@ export interface DocumentSettings {
   comments?: CommentInfo[]
   footnotes?: NoteInfo[]
   endnotes?: NoteInfo[]
+  /** References → Manage Sources (bibliography sources) */
+  sources?: SourceInfo[]
   /** Review → Protect Document (applies to the saved file) */
   protection?: DocProtection | null
   writeProtection?: WriteProtection | null

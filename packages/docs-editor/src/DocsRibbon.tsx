@@ -178,8 +178,9 @@ export function DocsRibbon({
     inkCount: 0,
     onInkClearAll: unavailable('Drawing'),
     onInsertNote,
-    sources: [],
-    onAddSource: unavailable('Citations'),
+    sources: runtime.settings.sources ?? [],
+    onAddSource: (source) =>
+      void runtime.applySettings({ sources: [...(runtime.settings.sources ?? []), source] }),
     zoom: view.zoom,
     onZoom: view.onZoom,
     onZoomFit: view.onZoomFit,

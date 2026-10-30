@@ -236,6 +236,7 @@ export class DocxSession {
       watermark:
         edits.watermark !== undefined ? edits.watermark : (this.original.watermarkText ?? null),
       comments: edits.comments ?? this.original.comments,
+      sources: edits.sources ?? this.original.sources,
       protection: edits.protection !== undefined ? edits.protection : this.original.protection,
       writeProtection:
         edits.writeProtection !== undefined ? edits.writeProtection : this.original.writeProtection,
@@ -675,6 +676,9 @@ export class DocxSession {
         : {}),
       ...(this.root.overlays.settings.comments
         ? { comments: this.root.overlays.settings.comments }
+        : {}),
+      ...(this.root.overlays.settings.sources
+        ? { sources: this.root.overlays.settings.sources }
         : {}),
       ...(this.root.overlays.settings.protection !== undefined
         ? { protection: this.root.overlays.settings.protection }

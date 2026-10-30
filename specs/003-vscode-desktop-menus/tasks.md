@@ -40,6 +40,7 @@
   - [x] Review → Protect Document: the desktop dialog sets editing restriction, password-to-modify (hash only) and remove-personal-information as settings entries; saved to settings.xml, reopened read-only when enforced. Password-to-open encryption remains explicit.
   - [x] Picture Format on file pictures: image blocks are no longer sealed placeholders; size, rotation, wrap and other picture attributes are edited as the desktop does, while anchors and raw XML stay immutable; resized extents saved. Charts, shapes and other objects stay sealed.
   - [x] Set Numbering Value (restart/continue via restart definitions) and Adjust List Indents (level edits of file or session lists, step-less entries) with the desktop dialogs; presented and saved to numbering.xml.
+  - [x] References: sources (Manage Sources / Insert Citation / Bibliography) as a settings list saved to the sources part; Table of Contents, Index and Insert Caption blocks accepted only when their generated field XML matches the engine templates exactly (escaped text, in-document TOC / INDEX / SEQ instructions).
   - [ ] Picture bullets.
   - [ ] Remaining: comments, notes, headers/footers, page setup, revisions, protection, drawing, mail merge, print/export.
 - [ ] Route all ribbon AI actions into native VS Code chat with document context.

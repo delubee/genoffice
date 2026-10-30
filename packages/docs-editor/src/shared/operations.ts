@@ -369,6 +369,22 @@ export const documentSettingsSchema = z
       .nullable()
       .optional(),
     removePersonalInfo: z.boolean().optional(),
+    sources: z
+      .array(
+        z
+          .object({
+            tag: z.string().regex(/^[\p{L}\p{N}_.-]{1,64}$/u),
+            type: z.string().regex(/^[A-Za-z]{1,40}$/),
+            author: commentText(1000),
+            title: commentText(1000),
+            year: commentText(20),
+            publisher: commentText(1000).optional(),
+            url: commentText(2000).optional(),
+          })
+          .strict(),
+      )
+      .max(2000)
+      .optional(),
     themeFonts: z
       .record(z.string().regex(/^[A-Za-z]{1,20}$/), themeText)
       .refine((fonts) => typeof fonts.major === 'string' && typeof fonts.minor === 'string')

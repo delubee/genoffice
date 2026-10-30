@@ -136,3 +136,20 @@ it('saves Protect Document settings and reopens the document read-only', async (
     apply(session, { protection: { edit: 'readOnly', enforced: true, hash: '<x/>' } }),
   ).toThrow()
 })
+
+it('saves References sources for citations and bibliographies', async () => {
+  const session = await DocxSession.open(
+    await buildDocx({ bodyXml: '<w:p><w:r><w:t>Cited</w:t></w:r></w:p>' }),
+  )
+  const source = {
+    tag: 'Wang2024',
+    type: 'Book',
+    author: 'Wang Li',
+    title: 'Field Notes',
+    year: '2024',
+  }
+  apply(session, { sources: [source] })
+  const reopened = await DocxSession.open(await session.save())
+  expect(reopened.presentation().settings!.sources).toEqual([expect.objectContaining(source)])
+  expect(() => apply(session, { sources: [{ ...source, tag: '<x/>' }] })).toThrow()
+})

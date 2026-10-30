@@ -336,6 +336,75 @@ function assertShape(key: string, value: unknown, depth = 0): void {
   throw new Error(`Invalid ${key}`)
 }
 
+// Field paragraphs References generates (TOC, index, caption): matched exactly
+// against the engine's templates, with escaped text as the only variable part.
+const TEXT = '(?:[^<>&]|&(?:amp|lt|gt|quot|apos);)*'
+const NO_PROOF = '<w:rPr><w:noProof/></w:rPr>'
+const BEGIN = (instr: string) =>
+  '<w:r><w:fldChar w:fldCharType="begin" w:dirty="true"/></w:r>' +
+  `<w:r><w:instrText xml:space="preserve"> ${instr} </w:instrText></w:r>` +
+  '<w:r><w:fldChar w:fldCharType="separate"/></w:r>'
+const END = '<w:r><w:fldChar w:fldCharType="end"/></w:r>'
+const escapeRe = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const TOC_BEGIN =
+  escapeRe(
+    '<w:r><w:fldChar w:fldCharType="begin" w:dirty="true"/></w:r>' +
+      '<w:r><w:instrText xml:space="preserve"> TOC \\o "1-',
+  ) +
+  '[1-9]' +
+  escapeRe('" \\h \\z \\u </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r>')
+const GENERATED_FIELD_XML = [
+  new RegExp(
+    '^<w:p><w:pPr><w:pStyle w:val="TOC[1-9]"/>' +
+      escapeRe('<w:tabs><w:tab w:val="right" w:leader="dot" w:pos="9350"/></w:tabs>') +
+      escapeRe(NO_PROOF) +
+      '</w:pPr>' +
+      `(?:${TOC_BEGIN})?` +
+      `<w:r>${escapeRe(NO_PROOF)}<w:t xml:space="preserve">${TEXT}</w:t></w:r>` +
+      `<w:r>${escapeRe(NO_PROOF)}<w:tab/></w:r>` +
+      `(?:<w:r>${escapeRe(NO_PROOF)}<w:t>[0-9]{1,6}</w:t></w:r>)?` +
+      `(?:${escapeRe(END)})?</w:p>$`,
+  ),
+  new RegExp(
+    '^<w:p>' +
+      escapeRe(
+        '<w:pPr><w:tabs><w:tab w:val="right" w:leader="dot" w:pos="4300"/></w:tabs>' +
+          NO_PROOF +
+          '</w:pPr>',
+      ) +
+      `(?:${escapeRe(BEGIN('INDEX \\c "2"'))})?` +
+      `<w:r>${escapeRe(NO_PROOF)}<w:t xml:space="preserve">${TEXT}</w:t></w:r>` +
+      `<w:r>${escapeRe(NO_PROOF)}<w:tab/></w:r>` +
+      `(?:${escapeRe(END)})?</w:p>$`,
+  ),
+  (() => {
+    const run = (inner: string) =>
+      `<w:r>${escapeRe('<w:rPr><w:color w:val="44546A"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr>')}${inner}</w:r>`
+    return new RegExp(
+      '^' +
+        escapeRe(
+          '<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="80" w:after="200"/></w:pPr>',
+        ) +
+        run(`<w:t xml:space="preserve">(${TEXT}) </w:t>`) +
+        run(escapeRe('<w:fldChar w:fldCharType="begin" w:dirty="true"/>')) +
+        run(`<w:instrText xml:space="preserve"> SEQ \\1 ${escapeRe('\\* ARABIC')} </w:instrText>`) +
+        run(escapeRe('<w:fldChar w:fldCharType="separate"/>')) +
+        run('<w:t>[0-9]{1,6}</w:t>') +
+        run(escapeRe('<w:fldChar w:fldCharType="end"/>')) +
+        `(?:${run(`<w:t xml:space="preserve"> ${TEXT}</w:t>`)})?</w:p>$`,
+    )
+  })(),
+]
+/** References → Table of Contents / Index / Caption: a passthrough block of generated field XML. */
+function generatedField(attrs: Record<string, unknown>): boolean {
+  return (
+    attrs.blockType === 'passthrough' &&
+    attrs.docxIndex == null &&
+    typeof attrs.genXml === 'string' &&
+    attrs.genXml.length <= 100_000 &&
+    GENERATED_FIELD_XML.some((pattern) => pattern.test(attrs.genXml as string))
+  )
+}
 /** Insert → Pictures: a new picture block whose bytes the save writes as a fresh media part. */
 function newPicture(attrs: Record<string, unknown>): boolean {
   const image = attrs.genImage as
@@ -440,7 +509,9 @@ export function validateAndNormalize(
         )
           throw new Error('Unsupported block conversion')
       } else {
-        const picture = node.type === 'docProtected' && newPicture(node.attrs ?? {})
+        const picture =
+          node.type === 'docProtected' &&
+          (newPicture(node.attrs ?? {}) || generatedField(node.attrs ?? {}))
         if (node.type === 'docProtected' && !picture)
           throw new Error('Cannot create protected objects')
         const inheritedIndex = node.attrs?.docxIndex
@@ -454,7 +525,7 @@ export function validateAndNormalize(
         const defaults = defaultsOf(node.type)
         node.attrs = { ...node.attrs, officeId: makeId(), officeLocked: false }
         for (const key of rawAttrs)
-          if (key in node.attrs && !(picture && key === 'genImage'))
+          if (key in node.attrs && !(picture && (key === 'genImage' || key === 'genXml')))
             node.attrs[key] = defaults[key] ?? null
         if (!picture && needsProtection(node)) throw new Error('Unsupported new content')
         for (const [key, value] of Object.entries(node.attrs)) {
