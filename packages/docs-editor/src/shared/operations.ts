@@ -172,12 +172,14 @@ const settingValue = (value: unknown, depth: number): boolean => {
   return false
 }
 const twips = z.number().int().min(-31680).max(31680)
-// eslint-disable-next-line no-control-regex -- C0 controls other than tab/newline never serialize.
+// C0 controls other than tab/newline never serialize.
+// eslint-disable-next-line no-control-regex -- the pattern names exactly those controls.
+const C0_CONTROLS = /[\x00-\x08\x0b\x0c\x0e-\x1f]/
 const commentText = (max: number) =>
   z
     .string()
     .max(max)
-    .refine((value) => !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(value))
+    .refine((value) => !C0_CONTROLS.test(value))
 const commentId = z.string().regex(/^[0-9]{1,9}$/)
 export const commentsSchema = z
   .array(
