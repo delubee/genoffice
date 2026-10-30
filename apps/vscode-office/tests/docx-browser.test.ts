@@ -422,6 +422,18 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
       .poll(() => session.presentation().settings!.footnotes!.map((n) => n.text))
       .toEqual(['Annual report'])
     await page.locator('.office-docx-footnotes li', { hasText: 'Annual report' }).waitFor()
+    // View → Navigation Pane and Home → Styles Pane mount the desktop panes.
+    await page.locator('.ribbon-tab', { hasText: /^View$/ }).click()
+    await page
+      .locator('[data-tip="Show/hide the navigation pane (heading outline)"]')
+      .first()
+      .click()
+    await page.locator('aside.nav-pane').waitFor()
+    await page.locator('aside.nav-pane .nav-pane-close').click()
+    await page.locator('.ribbon-tab', { hasText: /^Home$/ }).click()
+    await page.locator('.rb-styles-pane').click()
+    await page.locator('aside.styles-pane').waitFor()
+    await page.locator('aside.styles-pane .nav-pane-close').click()
     const beforeTheme = session.content()
     await page.evaluate(() =>
       document.documentElement.style.setProperty('--vscode-editor-background', 'rgb(20, 20, 20)'),

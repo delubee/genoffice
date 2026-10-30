@@ -41,7 +41,8 @@ export class DocxDocument implements vscode.CustomDocument {
       this.busy = false
     }
   }
-  projection() {
+  async projection() {
+    await this.session.stylesReady()
     return {
       descriptor: this.session.descriptor(),
       content: this.session.content(),
@@ -67,7 +68,7 @@ export class DocxDocument implements vscode.CustomDocument {
   async project() {
     const bridge = this.bridge
     try {
-      await bridge?.request('view.resync', this.projection())
+      await bridge?.request('view.resync', await this.projection())
     } catch (error) {
       if (bridge === this.bridge) throw error
     }

@@ -5,6 +5,8 @@ import {
   type ParsedDocFull,
   numberingLevelFromCustom,
   readPageColor,
+  previewFontSettings,
+  type StyleInfo,
   readSectionSettings,
   type StyleUpsert,
   type NumberingDef,
@@ -13,6 +15,7 @@ import {
   HF_RAW_KEYS,
   commentsSchema,
   notesSchema,
+  styleUpsertsSchema,
   documentSettingsSchema,
   pendingListDefinitionsSchema,
 } from '@genoffice/docs-editor/shared/operations'
@@ -73,6 +76,8 @@ export class DocxSession {
   private readonly baseCSS: string
   private savedStateId: string | null
   private conflict = false
+  /** Styles resolved for the pending style definitions (refreshed by stylesReady). */
+  private liveStyles: { key: string; styles: Map<string, StyleInfo>; css: string } | null = null
   readonly readonly: boolean
 
   private constructor(private readonly original: ParsedDocFull) {
@@ -124,6 +129,42 @@ export class DocxSession {
   markConflict() {
     this.conflict = true
   }
+  /** Resolve styles.xml with the pending definitions before presenting them. */
+  async stylesReady(): Promise<void> {
+    const upserts = this.root.overlays.styles
+    const key = JSON.stringify(upserts)
+    if (!upserts.length || this.liveStyles?.key === key) return
+    const { styles } = await previewFontSettings(this.original, upserts)
+    this.liveStyles = {
+      key,
+      styles,
+      css:
+        docStyleCss({ ...this.original, styles }) +
+        docThemeCss(
+          this.original.themeFonts,
+          this.original.themeColors,
+          Boolean(docBodyFont(this.original)),
+        ),
+    }
+  }
+  /** Style definitions join the overlay merged as the desktop's upsert does. */
+  private withStyles(overlays: Overlays, input: unknown) {
+    for (const up of styleUpsertsSchema.parse(input) as StyleUpsert[]) {
+      const previous = overlays.styles.find((style) => style.styleId === up.styleId)
+      overlays.styles = previous
+        ? overlays.styles.map((style) =>
+            style === previous
+              ? {
+                  ...previous,
+                  ...up,
+                  ...(up.pPr || previous.pPr ? { pPr: { ...previous.pPr, ...up.pPr } } : {}),
+                  ...(up.rPr || previous.rPr ? { rPr: { ...previous.rPr, ...up.rPr } } : {}),
+                }
+              : style,
+          )
+        : [...overlays.styles, up]
+    }
+  }
   presentation(): DocumentPresentation {
     const numbering = new Map(this.original.numbering)
     for (const definition of this.root.overlays.numbering)
@@ -158,6 +199,8 @@ export class DocxSession {
     }
     // Engine models contain optional undefined properties; explicitly project
     // trusted parsed data into JSON before the strict transport sees it.
+    const live =
+      this.liveStyles?.key === JSON.stringify(this.root.overlays.styles) ? this.liveStyles : null
     const pendingCSS = this.root.overlays.styles
       .map(
         (style) =>
@@ -166,9 +209,9 @@ export class DocxSession {
       .join('\n')
     return JSON.parse(
       JSON.stringify({
-        css: this.baseCSS + pendingCSS,
+        css: (live ? live.css : this.baseCSS) + pendingCSS,
         numbering: [...numbering.entries()],
-        styles: [...this.original.styles.entries()],
+        styles: [...(live ? live.styles : this.original.styles).entries()],
         docDefaults: this.original.docDefaults,
         settings: this.settings(),
       }),
@@ -230,7 +273,9 @@ export class DocxSession {
     }
     check([edit.header?.paras, edit.footer?.paras])
     const overlays = structuredClone(this.root.overlays)
-    overlays.settings = { ...overlays.settings, ...edit } as DocumentSettings
+    const { styles, ...settings } = edit
+    if (styles) this.withStyles(overlays, styles)
+    overlays.settings = { ...overlays.settings, ...settings } as DocumentSettings
     const fromVersion = this.collabVersion
     this.commitRoot(this.root.doc, overlays)
     const commit: Commit = {
@@ -361,13 +406,20 @@ export class DocxSession {
   }
 
   submit(request: StepRequest): Commit {
-    if (!request.numbering && !request.comments && !request.footnotes && !request.endnotes)
+    if (
+      !request.numbering &&
+      !request.comments &&
+      !request.footnotes &&
+      !request.endnotes &&
+      !request.styles
+    )
       return this.submitSteps(request, this.root.overlays)
     const overlays = request.numbering
       ? this.withListDefinitions(request.numbering)
       : structuredClone(this.root.overlays)
     if (request.comments)
       overlays.settings = { ...overlays.settings, comments: commentsSchema.parse(request.comments) }
+    if (request.styles) this.withStyles(overlays, request.styles)
     for (const kind of ['footnotes', 'endnotes'] as const)
       if (request[kind])
         overlays.settings = {

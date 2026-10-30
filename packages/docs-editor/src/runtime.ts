@@ -61,9 +61,12 @@ export class DocumentRuntime {
   } = { newDefs: [], restartNums: [], levelEdits: [], picBullets: [] }
   readonly numIdFloor = { current: 0 }
   /** Review list changes (comments, notes) waiting for the steps that anchor them, or their own entry. */
-  private pendingLists: Pick<DocumentSettings, 'comments' | 'footnotes' | 'endnotes'> | null = null
+  private pendingLists: Pick<
+    DocumentSettings,
+    'comments' | 'footnotes' | 'endnotes' | 'styles'
+  > | null = null
   /** Review edits, as the desktop review actions make them. */
-  setReviewList<K extends 'comments' | 'footnotes' | 'endnotes'>(
+  setReviewList<K extends 'comments' | 'footnotes' | 'endnotes' | 'styles'>(
     kind: K,
     list: NonNullable<DocumentSettings[K]>,
   ) {
@@ -76,6 +79,10 @@ export class DocumentRuntime {
       this.pendingLists = null
       void this.applySettings(lists)
     }, 0)
+  }
+  /** Styles pane definitions: queued like review lists, merged by the session. */
+  upsertStyle(style: NonNullable<DocumentSettings['styles']>[number]) {
+    this.setReviewList('styles', [...(this.pendingLists?.styles ?? []), style])
   }
   setComments(comments: NonNullable<DocumentSettings['comments']>) {
     this.setReviewList('comments', comments)

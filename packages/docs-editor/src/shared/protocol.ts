@@ -4,6 +4,7 @@ import type {
   CustomNumberingLevel,
   HeaderFooter,
   NoteInfo,
+  StyleUpsert,
   NumberingDef,
   SectionSettings,
   StyleInfo,
@@ -22,6 +23,8 @@ export interface DocumentSettings {
   comments?: CommentInfo[]
   footnotes?: NoteInfo[]
   endnotes?: NoteInfo[]
+  /** style definition edits (merged into the session's pending styles) */
+  styles?: StyleUpsert[]
 }
 /** List definitions the view allocated for these steps (Ribbon bullets / numbering / multilevel). */
 export interface PendingListDefinitions {
@@ -63,6 +66,8 @@ export interface StepRequest {
   comments?: CommentInfo[]
   footnotes?: NoteInfo[]
   endnotes?: NoteInfo[]
+  /** style definitions (Styles pane / gallery) the steps use */
+  styles?: StyleUpsert[]
 }
 export interface Commit {
   descriptor: SessionDescriptor

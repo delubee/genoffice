@@ -234,6 +234,33 @@ const hfValue = (key: string, value: unknown, depth: number): boolean => {
     )
   return false
 }
+/** Styles pane definitions: identifiers plus plain run/paragraph properties. */
+const styleIdPattern = /^[A-Za-z0-9_.-]{1,253}$/
+export const styleUpsertsSchema = z
+  .array(
+    z
+      .object({
+        styleId: z.string().regex(styleIdPattern),
+        type: z.enum(['paragraph', 'character', 'table']).optional(),
+        name: z
+          .string()
+          .max(253)
+          .refine((value) => !/[<>&"]/.test(value))
+          .optional(),
+        basedOn: z.string().regex(styleIdPattern).nullable().optional(),
+        next: z.string().regex(styleIdPattern).nullable().optional(),
+        quickFormat: z.boolean().optional(),
+        rPr: z.record(z.string(), z.unknown()).optional(),
+        pPr: z.record(z.string(), z.unknown()).optional(),
+      })
+      .strict()
+      .refine(
+        (style) => settingValue(style.rPr ?? null, 0) && settingValue(style.pPr ?? null, 0),
+        'Invalid style properties',
+      ),
+  )
+  .max(500)
+
 /** Footnote / endnote bodies: plain JSON runs whose text the writer escapes. */
 export const notesSchema = z
   .array(
@@ -300,6 +327,7 @@ export const documentSettingsSchema = z
     header: headerFooterSchema.optional(),
     comments: commentsSchema.optional(),
     footnotes: notesSchema.optional(),
+    styles: styleUpsertsSchema.optional(),
     endnotes: notesSchema.optional(),
     footer: headerFooterSchema.optional(),
     watermark: z

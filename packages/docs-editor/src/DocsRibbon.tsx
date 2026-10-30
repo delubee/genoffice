@@ -27,9 +27,16 @@ export function DocsRibbon({
   onHfEdit,
   comments,
   onInsertNote,
+  panes,
   quickActions,
 }: {
   runtime: DocumentRuntime
+  panes: {
+    nav: boolean
+    styles: boolean
+    onNav(show: boolean): void
+    onStyles(show: boolean): void
+  }
   onInsertNote(kind: 'footnote' | 'endnote'): void
   comments: {
     count: number
@@ -58,8 +65,6 @@ export function DocsRibbon({
   const [zoom, setZoom] = useState(100)
   const [showMarks, setShowMarks] = useState(false)
   const [showRuler, setShowRuler] = useState(false)
-  const [showNav, setShowNav] = useState(false)
-  const [showStylesPane, setShowStylesPane] = useState(false)
   const [darkPage, setDarkPage] = useState(false)
   const [viewMode, setViewMode] = useState<RibbonProps['viewMode']>('print')
   const [readMode, setReadMode] = useState(false)
@@ -166,10 +171,10 @@ export function DocsRibbon({
     onShowMarks: setShowMarks,
     showRuler,
     onShowRuler: setShowRuler,
-    showNav,
-    onShowNav: setShowNav,
-    showStylesPane,
-    onShowStylesPane: setShowStylesPane,
+    showNav: panes.nav,
+    onShowNav: panes.onNav,
+    showStylesPane: panes.styles,
+    onShowStylesPane: panes.onStyles,
     commentCount: comments.count,
     openCommentCount: comments.open,
     resolvedCommentCount: comments.resolved,

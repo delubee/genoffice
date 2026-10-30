@@ -28,6 +28,10 @@ import {
 } from '../../../apps/docs/src/renderer/review-actions'
 import { wordRangeAtCaret } from '../../../apps/docs/src/renderer/editor/comments'
 import { PromptModal } from '../../../apps/docs/src/renderer/components/PromptModal'
+import { StylesPane } from '../../../apps/docs/src/renderer/components/StylesPane'
+import { NavPane } from '../../../apps/docs/src/renderer/components/NavPane'
+import { computeFormatState } from '../../../apps/docs/src/renderer/components/ribbon-format-state'
+import type { DocDefaults, StyleUpsert } from '@genoffice/docx-engine'
 import { submitNote, type NotePrompt } from '../../../apps/docs/src/renderer/review-actions'
 import {
   EditorContextMenu,
@@ -49,6 +53,11 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
   const footnotes = runtime.settings.footnotes ?? []
   const endnotes = runtime.settings.endnotes ?? []
   const [notePrompt, setNotePrompt] = useState<NotePrompt | null>(null)
+  const [showNav, setShowNav] = useState(false)
+  const [showStylesPane, setShowStylesPane] = useState(false)
+  const [pendingStyles, setPendingStyles] = useState<Record<string, StyleUpsert>>({})
+  const docDefaults = (editor.storage.listNumbering as { docDefaults?: DocDefaults } | undefined)
+    ?.docDefaults
   /** The desktop review actions over the session's comment list. */
   const review = (): ReviewContext => ({
     editor,
@@ -202,6 +211,12 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
           onParagraphDialog={() => setParagraphDialog(true)}
           onHfEdit={(kind) => setHfEdit((current) => ({ ...current, [kind]: Date.now() }))}
           comments={reviewComments}
+          panes={{
+            nav: showNav,
+            styles: showStylesPane,
+            onNav: setShowNav,
+            onStyles: setShowStylesPane,
+          }}
           onInsertNote={(kind) => editor.isEditable && setNotePrompt({ kind })}
           onFind={() => openFind(false)}
           onReplace={() => openFind(true)}
@@ -234,6 +249,32 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
             onClose={() => setFind(null)}
             focusFindNonce={find.find}
             focusReplaceNonce={find.replace}
+          />
+        )}
+        {showNav && (
+          <NavPane
+            editor={editor}
+            doc={editor.state.doc}
+            zoom={1}
+            pageInfo={{ current: 1, total: 1 }}
+            onClose={() => setShowNav(false)}
+          />
+        )}
+        {showStylesPane && (
+          <StylesPane
+            editor={editor}
+            styles={styles}
+            {...(docDefaults ? { docDefaults } : {})}
+            fs={computeFormatState(editor, styles, docDefaults)}
+            canEdit={editor.isEditable}
+            pending={pendingStyles}
+            onUpsert={(style) => {
+              runtime.upsertStyle(style)
+              setPendingStyles((current) => ({ ...current, [style.styleId]: style }))
+              return null
+            }}
+            onNotice={() => {}}
+            onClose={() => setShowStylesPane(false)}
           />
         )}
         {notePrompt && (

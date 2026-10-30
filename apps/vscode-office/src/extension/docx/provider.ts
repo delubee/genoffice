@@ -29,6 +29,7 @@ const requestSchema = z
     comments: z.json().optional(),
     footnotes: z.json().optional(),
     endnotes: z.json().optional(),
+    styles: z.json().optional(),
   })
   .strict()
 
@@ -136,15 +137,19 @@ export class DocxEditorProvider
       return { ready: true }
     })
     bridge.handle('view.intent', (raw) =>
-      document.exclusive(() => {
+      document.exclusive(async () => {
         const revision = document.session.descriptor().revision
         const commit = document.session.submit(requestSchema.parse(raw))
+        if (commit.presentation) {
+          await document.session.stylesReady()
+          commit.presentation = document.session.presentation()
+        }
         if (commit.changed && commit.descriptor.revision > revision) this.record(document)
         return commit
       }),
     )
     bridge.handle('docx.operations', (raw) =>
-      document.exclusive(() => {
+      document.exclusive(async () => {
         const input = z
           .object({
             sessionId: z.string().uuid(),
@@ -162,7 +167,7 @@ export class DocxEditorProvider
       }),
     )
     bridge.handle('docx.settings', (raw) =>
-      document.exclusive(() => {
+      document.exclusive(async () => {
         const input = z
           .object({
             sessionId: z.string().uuid(),
@@ -174,6 +179,8 @@ export class DocxEditorProvider
           .parse(raw)
         if (input.sessionId !== document.session.sessionId) throw new Error('Wrong DOCX session')
         const commit = document.session.applySettings(input)
+        await document.session.stylesReady()
+        commit.presentation = document.session.presentation()
         this.record(document)
         return commit
       }),
