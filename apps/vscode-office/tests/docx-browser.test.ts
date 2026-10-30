@@ -159,8 +159,11 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     expect(chats[1]).toMatchObject({ partial: true, scope: 'selection' })
     expect(bindings.resolve(chats[1]!.bindingId).selection?.blocks.length).toBeGreaterThan(0)
     expect(chats[1]!.query).not.toContain('Hello world')
-    await editor.click()
-    await page.keyboard.press('End')
+    await editor.evaluate((element) =>
+      (
+        element as unknown as { editor: { commands: { focus(at: string): void } } }
+      ).editor.commands.focus('end'),
+    )
     await page.keyboard.press('Enter')
     await page.keyboard.type('Second')
     expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
@@ -172,7 +175,7 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     ])
     await page.keyboard.press('Control+Home')
     await page.keyboard.press('Control+Shift+ArrowRight')
-    await page.getByTitle('Bold', { exact: true }).click()
+    await page.getByRole('button', { name: 'Bold (Ctrl+B)', exact: true }).click()
     expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
     expect(
       session
@@ -180,14 +183,14 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
         .content![0]!.content!.some((node) => node.marks?.some((mark) => mark.type === 'bold')),
     ).toBe(true)
     const beforeDialog = session.content()
-    await page.getByTitle('Font', { exact: true }).click()
+    await page.keyboard.press('Control+KeyD')
     let fontDialog = page.getByRole('dialog', { name: 'Font', exact: true })
     await fontDialog.getByRole('tab', { name: 'Advanced', exact: true }).click()
     await fontDialog.getByLabel('Scale (%)', { exact: true }).fill('80')
     await fontDialog.getByRole('button', { name: 'Cancel', exact: true }).click()
     expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
     expect(session.content()).toEqual(beforeDialog)
-    await page.getByTitle('Font', { exact: true }).click()
+    await page.keyboard.press('Control+KeyD')
     fontDialog = page.getByRole('dialog', { name: 'Font', exact: true })
     await fontDialog.getByRole('tab', { name: 'Advanced', exact: true }).click()
     await fontDialog.getByLabel('Scale (%)', { exact: true }).fill('80')
@@ -217,14 +220,14 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     session.history('redo')
     await bridge.request('view.resync', projection())
     const beforeFontText = await editor.textContent()
-    const sizeInput = page.getByLabel('Font Size', { exact: true })
+    const sizeInput = page.getByLabel('Font Size', { exact: true }).first()
     await sizeInput.focus()
     await page.keyboard.press('Control+A')
     await page.keyboard.type('14')
     expect(await sizeInput.inputValue()).toBe('14')
     await page.keyboard.press('Enter')
     expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
-    const fontInput = page.getByLabel('Font', { exact: true })
+    const fontInput = page.getByLabel('Font', { exact: true }).first()
     await fontInput.focus()
     await page.keyboard.press('Control+A')
     await page.keyboard.type('Times New Roman')
@@ -240,12 +243,12 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
             (mark) =>
               mark.type === 'docTextStyle' &&
               mark.attrs?.sizeHalfPoints === 28 &&
-              mark.attrs?.font === 'Times New Roman',
+              mark.attrs?.fontAscii === 'Times New Roman',
           ),
         ),
     ).toBe(true)
     const beforeParagraph = session.content()
-    await page.getByTitle('Paragraph', { exact: true }).click()
+    await page.keyboard.press('Control+Alt+KeyM')
     const paragraphDialog = page.getByRole('dialog', { name: 'Paragraph', exact: true })
     await paragraphDialog.getByLabel(/^Space before/).fill('12')
     await paragraphDialog.getByRole('button', { name: 'Line spacing', exact: true }).click()
@@ -270,17 +273,20 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     expect(session.content()).toEqual(beforeParagraph)
     session.history('redo')
     await bridge.request('view.resync', projection())
-    await page.getByLabel('Paragraph', { exact: true }).selectOption('1')
+    await page.locator('.style-gallery').getByText('Heading 1', { exact: true }).click()
     expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
     expect(session.content().content![0]!.type).toBe('docHeading')
-    await page.getByLabel('Paragraph', { exact: true }).selectOption('0')
+    await page.locator('.style-gallery').getByText('Normal', { exact: true }).click()
     expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
-    await page.getByTitle('Insert a table', { exact: true }).click()
+    await page.locator('.ribbon-tab', { hasText: /^Insert$/ }).click()
+    await page.locator('[data-tip="Insert a table"]').click()
+    await page.locator('.table-picker-grid .table-cell').nth(11).click()
     expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
     await page.locator('.tiptap td p').first().click()
-    await page.getByTitle('Insert Below', { exact: true }).click()
+    await page.locator('.ribbon-tab', { hasText: /^Table Layout$/ }).click()
+    await page.getByRole('button', { name: 'Insert Below', exact: true }).click()
     expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
-    await page.getByTitle('Insert Right', { exact: true }).click()
+    await page.getByRole('button', { name: 'Insert Right', exact: true }).click()
     expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
     const table = session.content().content!.find((node) => node.type === 'docTable')!
     expect(table.content).toHaveLength(3)
@@ -316,7 +322,7 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
       }))
         document.documentElement.style.setProperty(name, value)
     })
-    await page.getByTitle('Font', { exact: true }).click()
+    await page.keyboard.press('Control+KeyD')
     expect(
       await page
         .getByRole('dialog', { name: 'Font', exact: true })

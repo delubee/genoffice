@@ -1,0 +1,174 @@
+import { useState, type ComponentProps, type ReactNode } from 'react'
+import type { DocDefaults, StyleInfo } from '@genoffice/docx-engine'
+import { Ribbon } from '../../../apps/docs/src/renderer/components/Ribbon'
+import { computeFormatState } from '../../../apps/docs/src/renderer/components/ribbon-format-state'
+import { useShallowStable } from '../../../apps/docs/src/renderer/use-stable'
+import type { DocumentRuntime } from './runtime'
+
+type RibbonProps = ComponentProps<typeof Ribbon>
+
+/**
+ * The desktop Docs ribbon bound to the VS Code DOCX runtime. Editor commands
+ * run on the shared editor and enter the host session through its validated
+ * steps; view toggles stay local to the view, and host capabilities without a
+ * VS Code port report explicitly instead of hiding the control.
+ */
+export function DocsRibbon({
+  runtime,
+  onParagraphDialog,
+  quickActions,
+}: {
+  runtime: DocumentRuntime
+  onParagraphDialog(): void
+  quickActions?: ReactNode
+}) {
+  const editor = runtime.editor
+  const storage = editor.storage.listNumbering as
+    { styles?: Map<string, StyleInfo>; docDefaults?: DocDefaults } | undefined
+  const formatState = useShallowStable(
+    computeFormatState(editor, storage?.styles, storage?.docDefaults),
+  )
+  const [zoom, setZoom] = useState(100)
+  const [showMarks, setShowMarks] = useState(false)
+  const [showRuler, setShowRuler] = useState(false)
+  const [showNav, setShowNav] = useState(false)
+  const [showStylesPane, setShowStylesPane] = useState(false)
+  const [darkPage, setDarkPage] = useState(false)
+  const [viewMode, setViewMode] = useState<RibbonProps['viewMode']>('print')
+  const [readMode, setReadMode] = useState(false)
+  const [showGrid, setShowGrid] = useState(false)
+  const [splitView, setSplitView] = useState(false)
+  const [tableGridlines, setTableGridlines] = useState(true)
+  const unavailable = (feature: string) => () =>
+    runtime.reportError(`${feature} is not available in the VS Code editor yet.`)
+  const file = (action: 'open' | 'save' | 'saveAs') => () =>
+    void runtime.officeAction({ action }).catch((error) => runtime.reportError(error))
+  const props: RibbonProps = {
+    editor,
+    formatState,
+    quickActions,
+    hasDoc: true,
+    blocks: [],
+    styles: storage?.styles,
+    docDefaults: storage?.docDefaults,
+    onParagraphDialog,
+    onFind: unavailable('Find'),
+    onReplace: unavailable('Replace'),
+    onOpen: file('open'),
+    onSave: file('save'),
+    onSaveAs: file('saveAs'),
+    onConvert: unavailable('Export'),
+    showAi: false,
+    onToggleAi: () =>
+      void runtime
+        .officeAction({ action: 'chat', scope: 'document', instruction: '' })
+        .catch((error) => runtime.reportError(error)),
+    section: null,
+    onSection: unavailable('Page setup'),
+    activeSection: null,
+    onInsertSectionBreak: unavailable('Section breaks'),
+    onPaperSizeAll: unavailable('Paper size'),
+    mirrorMargins: false,
+    onMirrorMargins: unavailable('Mirror margins'),
+    pageColor: null,
+    onPageColor: unavailable('Page color'),
+    watermark: null,
+    onWatermark: unavailable('Watermark'),
+    themeFonts: null,
+    onThemeFonts: unavailable('Theme fonts'),
+    themeColors: null,
+    onThemeColors: unavailable('Theme colors'),
+    inkTool: 'select',
+    onInkTool: unavailable('Drawing'),
+    inkPen: { color: 'C00000', width: 2 },
+    onInkPen: unavailable('Drawing'),
+    inkHighlighter: { color: 'FFFF00', width: 10 },
+    onInkHighlighter: unavailable('Drawing'),
+    inkCount: 0,
+    onInkClearAll: unavailable('Drawing'),
+    onInsertNote: unavailable('Footnotes and endnotes'),
+    sources: [],
+    onAddSource: unavailable('Citations'),
+    zoom,
+    onZoom: setZoom,
+    onZoomFit: () => setZoom(100),
+    onZoomDialog: unavailable('Zoom dialog'),
+    darkPage,
+    onDarkPage: setDarkPage,
+    onAiPreset: (instruction) =>
+      void runtime
+        .officeAction({ action: 'chat', scope: 'document', instruction })
+        .catch((error) => runtime.reportError(error)),
+    header: null,
+    onHeader: unavailable('Headers'),
+    onPageNumFormat: unavailable('Page numbers'),
+    onInsertField: unavailable('Fields'),
+    footer: null,
+    onFooter: unavailable('Footers'),
+    hfEditing: null,
+    onHfAction: unavailable('Header & Footer'),
+    onHfEdit: unavailable('Header & Footer'),
+    showMarks,
+    onShowMarks: setShowMarks,
+    showRuler,
+    onShowRuler: setShowRuler,
+    showNav,
+    onShowNav: setShowNav,
+    showStylesPane,
+    onShowStylesPane: setShowStylesPane,
+    commentCount: 0,
+    openCommentCount: 0,
+    resolvedCommentCount: 0,
+    onShowComments: unavailable('Comments'),
+    canComment: false,
+    onNewComment: unavailable('Comments'),
+    commentAtCaret: false,
+    onDeleteComment: unavailable('Comments'),
+    onDeleteAllComments: unavailable('Comments'),
+    onGotoComment: unavailable('Comments'),
+    trackChanges: false,
+    onTrackChanges: unavailable('Track Changes'),
+    spellcheck: false,
+    onSpellcheck: unavailable('Spelling'),
+    revisionDisplay: 'all',
+    onRevisionDisplay: unavailable('Revision display'),
+    revisionCount: 0,
+    onAcceptRevision: unavailable('Revisions'),
+    onRejectRevision: unavailable('Revisions'),
+    onGotoRevision: unavailable('Revisions'),
+    isProtected: false,
+    commentsAllowed: true,
+    trackChangesForced: false,
+    protectActive: false,
+    onProtectDoc: unavailable('Document protection'),
+    onCompare: unavailable('Compare'),
+    mergeSource: null,
+    onPickMergeDataSource: unavailable('Mail merge'),
+    onMergeMailings: () =>
+      Promise.reject(new Error('Mail merge is not available in the VS Code editor yet.')),
+    filePath: null,
+    viewMode,
+    onViewMode: setViewMode,
+    readMode,
+    onReadMode: setReadMode,
+    showGrid,
+    onShowGrid: setShowGrid,
+    splitView,
+    onSplitView: setSplitView,
+    onPagePreview: unavailable('Print preview'),
+    tableGridlines,
+    onToggleTableGridlines: () => setTableGridlines((value) => !value),
+    onTableDialog: unavailable('Table dialogs'),
+    onListDialog: unavailable('List dialogs'),
+    onPasteDefaults: unavailable('Paste defaults'),
+  }
+  return (
+    <div
+      className="office-docx-ribbon"
+      data-show-marks={showMarks || undefined}
+      style={{ ['--office-docx-zoom' as string]: String(zoom / 100) }}
+    >
+      <Ribbon {...props} />
+    </div>
+  )
+}

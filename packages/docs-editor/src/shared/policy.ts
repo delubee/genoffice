@@ -8,9 +8,50 @@ export const DOCX_LIMITS = {
   stepBytes: 1024 ** 2,
   history: 256 * 1024 ** 2,
 } as const
-const editable = new Set(['docParagraph', 'docHeading', 'docListItem', 'docTable'])
-const simpleMarks = new Set(['bold', 'italic', 'underline', 'strike', 'docTextStyle'])
-const simpleInline = new Set(['text', 'hardBreak'])
+/** Blocks with a host identity: the session anchors each to its source XML. */
+const tracked = new Set(['docParagraph', 'docHeading', 'docListItem', 'docTable', 'docProtected'])
+const textBlocks = new Set(['docParagraph', 'docHeading', 'docListItem'])
+/**
+ * Attributes the serializer writes verbatim as XML, or that anchor content to
+ * source parts (comments, revisions, fields, relationships). The view may keep
+ * a value it was given but never author one: a new or split owner drops them.
+ */
+const rawAttrs = new Set([
+  'docxIndex',
+  'rawPPr',
+  'rawRPr',
+  'rawTrPr',
+  'rawTcPr',
+  'xml',
+  'omml',
+  'model',
+  'sdtShell',
+  'sdtPr',
+  'beginXml',
+  'instr',
+  'fieldId',
+  'fieldPart',
+  'rId',
+  'ids',
+  'originalStructure',
+  'originalFormatting',
+  'blockRevision',
+  'rowRevision',
+  'cellRevision',
+  'pPrChange',
+  'paraMarkIns',
+  'paraMarkDel',
+  'tblFloatSource',
+  'bookmarks',
+  'hiddenBookmarks',
+  'commentStarts',
+  'commentEnds',
+  'genXml',
+  'genImage',
+  'genChart',
+])
+/** Marks whose meaning lives in another package part (only kept, never created). */
+const sourceMarks = new Set(['refField', 'instrField', 'ctrlCheckbox', 'comment', 'redaction'])
 const mutableAttrs = new Set([
   'align',
   'indentLeft',
@@ -43,24 +84,7 @@ const mutableAttrs = new Set([
   'pageBreakBefore',
   'outlineOnly',
 ])
-const nestedMutable = new Set(['colwidth', 'heightTwips', 'heightRule'])
-const sourceOnlyAttrs = (attrs: Record<string, unknown>) =>
-  Object.fromEntries(Object.entries(attrs).filter(([key]) => !nestedMutable.has(key)))
-const sourceAttrs = new Set([
-  'docxIndex',
-  'rawPPr',
-  'sdtShell',
-  'bookmarks',
-  'hiddenBookmarks',
-  'commentStarts',
-  'commentEnds',
-  'pPrChange',
-  'paraMarkIns',
-  'paraMarkDel',
-  'blockRevision',
-  'originalStructure',
-  'originalFormatting',
-])
+const nestedChecked = new Set(['colwidth', 'heightTwips', 'heightRule'])
 const textStyleAttrs = new Set([
   'color',
   'sizeHalfPoints',
@@ -88,7 +112,12 @@ const fontNumberBounds: Record<string, readonly [number, number]> = {
   positionHalfPoints: [-3168, 3168],
   kernHalfPoints: [0, 1638],
 }
-const encode = (value: unknown) => JSON.stringify(value)
+// Strict: a non-finite number would otherwise encode as null and pass as unchanged.
+const encode = (value: unknown) =>
+  JSON.stringify(value, (_key, item: unknown) => {
+    if (typeof item === 'number' && !Number.isFinite(item)) throw new Error('Invalid number')
+    return item
+  })
 export function jsonBytes(value: unknown): number {
   return new TextEncoder().encode(encode(value)).length
 }
@@ -98,31 +127,14 @@ function walk(node: EditorJSON, visit: (node: EditorJSON) => void) {
   for (const child of node.content ?? []) walk(child, visit)
 }
 
-/** Conservatively preserve blocks requiring features outside the first editor slice. */
+/** Private runs never reach the view; host-protected objects stay placeholders. */
 function needsProtection(node: EditorJSON): boolean {
   if (node.type === 'docProtected') return true
-  if (!editable.has(node.type)) return true
-  let complex = Boolean(node.attrs?.sdtShell || node.attrs?.blockRevision)
+  let redacted = false
   walk(node, (child) => {
-    if (
-      child.attrs?.sdtShell ||
-      child.attrs?.blockRevision ||
-      child.attrs?.rowRevision ||
-      child.attrs?.paraMarkIns ||
-      child.attrs?.paraMarkDel
-    )
-      complex = true
-    if (
-      child !== node &&
-      !simpleInline.has(child.type) &&
-      !['docTableRow', 'docTableCell', 'docTableHeader', ...editable].includes(child.type)
-    )
-      complex = true
-    if (child.marks?.some((mark) => !simpleMarks.has(mark.type))) complex = true
-    if (child.attrs?.colspan && child.attrs.colspan !== 1) complex = true
-    if (child.attrs?.rowspan && child.attrs.rowspan !== 1) complex = true
+    if (child.marks?.some((mark) => mark.type === 'redaction')) redacted = true
   })
-  return complex
+  return redacted
 }
 
 export function prepareDocument(input: EditorJSON, makeId: () => string): EditorJSON {
@@ -150,9 +162,8 @@ export function prepareDocument(input: EditorJSON, makeId: () => string): Editor
     )
       throw new Error('Unsupported content cannot be safely anchored to the original DOCX')
   walk(doc, (node) => {
-    if (editable.has(node.type) || node.type === 'docProtected') {
+    if (tracked.has(node.type))
       node.attrs = { ...node.attrs, officeId: makeId(), officeLocked: node.type === 'docProtected' }
-    }
   })
   return docxSchema.nodeFromJSON(doc).toJSON() as EditorJSON
 }
@@ -250,7 +261,42 @@ function assertAttrValue(key: string, value: unknown) {
     throw new Error('Invalid column widths')
 }
 
-/** Source metadata is immutable; only explicitly supported presentation values may change. */
+/** Authored values are plain JSON of bounded shape; links and pictures are checked by kind. */
+function assertShape(key: string, value: unknown, depth = 0): void {
+  if (value == null || typeof value === 'boolean') return
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new Error(`Invalid ${key}`)
+    return
+  }
+  if (typeof value === 'string') {
+    // eslint-disable-next-line no-control-regex -- C0 controls other than tab/newline never serialize.
+    if (/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(value)) throw new Error(`Invalid ${key}`)
+    if ((key === 'dataUrl' || key === 'imageDataUrl') && depth === 0)
+      if (!/^data:image\/(png|jpeg|gif|bmp|webp|tiff);base64,[A-Za-z0-9+/=]*$/.test(value))
+        throw new Error(`Invalid ${key}`)
+    if (key === 'href' && /^\s*(javascript|vbscript|data|file):/i.test(value))
+      throw new Error('Invalid link')
+    return
+  }
+  if (depth >= 6) throw new Error(`Invalid ${key}`)
+  if (Array.isArray(value)) {
+    if (value.length > 4096) throw new Error(`Invalid ${key}`)
+    for (const item of value) assertShape(key, item, depth + 1)
+    return
+  }
+  if (typeof value === 'object') {
+    const entries = Object.entries(value)
+    if (entries.length > 256) throw new Error(`Invalid ${key}`)
+    for (const [, item] of entries) assertShape(key, item, depth + 1)
+    return
+  }
+  throw new Error(`Invalid ${key}`)
+}
+
+/**
+ * Source metadata and raw XML are immutable; every other schema value may be
+ * authored within its shape bounds, as the desktop editor writes it.
+ */
 export function validateAndNormalize(
   before: EditorJSON,
   candidate: EditorJSON,
@@ -263,31 +309,40 @@ export function validateAndNormalize(
     if (typeof node.attrs?.officeId === 'string') originals.set(node.attrs.officeId, node)
   })
   const seen = new Set<string>()
-  const sourceMarkValues = new WeakMap<EditorJSON, Map<string, Set<unknown>>>()
-  const hasSourceMarkValue = (source: EditorJSON, type: string, key: string, value: unknown) => {
-    let values = sourceMarkValues.get(source)
+  // Raw values present anywhere in a source block, per node or mark type.
+  const sourceValues = new WeakMap<EditorJSON, Map<string, Set<string>>>()
+  const hasSourceValue = (source: EditorJSON, type: string, key: string, value: unknown) => {
+    let values = sourceValues.get(source)
     if (!values) {
       values = new Map()
+      const add = (owner: string, attrs: Record<string, unknown> | undefined) => {
+        for (const [attr, original] of Object.entries(attrs ?? {})) {
+          const name = `${owner}:${attr}`
+          let known = values!.get(name)
+          if (!known) values!.set(name, (known = new Set()))
+          known.add(encode(original))
+        }
+      }
       walk(source, (node) => {
-        for (const mark of node.marks ?? [])
-          for (const [attr, originalValue] of Object.entries(mark.attrs ?? {})) {
-            const name = `${mark.type}:${attr}`
-            let known = values!.get(name)
-            if (!known) values!.set(name, (known = new Set()))
-            known.add(originalValue)
-          }
+        add(node.type, node.attrs)
+        for (const mark of node.marks ?? []) add(mark.type, mark.attrs)
       })
-      sourceMarkValues.set(source, values)
+      sourceValues.set(source, values)
     }
-    return values.get(`${type}:${key}`)?.has(value) ?? false
+    return values.get(`${type}:${key}`)?.has(encode(value)) ?? false
   }
+  const defaultsOf = (type: string) => docxSchema.nodes[type]!.create().attrs
   const result = structuredClone(candidate)
   const verify = (node: EditorJSON, originalBlock?: EditorJSON) => {
-    const tracked = editable.has(node.type) || node.type === 'docProtected'
     let original = originalBlock
-    if (tracked) {
-      const id = node.attrs?.officeId
-      if (id != null && (typeof id !== 'string' || !originals.has(id) || seen.has(id)))
+    if (tracked.has(node.type)) {
+      // A mid-paragraph split copies every attribute, the identity included
+      // (keepOnSplit only filters end splits): the second owner is the new block.
+      const repeated = typeof node.attrs?.officeId === 'string' && seen.has(node.attrs.officeId)
+      if (repeated && originals.get(node.attrs!.officeId as string)?.attrs?.officeLocked)
+        throw new Error('Invalid or duplicate block identity')
+      const id = repeated ? null : node.attrs?.officeId
+      if (id != null && (typeof id !== 'string' || !originals.has(id)))
         throw new Error('Invalid or duplicate block identity')
       if (typeof id === 'string') {
         seen.add(id)
@@ -297,26 +352,29 @@ export function validateAndNormalize(
             throw new Error('Protected content cannot be changed')
           return
         }
-        const defaults = docxSchema.nodes[node.type]!.create().attrs
+        const defaults = defaultsOf(node.type)
         for (const [key, value] of Object.entries(node.attrs ?? {})) {
-          const introducedDefault =
-            original.attrs?.[key] === undefined && encode(value) === encode(defaults[key])
-          if (
-            !mutableAttrs.has(key) &&
-            !introducedDefault &&
-            encode(value) !== encode(original.attrs?.[key])
-          )
-            throw new Error(`Immutable attribute: ${key}`)
-          if (mutableAttrs.has(key) && !Object.is(value, original.attrs?.[key]))
-            assertAttrValue(key, value)
+          if (key === 'officeId' || key === 'officeLocked') continue
+          const unchanged = encode(value) === encode(original.attrs?.[key])
+          if (rawAttrs.has(key)) {
+            if (
+              !unchanged &&
+              !(original.attrs?.[key] === undefined && encode(value) === encode(defaults[key]))
+            )
+              throw new Error(`Immutable attribute: ${key}`)
+            continue
+          }
+          if (unchanged) continue
+          assertShape(key, value)
+          if (mutableAttrs.has(key) && textBlocks.has(node.type)) assertAttrValue(key, value)
         }
         if (
           node.type !== original.type &&
-          !['docParagraph', 'docHeading', 'docListItem'].includes(node.type)
+          !(textBlocks.has(node.type) && textBlocks.has(original.type))
         )
           throw new Error('Unsupported block conversion')
       } else {
-        if (!editable.has(node.type)) throw new Error('Cannot create protected objects')
+        if (node.type === 'docProtected') throw new Error('Cannot create protected objects')
         const inheritedIndex = node.attrs?.docxIndex
         const inherited = [...originals.values()].find(
           (source) =>
@@ -324,47 +382,50 @@ export function validateAndNormalize(
             inheritedIndex != null &&
             source.attrs?.docxIndex === inheritedIndex,
         )
+        // A new owner never takes over source XML: anchors and raw values reset.
+        const defaults = defaultsOf(node.type)
         node.attrs = { ...node.attrs, officeId: makeId(), officeLocked: false }
-        // A split inherits source attributes in upstream schema. Retain its text/format,
-        // but never create a second owner of the original XML anchor.
-        for (const key of sourceAttrs) if (key in node.attrs) node.attrs[key] = null
+        for (const key of rawAttrs) if (key in node.attrs) node.attrs[key] = defaults[key] ?? null
         if (needsProtection(node)) throw new Error('Unsupported new content')
-        const defaults = docxSchema.nodes[node.type]!.create().attrs
         for (const [key, value] of Object.entries(node.attrs)) {
-          if (sourceAttrs.has(key) || key === 'officeId' || key === 'officeLocked') continue
-          if (!mutableAttrs.has(key) && encode(value) !== encode(defaults[key]))
-            throw new Error(`Unsupported new attribute: ${key}`)
-          assertAttrValue(key, value)
+          if (rawAttrs.has(key) || key === 'officeId' || key === 'officeLocked') continue
+          assertShape(key, value)
+          if (mutableAttrs.has(key) && textBlocks.has(node.type)) assertAttrValue(key, value)
         }
         original = inherited
       }
-    }
-    if (!tracked && node.type !== 'doc' && node.type !== 'text') {
-      const defaults = docxSchema.nodes[node.type]!.create().attrs
-      for (const [key, value] of Object.entries(node.attrs ?? {}))
-        if (nestedMutable.has(key)) assertAttrValue(key, value)
-      let trusted = encode(sourceOnlyAttrs(node.attrs ?? {})) === encode(sourceOnlyAttrs(defaults))
-      if (original)
-        walk(original, (source) => {
+    } else if (node.type !== 'doc' && node.type !== 'text') {
+      const defaults = defaultsOf(node.type)
+      for (const [key, value] of Object.entries(node.attrs ?? {})) {
+        if (rawAttrs.has(key)) {
           if (
-            source.type === node.type &&
-            encode(sourceOnlyAttrs(source.attrs ?? {})) ===
-              encode(sourceOnlyAttrs(node.attrs ?? {}))
+            encode(value) !== encode(defaults[key]) &&
+            !(original && hasSourceValue(original, node.type, key, value))
           )
-            trusted = true
-        })
-      if (!trusted) throw new Error('Untrusted nested attributes')
+            throw new Error(`Untrusted nested attribute: ${key}`)
+          continue
+        }
+        assertShape(key, value)
+        if (nestedChecked.has(key)) assertAttrValue(key, value)
+      }
     }
     for (const mark of node.marks ?? []) {
-      if (!simpleMarks.has(mark.type)) throw new Error('Unsupported mark')
+      if (!docxSchema.marks[mark.type]) throw new Error('Unsupported mark')
+      const fromSource = (key: string, value: unknown) =>
+        !!original && value != null && hasSourceValue(original, mark.type, key, value)
+      if (
+        sourceMarks.has(mark.type) &&
+        !Object.keys(mark.attrs ?? {}).every(
+          (key) => fromSource(key, mark.attrs![key]) || mark.attrs![key] == null,
+        )
+      )
+        throw new Error('Unsupported mark')
+      if (sourceMarks.has(mark.type) && !original) throw new Error('Unsupported mark')
       for (const [key, value] of Object.entries(mark.attrs ?? {})) {
-        const trusted =
-          original && value != null && hasSourceMarkValue(original, mark.type, key, value)
-        if (textStyleAttrs.has(key) && mark.type === 'docTextStyle') {
-          // Preserve existing authored values even when foreign documents use
-          // ranges outside the dialog's edit bounds. Validate newly changed values.
-          if (!trusted) assertAttrValue(key, value)
-        } else if (value != null && !trusted) throw new Error(`Untrusted mark attribute: ${key}`)
+        if (value == null || fromSource(key, value)) continue
+        if (rawAttrs.has(key)) throw new Error(`Untrusted mark attribute: ${key}`)
+        assertShape(key, value)
+        if (textStyleAttrs.has(key) && mark.type === 'docTextStyle') assertAttrValue(key, value)
       }
     }
     for (const child of node.content ?? []) verify(child, original)
