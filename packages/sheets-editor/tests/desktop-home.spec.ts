@@ -1290,7 +1290,7 @@ test('Filter by Selected Cell color from the context menu records a color filter
   // B2 gets a fill through the fixture's canonical edit, then the filter targets that colour.
   await page.evaluate(() => (window as any).toolbar.seedClearTargets())
   await page.evaluate(() => (window as any).toolbar.select('B2'))
-  let before = await revision()
+  const before = await revision()
   expect(
     await page.evaluate(() =>
       (window as any).toolbar.facade().executeCommand('genoffice.ctx.filter-by', { by: 'fill' }),
