@@ -671,3 +671,8 @@ Review protection foundation (2026-10-29):
 - [x] Page Number Format (fmt/start) of the final section is a document setting saved as `w:pgNumType`.
 - [x] First-page and even-page header/footer parts are edited as extra strips while the option is on and saved as `w:type="first"|"even"` parts.
 - [ ] Link to Previous needs sections and still reports a host limitation.
+
+## Native suite checkpoint (83c87ca6)
+
+- Full `minimum` native run: 60 passing, 2 pending, 3 failing. `Product workspace skill commands` and `Product worksheet dimensions` are the pre-existing failures; `Workbook native shortcuts UI` timed out waiting for the frame in the full run but passes alone (suite-isolation flake).
+- [ ] Harden `Workbook native shortcuts UI` against the full-run frame timeout.
