@@ -6665,8 +6665,8 @@ export class WorkbookRuntime implements EditorProjection {
     if (!target || !state) throw new Error(t('appSelectCellFirst'))
     const bounds = parseRange(target.address)
     if (bounds.endRow <= bounds.startRow) throw new Error(t('appDedupeSelectRows'))
-    if (rangeCellCount(bounds) > 2000)
-      throw new Error('Remove Duplicates supports selections of at most 2000 cells.')
+    if (rangeCellCount(bounds) > 200_000)
+      throw new Error('Remove Duplicates supports selections of at most 200,000 cells.')
     return {
       target: { sheetId: target.sheetId, address: target.address },
       stateId: state.stateId,
@@ -6705,18 +6705,27 @@ export class WorkbookRuntime implements EditorProjection {
       throw new Error('The document changed while Remove Duplicates was open. Reopen the dialog.')
     const bounds = parseRange(target.address)
     if (bounds.endRow <= bounds.startRow) throw new Error(t('appDedupeSelectRows'))
-    if (rangeCellCount(bounds) > 2000)
-      throw new Error('Remove Duplicates supports selections of at most 2000 cells.')
+    if (rangeCellCount(bounds) > 200_000)
+      throw new Error('Remove Duplicates supports selections of at most 200,000 cells.')
     const frozen = { stateId: context.stateId, revision: context.revision }
     const current = () =>
       !this.closed && this.state?.stateId === frozen.stateId && this.revision === frozen.revision
-    const result = (await this.host.read(target.sheetId, bounds, frozen.stateId)) as {
-      cells: ViewCell[]
-      merges?: GridRange[]
+    // The host reads at most 2000 cells at a time: larger selections load in row bands.
+    const result: { cells: ViewCell[]; merges: GridRange[] } = { cells: [], merges: [] }
+    const bandRows = Math.max(1, Math.floor(2000 / (bounds.endColumn - bounds.startColumn + 1)))
+    for (let row = bounds.startRow; row <= bounds.endRow; row += bandRows) {
+      const band = (await this.host.read(
+        target.sheetId,
+        { ...bounds, startRow: row, endRow: Math.min(bounds.endRow, row + bandRows - 1) },
+        frozen.stateId,
+      )) as { cells: ViewCell[]; merges?: GridRange[] }
+      result.cells.push(...band.cells)
+      result.merges.push(...(band.merges ?? []))
+      if (!current())
+        throw new Error('The document changed while reading the selection. Try again.')
     }
-    if (!current()) throw new Error('The document changed while reading the selection. Try again.')
     if (
-      result.merges?.some(
+      result.merges.some(
         (merge) =>
           merge.startRow <= bounds.endRow &&
           merge.endRow >= bounds.startRow &&
@@ -6768,8 +6777,36 @@ export class WorkbookRuntime implements EditorProjection {
           value: next[row]![column]!,
         })
     }
-    if (operations.length > 2000) throw new Error('The selection requires too many cell updates.')
-    await this.enqueue(operations, frozen, { failureInDialog: true })
+    if (operations.length > 2000) {
+      // One staged commit (a single history entry) carries the writes beyond the batch ceiling. Runs of
+      // changed rows are written as value blocks, which the host applies far faster than cell by cell.
+      const width = original[0]!.length
+      const band = Math.max(1, Math.floor(1000 / width))
+      const stages: WorkbookOperation[][] = []
+      let row = 0
+      while (row < original.length) {
+        if (original[row]!.every((value, column) => Object.is(value, next[row]![column]))) {
+          row++
+          continue
+        }
+        const first = row
+        while (
+          row < original.length &&
+          row - first < band &&
+          !original[row]!.every((value, column) => Object.is(value, next[row]![column]))
+        )
+          row++
+        stages.push([
+          {
+            op: 'set_range',
+            sheetId: target.sheetId,
+            start: formatAddress(bounds.startRow + first, bounds.startColumn),
+            values: next.slice(first, row),
+          },
+        ])
+      }
+      await this.enqueueStaged(stages, frozen)
+    } else await this.enqueue(operations, frozen, { failureInDialog: true })
     return deduped.removed
   }
   async flashFill() {

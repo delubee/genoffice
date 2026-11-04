@@ -529,7 +529,7 @@
 - [x] Add the Data → Consolidate dialog with desktop aggregation functions, position/left-label modes, default selection reference and multiple source ranges.
 - [x] Reuse the desktop consolidation matrix algorithm, read labels from the frozen host revision, and submit typed labels and live formulas as one canonical transaction with bounds and overlap checks; output currently shares the host 2,000-cell limit.
 - [x] Verify Consolidate through real VS Code UI, exact native Undo/Redo, saved formula XML and independent reopen with a new session reading the formula and both original source values.
-- [ ] Complete duplicate-removal acceptance for larger/sparse selections, dates inside compared/moved rows, formula error/result freshness, filtered/protected rows, all appearance/locale and installed platforms; the current command is limited to 2000 selected cells and ready scalar values.
+- [ ] Complete duplicate-removal acceptance for larger/sparse selections, dates inside compared/moved rows, formula error/result freshness, filtered/protected rows, all appearance/locale and installed platforms; selections beyond 2000 cells now read in row bands and write as staged value blocks (up to 200,000 cells); ready scalar values only.
 
 Column-header filter popup follow-up (2026-10-28):
 
