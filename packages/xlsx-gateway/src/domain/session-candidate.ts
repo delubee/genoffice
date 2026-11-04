@@ -29,7 +29,7 @@ import {
   columnIndex,
   rangeAddresses,
 } from './cell-address'
-import { computeSortedRowOrder } from './sort-range'
+import { computeSortChanges, computeSortedRowOrder } from './sort-range'
 import { updateSessionFilter } from './session-filter'
 import { shiftIndex, shiftSpecForOp } from './formula-shift'
 import {
@@ -1494,53 +1494,79 @@ export async function computeCandidateState(
               material.hiddenRows?.[op.sheetId],
             )
           : undefined
-      const adapter = new InMemoryWorkbookAdapter(book, {
-        sortLocale: SESSION_SORT_LOCALE,
-        ...(sortVisible ? { sortRowVisible: sortVisible } : {}),
-      })
-      const plan = adapter.plan({
-        dslVersion: 1,
-        summary: intent.summary,
-        transactionId: `${intent.transactionId}-${index}`,
-        baseRevision: book.revision,
-        operations: [op],
-      })
-      expandedWrites += plan.cellChanges.length
-      if (expandedWrites > 2000)
-        throw new Error('expanded_write_limit: ordinary batches allow 2000 cells')
-      if (plan.warnings.length)
-        throw new Error(`unsafe_reference_change: ${plan.warnings.join('; ')}`)
-      if (
-        op.op === 'set_cell' ||
-        op.op === 'set_formula' ||
-        op.op === 'clear_cell' ||
-        op.op === 'set_range' ||
-        op.op === 'clear_range'
-      )
-        for (const change of plan.cellChanges) {
-          const template = typedTemplates.get(change.sheetId)?.[change.address]
-          if (template)
-            template.kind =
-              change.after.value === null
-                ? 'blank'
-                : typeof change.after.value === 'number'
-                  ? 'number'
-                  : typeof change.after.value === 'boolean'
-                    ? 'boolean'
-                    : 'string'
-        }
-      adapter.apply(plan)
-      next = adapter.getSnapshot()
-      if (op.op === 'format_range' && op.reset) {
-        const range = parseRange(op.range),
-          templates = typedTemplates.get(op.sheetId)!
-        for (let row = range.startRow; row <= range.endRow; row++)
-          for (let column = range.startColumn; column <= range.endColumn; column++) {
-            const address = formatAddress(row, column)
-            const template = templates[address] ?? { kind: 'blank' as const, rawValue: null }
-            templates[address] = { ...template, style: {}, styleReset: true }
-            delete templates[address]!.numberFormat
+      // The in-memory adapter caps a sort at 2000 cells because it expands to per-cell edits; the
+      // session applies larger sorts directly to the snapshot (the permutation below follows).
+      const largeSort = op.op === 'sort_range' && rangeCellCount(parseRange(op.range)) > 2000
+      if (largeSort && op.op === 'sort_range') {
+        const source = book.sheets.find((sheet) => sheet.id === op.sheetId)!
+        const changes = computeSortChanges(
+          {
+            range: op.range,
+            ...(sortVisible ? { rowVisible: (row: number) => sortVisible(row) } : {}),
+            byColumn: op.byColumn,
+            ascending: op.order === 'asc',
+            hasHeader: op.hasHeader ?? false,
+            ...(op.levels === undefined ? {} : { levels: op.levels }),
+            locale: SESSION_SORT_LOCALE,
+          },
+          (address) => source.cells[address] ?? { value: null },
+        )
+        const sorted = structuredClone(book)
+        const target = sorted.sheets.find((sheet) => sheet.id === op.sheetId)!
+        for (const change of changes)
+          (target.cells as Record<string, { value: unknown }>)[change.address] = {
+            value: change.after,
           }
+        next = sorted
+      } else {
+        const adapter = new InMemoryWorkbookAdapter(book, {
+          sortLocale: SESSION_SORT_LOCALE,
+          ...(sortVisible ? { sortRowVisible: sortVisible } : {}),
+        })
+        const plan = adapter.plan({
+          dslVersion: 1,
+          summary: intent.summary,
+          transactionId: `${intent.transactionId}-${index}`,
+          baseRevision: book.revision,
+          operations: [op],
+        })
+        expandedWrites += plan.cellChanges.length
+        if (expandedWrites > 2000)
+          throw new Error('expanded_write_limit: ordinary batches allow 2000 cells')
+        if (plan.warnings.length)
+          throw new Error(`unsafe_reference_change: ${plan.warnings.join('; ')}`)
+        if (
+          op.op === 'set_cell' ||
+          op.op === 'set_formula' ||
+          op.op === 'clear_cell' ||
+          op.op === 'set_range' ||
+          op.op === 'clear_range'
+        )
+          for (const change of plan.cellChanges) {
+            const template = typedTemplates.get(change.sheetId)?.[change.address]
+            if (template)
+              template.kind =
+                change.after.value === null
+                  ? 'blank'
+                  : typeof change.after.value === 'number'
+                    ? 'number'
+                    : typeof change.after.value === 'boolean'
+                      ? 'boolean'
+                      : 'string'
+          }
+        adapter.apply(plan)
+        next = adapter.getSnapshot()
+        if (op.op === 'format_range' && op.reset) {
+          const range = parseRange(op.range),
+            templates = typedTemplates.get(op.sheetId)!
+          for (let row = range.startRow; row <= range.endRow; row++)
+            for (let column = range.startColumn; column <= range.endColumn; column++) {
+              const address = formatAddress(row, column)
+              const template = templates[address] ?? { kind: 'blank' as const, rawValue: null }
+              templates[address] = { ...template, style: {}, styleReset: true }
+              delete templates[address]!.numberFormat
+            }
+        }
       }
       if (op.op === 'sort_range') {
         const range = parseRange(op.range),

@@ -7884,8 +7884,8 @@ export class WorkbookRuntime implements EditorProjection {
       state = this.state
     if (!target || !state) throw new Error(t('appSelectCellFirst'))
     const bounds = parseRange(target.address)
-    if (rangeCellCount(bounds) > 2000)
-      throw new Error('Sort supports at most 2,000 selected cells.')
+    if (rangeCellCount(bounds) > 200_000)
+      throw new Error('Sort supports at most 200,000 selected cells.')
     const frozen = { stateId: state.stateId, revision: this.revision }
     const result = (await this.host.read(
       target.sheetId,
