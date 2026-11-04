@@ -697,4 +697,4 @@ Review protection foundation (2026-10-29):
 
 - Full `minimum` run: 61 passing, 2 pending, 2 failing. `Product workspace skill commands` was a stale `0.1.0` expectation and now compares with the extension's package version.
 - `Product worksheet dimensions` still fails here: 13 characters measure 104 px (Normal-font MDW 8) instead of 91 px (MDW 7). The expectation assumes the Calibri metrics; this host lacks the font, so it is environment-dependent.
-- [ ] Make `Product worksheet dimensions` independent of the host's installed fonts (derive the expected pixels from the measured MDW) or install the fixture font in CI.
+- [x] `Product worksheet dimensions` accepts the 7 px (Calibri) or 8 px (fallback font) digit width and compares undo against the measured original.

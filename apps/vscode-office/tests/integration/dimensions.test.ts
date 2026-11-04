@@ -32,7 +32,9 @@ suite('Product worksheet dimensions', () => {
       await vscode.commands.executeCommand('vscode.openWith', uri, 'genoffice.workbook')
       let document = api.getDocument(uri)
       await document.whenViewReady()
-      assert.equal((await shown(document)).dimensions.columns[1]!.pixels, 91)
+      // 13 characters of the Normal font's maximum digit width: 7 px (Calibri) or 8 px (fallback font).
+      const originalWidth = (await shown(document)).dimensions.columns[1]!.pixels
+      assert.ok([91, 104].includes(originalWidth), `unexpected 13-character width ${originalWidth}`)
       assert.ok(Math.abs((await shown(document)).dimensions.rows[1]!.pixels - (22 * 4) / 3) < 0.01)
       await document.engine.submit({
         schemaVersion: 1,
@@ -61,7 +63,7 @@ suite('Product worksheet dimensions', () => {
       assert.equal((await shown(document)).dimensions.columns[1]!.pixels, 140)
       assert.equal((await shown(document)).dimensions.rows[1]!.pixels, 40)
       await document.engine.undo()
-      assert.equal((await shown(document)).dimensions.columns[1]!.pixels, 91)
+      assert.equal((await shown(document)).dimensions.columns[1]!.pixels, originalWidth)
       await document.engine.redo()
       assert.equal((await shown(document)).dimensions.columns[1]!.pixels, 140)
       await vscode.commands.executeCommand('workbench.action.files.save')
