@@ -101,7 +101,12 @@ it('saves protected-sheet formula view without touching protection, source cell 
           showRowColHeaders: false,
           zoomScale: 120,
         })
-        const read = await source.readFeatures(reopened.sessionId, reopened.metadata.sheets[0]!.id)
+        // The reopened source indexes its features in the background: wait for them.
+        let read = await source.readFeatures(reopened.sessionId, reopened.metadata.sheets[0]!.id)
+        for (let attempt = 0; attempt < 50 && !read.sheetProtection; attempt++) {
+          await new Promise((resolve) => setTimeout(resolve, 100))
+          read = await source.readFeatures(reopened.sessionId, reopened.metadata.sheets[0]!.id)
+        }
         expect(read).toMatchObject({ sheetProtection: { protected: true } })
       } finally {
         await source.close(reopened.sessionId)
