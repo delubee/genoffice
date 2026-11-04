@@ -6948,17 +6948,32 @@ export class WorkbookRuntime implements EditorProjection {
     const bounds = parseRange(target.address)
     if (bounds.startColumn !== bounds.endColumn)
       throw new Error('Text to Columns requires a selection in one column.')
-    if (rangeCellCount(bounds) > 2000)
-      throw new Error('Text to Columns supports at most 2000 selected cells.')
+    if (rangeCellCount(bounds) > 100_000)
+      throw new Error('Text to Columns supports at most 100,000 selected cells.')
     const sheet = state.sheets.find((item) => item.id === target.sheetId)
     if (!sheet) throw new Error('The selected sheet no longer exists.')
     const frozen = { stateId: state.stateId, revision: this.revision }
     const current = () =>
       !this.closed && this.state?.stateId === frozen.stateId && this.revision === frozen.revision
-    const source = (await this.host.read(target.sheetId, bounds, frozen.stateId)) as {
-      cells: ViewCell[]
+    // The host reads at most 2000 cells at a time: longer selections load in row bands.
+    const readBanded = async (range: GridRange) => {
+      const cells: ViewCell[] = [],
+        merges: GridRange[] = []
+      const bandRows = Math.max(1, Math.floor(2000 / (range.endColumn - range.startColumn + 1)))
+      for (let row = range.startRow; row <= range.endRow; row += bandRows) {
+        const band = (await this.host.read(
+          target.sheetId,
+          { ...range, startRow: row, endRow: Math.min(range.endRow, row + bandRows - 1) },
+          frozen.stateId,
+        )) as { cells: ViewCell[]; merges?: GridRange[] }
+        cells.push(...band.cells)
+        merges.push(...(band.merges ?? []))
+        if (!current())
+          throw new Error('The document changed while reading text to split. Try again.')
+      }
+      return { cells, merges }
     }
-    if (!current()) throw new Error('The document changed while reading text to split. Try again.')
+    const source = await readBanded(bounds)
     const sourceCells = new Map(source.cells.map((cell) => [cell.address, cell]))
     const delimiterText = { 1: '\t', 2: ',', 4: ';', 8: ' ' }[delimiter],
       separator = new RegExp(`[${delimiterText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}]`),
@@ -6992,14 +7007,10 @@ export class WorkbookRuntime implements EditorProjection {
       }
     if (endColumn >= MAX_GRID_COLUMNS)
       throw new Error('Text to Columns would exceed the worksheet column limit.')
-    if (rangeCellCount(outputBounds) > 2000)
-      throw new Error('Text to Columns would write more than 2000 cells at once.')
-    const output = (await this.host.read(target.sheetId, outputBounds, frozen.stateId)) as {
-      cells: ViewCell[]
-      merges?: GridRange[]
-    }
-    if (!current()) throw new Error('The document changed while reading text to split. Try again.')
-    if (output.merges?.length)
+    if (rangeCellCount(outputBounds) > 200_000)
+      throw new Error('Text to Columns would write more than 200,000 cells at once.')
+    const output = await readBanded(outputBounds)
+    if (output.merges.length)
       throw new Error(
         'Remove merged cells from the Text to Columns output range before continuing.',
       )
@@ -7017,8 +7028,49 @@ export class WorkbookRuntime implements EditorProjection {
           operations.push({ op: 'set_cell', sheetId: target.sheetId, address, value })
       }
     }
-    if (operations.length > 2000) throw new Error('Text to Columns requires too many cell updates.')
-    if (operations.length) await this.enqueue(operations, frozen, { failureInDialog: true })
+    if (operations.length > 2000) {
+      // One staged commit carries the writes beyond the batch ceiling, as value blocks of changed rows.
+      const stages: WorkbookOperation[][] = []
+      const width = maxLength + 1
+      const band = Math.max(1, Math.floor(1000 / width))
+      const changedRows = new Set(
+        operations.map((op) => parseAddress((op as { address: string }).address).row),
+      )
+      let row = bounds.startRow
+      while (row <= lastRow) {
+        if (!changedRows.has(row)) {
+          row++
+          continue
+        }
+        // A single-part row keeps its source cell: its block starts one column to the right.
+        const skipsFirst = rows[row - bounds.startRow]?.length === 1
+        const first = row
+        while (
+          row <= lastRow &&
+          row - first < band &&
+          changedRows.has(row) &&
+          (rows[row - bounds.startRow]?.length === 1) === skipsFirst
+        )
+          row++
+        const offset = skipsFirst ? 1 : 0
+        stages.push([
+          {
+            op: 'set_range',
+            sheetId: target.sheetId,
+            start: formatAddress(first, bounds.startColumn + offset),
+            values: rows
+              .slice(first - bounds.startRow, row - bounds.startRow)
+              .map((parts) =>
+                Array.from(
+                  { length: width - offset },
+                  (_, index) => parts?.[index + offset] || null,
+                ),
+              ),
+          },
+        ])
+      }
+      await this.enqueueStaged(stages, frozen)
+    } else if (operations.length) await this.enqueue(operations, frozen, { failureInDialog: true })
     return operations.length
   }
   private csvImportWork: Promise<unknown> | undefined
