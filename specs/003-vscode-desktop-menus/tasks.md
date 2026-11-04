@@ -691,4 +691,4 @@ Review protection foundation (2026-10-29):
 
 - All Go To tests now share `tests/integration/goto-helper.ts` (clears notifications, retries a stuck dialog); `Desktop Get Data UI` no longer fails in the full run.
 - Full `minimum` run: 60 passing, 2 pending, 3 failing: the two pre-existing product failures plus `Desktop Home AutoFit UI`, which fails on the default Xvfb screen (`A80` width assertion, also without the helper change) and passes with `xvfb-run -s "-screen 0 1920x1200x24"`. It is screen-size sensitive, not a regression.
-- [ ] Pin the Xvfb screen size for the native suite (or make the AutoFit assertion viewport-independent).
+- [x] The native suite runs under `xvfb-run -a -s "-screen 0 1920x1200x24"` (CI workflow updated); use the same locally.

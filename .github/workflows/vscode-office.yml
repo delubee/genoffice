@@ -61,8 +61,8 @@ jobs:
       - name: Native minimum and current stable VS Code
         run: |
           if [ "${{ matrix.target }}" = linux-x64 ]; then
-            xvfb-run -a npm run test:integration -w apps/vscode-office -- --label minimum --fail-zero
-            xvfb-run -a npm run test:integration -w apps/vscode-office -- --label stable --fail-zero
+            xvfb-run -a -s "-screen 0 1920x1200x24" npm run test:integration -w apps/vscode-office -- --label minimum --fail-zero
+            xvfb-run -a -s "-screen 0 1920x1200x24" npm run test:integration -w apps/vscode-office -- --label stable --fail-zero
           else
             npm run test:integration -w apps/vscode-office -- --label minimum --fail-zero
             npm run test:integration -w apps/vscode-office -- --label stable --fail-zero
