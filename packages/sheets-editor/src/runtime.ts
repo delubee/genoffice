@@ -6515,12 +6515,24 @@ export class WorkbookRuntime implements EditorProjection {
       params.col > range.endColumn
     )
       throw new Error('filter_column_outside_range')
-    if (rangeCellCount(range) > 2000)
-      throw new Error('Filter popups currently support tables of at most 2000 cells.')
-    const result = (await this.host.read(context.sheetId, range, context.stateId)) as {
-      cells: ViewCell[]
+    // The host reads at most 2000 cells at a time; larger tables load in row bands up to the host's
+    // 200,000-cell candidate bound.
+    if (rangeCellCount(range) > 200_000)
+      throw new Error('Filter popups support tables of at most 200,000 cells.')
+    const width = range.endColumn - range.startColumn + 1
+    if (width > 2000) throw new Error('Filter popups support tables of at most 2000 columns.')
+    const bandRows = Math.max(1, Math.floor(2000 / width))
+    const result: { cells: ViewCell[] } = { cells: [] }
+    for (let row = range.startRow; row <= range.endRow; row += bandRows) {
+      const band = (await this.host.read(
+        context.sheetId,
+        { ...range, startRow: row, endRow: Math.min(range.endRow, row + bandRows - 1) },
+        context.stateId,
+      )) as { cells: ViewCell[] }
+      result.cells.push(...band.cells)
+      if (!current())
+        throw new Error('The document changed while loading filter values. Try again.')
     }
-    if (!current()) throw new Error('The document changed while loading filter values. Try again.')
     const cells: Record<number, Record<number, ICellData>> = {}
     for (const cell of result.cells) {
       if (cell.formula && cell.calculationState !== 'ready' && cell.kind !== 'error')

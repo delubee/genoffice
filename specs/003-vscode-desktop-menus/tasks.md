@@ -540,6 +540,7 @@ Column-header filter popup follow-up (2026-10-28):
 - [x] Browser-verify failed retry, pending duplicate clicks, Save waiting, clear/unhide, offscreen source values, stale reads, authoritative formula caches and native condition/value mode switching.
 - [x] Verify native header checkbox clicks, one canonical revision, exact Undo/Redo, saved filter XML, unrelated package/style preservation and independent clean-session reopen in VS Code 1.109.5.
 - [ ] Complete imported-popup editing and installed Linux/Windows, geometry/locale/appearance/protection/table-filter variants.
+- [x] Column-header filter popups load tables larger than 2000 cells in row bands (up to the host's 200,000-cell bound). Verified only for the single-band path; a multi-band fixture is still missing.
 - [x] Add canonical fill/font color criteria and bounded XLSX persistence, including desktop multicolor round trips.
 - [ ] Complete imported/conditional/rich-text color variants and filters exceeding the current 2,000-cell budget before accepting complete desktop filter parity.
 
