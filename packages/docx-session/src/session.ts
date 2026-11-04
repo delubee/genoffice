@@ -78,6 +78,7 @@ interface Overlays {
   numbering: PendingListDefinitions['newDefs']
   restartNums: PendingListDefinitions['restartNums']
   levelEdits: NonNullable<PendingListDefinitions['levelEdits']>
+  picBullets: NonNullable<PendingListDefinitions['picBullets']>
   styles: StyleUpsert[]
   settings: DocumentSettings
 }
@@ -115,7 +116,14 @@ export class DocxSession {
       doc: docxSchema.nodeFromJSON(json),
       stateId: randomUUID(),
       bytes: jsonBytes(json),
-      overlays: { numbering: [], restartNums: [], levelEdits: [], styles: [], settings: {} },
+      overlays: {
+        numbering: [],
+        restartNums: [],
+        levelEdits: [],
+        picBullets: [],
+        styles: [],
+        settings: {},
+      },
     }
     this.savedStateId = this.root.stateId
     this.baseCSS = docStyleCss(original)
@@ -193,6 +201,16 @@ export class DocxSession {
         : [...overlays.styles, up]
     }
   }
+  /** Data URL of a picture bullet: pending images first, then the file's own levels. */
+  private picBulletSrc(id: number | undefined): string | undefined {
+    if (id === undefined) return undefined
+    const pending = this.root.overlays.picBullets.find((item) => item.id === id)
+    if (pending) return `data:${pending.mime};base64,${pending.base64}`
+    for (const definition of this.original.numbering.values())
+      for (const level of Object.values(definition.levels))
+        if (level.picBulletId === id && level.picBulletSrc) return level.picBulletSrc
+    return undefined
+  }
   presentation(): DocumentPresentation {
     const numbering = new Map(this.original.numbering)
     for (const definition of this.root.overlays.numbering)
@@ -201,7 +219,10 @@ export class DocxSession {
         abstractNumId: `pending-${definition.numId}`,
         levels: definition.levels
           ? Object.fromEntries(
-              definition.levels.map((level, index) => [index, numberingLevelFromCustom(level)]),
+              definition.levels.map((level, index) => [
+                index,
+                numberingLevelFromCustom(level, this.picBulletSrc(level.picBulletId)),
+              ]),
             )
           : {
               0: {
@@ -219,7 +240,13 @@ export class DocxSession {
         if (definition.abstractNumId === edit.abstractNumId)
           numbering.set(numId, {
             ...definition,
-            levels: { ...definition.levels, [edit.ilvl]: numberingLevelFromCustom(edit.level) },
+            levels: {
+              ...definition.levels,
+              [edit.ilvl]: numberingLevelFromCustom(
+                edit.level,
+                this.picBulletSrc(edit.level.picBulletId),
+              ),
+            },
           })
     for (const restart of this.root.overlays.restartNums) {
       const source = [...this.original.numbering.values()].find(
@@ -443,6 +470,7 @@ export class DocxSession {
       overlays.numbering = merged.numbering
       overlays.restartNums = merged.restartNums
       overlays.levelEdits = merged.levelEdits
+      overlays.picBullets = merged.picBullets
     }
     overlays.settings = { ...overlays.settings, ...settings } as DocumentSettings
     if (sectionHfEdit || sectionHfLink) {
@@ -631,6 +659,26 @@ export class DocxSession {
   private withListDefinitions(input: unknown, base: Overlays = this.root.overlays): Overlays {
     const pending = pendingListDefinitionsSchema.parse(input)
     const overlays = structuredClone(base)
+    for (const image of pending.picBullets ?? []) {
+      const existing = overlays.picBullets.find((item) => item.id === image.id)
+      if (existing) {
+        if (existing.base64 !== image.base64 || existing.mime !== image.mime)
+          throw new Error('Picture bullet identity reused')
+        continue
+      }
+      overlays.picBullets.push(image)
+    }
+    const fileHasPicBullet = (id: number) =>
+      [...this.original.numbering.values()].some((definition) =>
+        Object.values(definition.levels).some((level) => level.picBulletId === id),
+      )
+    const knownPicBullet = (id: number | undefined) =>
+      id === undefined || overlays.picBullets.some((item) => item.id === id) || fileHasPicBullet(id)
+    for (const level of [
+      ...pending.newDefs.flatMap((definition) => definition.levels ?? []),
+      ...(pending.levelEdits ?? []).map((edit) => edit.level),
+    ])
+      if (!knownPicBullet(level.picBulletId)) throw new Error('Unknown picture bullet')
     const taken = (numId: string) =>
       this.original.numbering.has(numId) ||
       overlays.numbering.some((definition) => definition.numId === numId) ||
@@ -871,12 +919,16 @@ export class DocxSession {
       newPictures: plan.newPictures,
       ...(this.root.overlays.numbering.length ||
       this.root.overlays.restartNums.length ||
-      this.root.overlays.levelEdits.length
+      this.root.overlays.levelEdits.length ||
+      this.root.overlays.picBullets.length
         ? {
             numbering: {
               newDefs: this.root.overlays.numbering,
               restartNums: this.root.overlays.restartNums,
               levelEdits: this.root.overlays.levelEdits,
+              ...(this.root.overlays.picBullets.length
+                ? { picBullets: this.root.overlays.picBullets }
+                : {}),
             },
           }
         : {}),

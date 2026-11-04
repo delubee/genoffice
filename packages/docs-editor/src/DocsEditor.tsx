@@ -42,6 +42,7 @@ import {
   type ListDialogKind,
 } from '../../../apps/docs/src/renderer/components/ListDialogs'
 import {
+  addPictureBullet,
   createCustomListDef,
   currentListTarget,
   currentListValue,
@@ -743,9 +744,14 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
           <DefineBulletDialog
             ilvl={Number(editor.getAttributes('docListItem').ilvl) || 0}
             onApply={(levels, picture) => {
-              if (picture)
-                runtime.reportError('Picture bullets are not available in the VS Code editor yet.')
-              else applyDefinedList(levels, 'bullets')
+              if (picture) {
+                const id = addPictureBullet(numberingContext(runtime), picture)
+                const at = Number(editor.getAttributes('docListItem').ilvl) || 0
+                levels = levels.map((level, index) =>
+                  index === at ? { ...level, picBulletId: id } : level,
+                )
+              }
+              applyDefinedList(levels, 'bullets')
             }}
             onClose={() => setListDialog(null)}
           />

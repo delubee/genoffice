@@ -214,6 +214,54 @@ it('keeps a header per section and relinks a section to the previous one', async
   ).toThrow()
 })
 
+it('saves a picture bullet with its image', async () => {
+  const session = await DocxSession.open(
+    await buildDocx({ bodyXml: '<w:p><w:r><w:t>Bullets</w:t></w:r></w:p>' }),
+  )
+  // A 1x1 transparent PNG.
+  const png =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+  apply(session, {
+    numbering: {
+      newDefs: [
+        {
+          numId: '900',
+          kind: 'bullet',
+          levels: [
+            { numFmt: 'bullet', lvlText: '•', indentLeft: 720, hanging: 360, picBulletId: 1 },
+          ],
+        },
+      ],
+      restartNums: [],
+      picBullets: [{ id: 1, base64: png, mime: 'image/png' }],
+    },
+  })
+  const level = session.presentation().numbering.find(([numId]) => numId === '900')![1].levels[0]!
+  expect(level.picBulletId).toBe(1)
+  expect(level.picBulletSrc).toBe(`data:image/png;base64,${png}`)
+  const zip = await JSZip.loadAsync(await session.save())
+  expect(await zip.file('word/numbering.xml')!.async('string')).toMatch(/<w:numPicBullet\b/)
+  const reopened = await DocxSession.open(await session.save())
+  const saved = [...reopened.presentation().numbering.values()].flatMap(([, definition]) =>
+    Object.values(definition.levels),
+  )
+  expect(saved.some((entry) => entry.picBulletId !== undefined && entry.picBulletSrc)).toBe(true)
+  expect(() =>
+    apply(session, {
+      numbering: {
+        newDefs: [
+          {
+            numId: '901',
+            kind: 'bullet',
+            levels: [{ numFmt: 'bullet', lvlText: '•', indentLeft: 720, picBulletId: 7 }],
+          },
+        ],
+        restartNums: [],
+      },
+    }),
+  ).toThrow('Unknown picture bullet')
+})
+
 it('refuses settings that could carry markup or exceed page bounds', async () => {
   const session = await DocxSession.open(
     await buildDocx({ bodyXml: '<w:p><w:r><w:t>Settings</w:t></w:r></w:p>' }),

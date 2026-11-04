@@ -134,6 +134,8 @@ export interface PendingListDefinitions {
   }>
   /** one level of an existing (or session) list rewritten: Adjust List Indents */
   levelEdits?: Array<{ abstractNumId: string; ilvl: number; level: CustomNumberingLevel }>
+  /** images of picture bullets the levels' picBulletId refer to (Define New Bullet → Picture) */
+  picBullets?: Array<{ id: number; base64: string; mime: 'image/png' | 'image/jpeg' | 'image/gif' }>
 }
 export interface DocumentPresentation {
   css: string

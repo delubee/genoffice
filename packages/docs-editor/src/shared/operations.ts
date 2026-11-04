@@ -97,11 +97,27 @@ const levelSchema = z
       .optional(),
     isLgl: z.boolean().optional(),
     lvlRestart: z.number().int().min(0).max(9).optional(),
+    picBulletId: z.number().int().min(1).max(32767).optional(),
   })
   .strict()
 const numIdSchema = z.string().regex(/^[1-9][0-9]{0,8}$/)
 export const pendingListDefinitionsSchema = z
   .object({
+    picBullets: z
+      .array(
+        z
+          .object({
+            id: z.number().int().min(1).max(32767),
+            base64: z
+              .string()
+              .max(700_000)
+              .regex(/^[A-Za-z0-9+/=]+$/),
+            mime: z.enum(['image/png', 'image/jpeg', 'image/gif']),
+          })
+          .strict(),
+      )
+      .max(50)
+      .optional(),
     newDefs: z
       .array(
         z

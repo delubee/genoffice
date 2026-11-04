@@ -744,3 +744,6 @@ Desktop menu parity that the VS Code extension cannot or does not yet provide:
 - [ ] Step 4: page preview with the desktop `PaginationPreview`.
 
 - [x] Layout → Breaks writes the new section's start type to the section the cursor is in (non-final sections via `sectionEdits`) and copies that section's page setup; Link to Previous is covered by the sections browser test.
+
+- [x] Docs picture bullets (Define New Bullet → Picture): the image travels with the list definition (`picBullets`), the session validates the references, presents the level's picture and the save writes `w:numPicBullet` (session test with save and reopen; the dialog's file picker is not covered by a UI test).
+- [x] Native suite (before picture bullets): 72 passing, 2 pending, 0 failing.

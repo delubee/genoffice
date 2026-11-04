@@ -62,16 +62,18 @@ export class DocumentRuntime {
    */
   pendingNumbering: PendingListDefinitions & {
     levelEdits: NonNullable<PendingListDefinitions['levelEdits']>
-    picBullets: never[]
+    picBullets: NonNullable<PendingListDefinitions['picBullets']>
   } = { newDefs: [], restartNums: [], levelEdits: [], picBullets: [] }
   /** Definition-only list edits (Adjust List Indents) commit as their own entry. */
   flushNumbering() {
     setTimeout(() => {
-      const { newDefs, restartNums, levelEdits } = this.pendingNumbering
+      const { newDefs, restartNums, levelEdits, picBullets } = this.pendingNumbering
       if (this.pending || sendableSteps(this.editor.state)) return
       if (!newDefs.length && !restartNums.length && !levelEdits.length) return
       this.pendingNumbering = { ...this.pendingNumbering, levelEdits: [] }
-      void this.applySettings({ numbering: { newDefs, restartNums, levelEdits } })
+      void this.applySettings({
+        numbering: { newDefs, restartNums, levelEdits, ...(picBullets.length ? { picBullets } : {}) },
+      })
     }, 0)
   }
   readonly numIdFloor = { current: 0 }
@@ -203,6 +205,9 @@ export class DocumentRuntime {
               newDefs: this.pendingNumbering.newDefs,
               restartNums: this.pendingNumbering.restartNums,
               levelEdits: this.pendingNumbering.levelEdits,
+              ...(this.pendingNumbering.picBullets.length
+                ? { picBullets: this.pendingNumbering.picBullets }
+                : {}),
             },
           }
         : {}),
@@ -456,6 +461,8 @@ export class DocumentRuntime {
       newDefs: this.pendingNumbering.newDefs.filter((item) => !acknowledged(item)),
       restartNums: this.pendingNumbering.restartNums.filter((item) => !acknowledged(item)),
     }
+    // The session keeps acknowledged picture bullets with its definitions.
+    if (!this.pendingNumbering.newDefs.length) this.pendingNumbering.picBullets = []
     storage.defs = defs
     this.settings = presentation.settings ?? {}
     storage.styles = new Map(presentation.styles)
