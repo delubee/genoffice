@@ -187,8 +187,24 @@ void bridge
     root.render(
       <StyledWorkbook
         onReady={(runtime) => {
-          void runtime
-            .install(descriptor.stateId, descriptor.revision, state)
+          // A host commit can land during the first reads; resync to the newest state instead of failing.
+          const install = async (
+            current: { stateId: string; revision: number },
+            data: unknown,
+            attempts: number,
+          ): Promise<void> => {
+            try {
+              await runtime.install(current.stateId, current.revision, data)
+            } catch (error) {
+              if (attempts <= 0 || !/no longer current/.test(String(error))) throw error
+              const next = (await bridge.request('view.resync', {})) as {
+                descriptor: { stateId: string; revision: number }
+                state: unknown
+              }
+              await install(next.descriptor, next.state, attempts - 1)
+            }
+          }
+          void install(descriptor, state, 3)
             .then(() => {
               document.documentElement.dataset.editorReady = 'true'
               ready(runtime)

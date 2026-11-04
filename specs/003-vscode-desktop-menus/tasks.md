@@ -628,7 +628,7 @@ PivotTable create follow-up (2026-10-29):
 - [x] Slicers, timelines and PivotChart.
 - [ ] `Desktop Insert Link UI` is flaky (Go To stays disabled in some runs, also at HEAD fc726c60); passed in the later Data/Insert run.
 - [ ] CLI: `mcp.test.ts` schema budget (96,298 > 94,208 bytes at HEAD), sidecar `info`, missing generated fixture and Homebrew install tests fail at HEAD; pre-existing.
-- [ ] A host-side commit that lands while a reopened view performs its first reads leaves the view on "The requested state is no longer current"; the view should resync instead of showing the error screen.
+- [x] A host-side commit that lands while a reopened view performs its first reads leaves the view on "The requested state is no longer current"; the view should resync instead of showing the error screen.
 - [ ] Selection-in-pivot hints and edit protection should follow grown (refreshed) output ranges, not only the original pivot ranges.
 - [x] Go To flake: engine selection-sync focus moved typing from open dialogs/panes into the hidden cell editor. The focus boundary now holds that focus back while a dialog/pane control (including `aside` panes) owns focus, and replays it only when a cell edit actually starts (set-cell-edit-visible), so non-modal reference editing keeps working. Browser suite 132/132.
 
