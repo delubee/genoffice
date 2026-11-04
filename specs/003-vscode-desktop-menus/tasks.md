@@ -735,3 +735,10 @@ Desktop menu parity that the VS Code extension cannot or does not yet provide:
 - **Performance bound:** Subtotal is capped at 10,000 source cells (each group recomputes the candidate).
 - **Untested variants:** Goal Seek on error-valued formulas, font-color context filter, Text to Number / table / range-protection / clipboard context-menu entries, Flash Fill beyond 2,000 rows.
 - **Platform:** the Windows VSIX behavior cannot be checked on the Linux CI/dev host used here.
+
+## Docs per-section settings (plan B)
+
+- [x] Step 1-2 (session): `settings.sections` lists every section of the file (start type, page setup, different first page, page numbering) and `settings.sectionEdits` edits non-final sections of the opened file, keyed by the closing paragraph's docxIndex; saved by rewriting that paragraph's sectPr (docx-session test).
+- [ ] Step 2 (view): derive the cursor's section in the editor and route the Layout tab and the Header & Footer options to it.
+- [ ] Step 3: per-section headers/footers and Link to Previous (engine `sectionHf` / `sectionHfUnlink`).
+- [ ] Step 4: page preview with the desktop `PaginationPreview`.

@@ -40,9 +40,31 @@ export interface InkSetting {
     offsetYPx: number
   }
 }
+/** One section as the view shows it (the final section's settings also appear at the top level). */
+export interface SectionEntry {
+  /** docxIndex of the paragraph that closes the section (the key of its edits) */
+  blockIndex: number
+  /** how the section starts */
+  startType: 'nextPage' | 'continuous' | 'evenPage' | 'oddPage'
+  section: SectionSettings
+  titlePg: boolean
+  pageNumbering: { fmt?: string; start?: number }
+  final: boolean
+}
+/** Edits to a non-final section of the opened file, keyed by the docxIndex of its closing paragraph. */
+export interface SectionEdit {
+  section?: SectionSettings
+  startType?: 'nextPage' | 'continuous' | 'evenPage' | 'oddPage'
+  titlePg?: boolean
+  pageNumbering?: { fmt?: string; start?: number }
+}
 /** Document settings the Layout and Design tabs edit (final section, page color, watermark). */
 export interface DocumentSettings {
   section?: SectionSettings
+  /** every section of the document (read-only output) */
+  sections?: SectionEntry[]
+  /** edits to non-final sections */
+  sectionEdits?: Record<string, SectionEdit>
   pageColor?: string | null
   mirrorMargins?: boolean
   /** Header & Footer → Different First Page / Different Odd & Even Pages */

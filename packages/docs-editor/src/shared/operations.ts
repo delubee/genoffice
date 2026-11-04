@@ -328,27 +328,54 @@ const headerFooterSchema = z
     (value) => hfValue('header', { ...value, newPictures: undefined }, 0),
     'Invalid header or footer',
   )
+const sectionSettingsSchema = z
+  .object({
+    pageWidth: z.number().int().min(1).max(63360),
+    pageHeight: z.number().int().min(1).max(63360),
+    orientation: z.enum(['portrait', 'landscape']),
+    marginTop: twips,
+    marginRight: twips,
+    marginBottom: twips,
+    marginLeft: twips,
+    pageBorder: z.boolean(),
+  })
+  .catchall(z.unknown())
+  .refine(
+    (section) =>
+      Object.entries(section).every(
+        ([key, value]) => SECTION_KEYS.has(key) && settingValue(value, 0),
+      ),
+    'Invalid section settings',
+  )
+const sectionStartSchema = z.enum(['nextPage', 'continuous', 'evenPage', 'oddPage'])
+const pageNumberingSchema = z
+  .strictObject({
+    fmt: z
+      .enum([
+        'decimal',
+        'numberInDash',
+        'lowerLetter',
+        'upperLetter',
+        'lowerRoman',
+        'upperRoman',
+        'chineseCounting',
+      ])
+      .optional(),
+    start: z.number().int().min(0).max(9999).optional(),
+  })
+  .optional()
+const sectionEditSchema = z.strictObject({
+  section: sectionSettingsSchema.optional(),
+  startType: sectionStartSchema.optional(),
+  titlePg: z.boolean().optional(),
+  pageNumbering: pageNumberingSchema,
+})
 export const documentSettingsSchema = z
   .object({
-    section: z
-      .object({
-        pageWidth: z.number().int().min(1).max(63360),
-        pageHeight: z.number().int().min(1).max(63360),
-        orientation: z.enum(['portrait', 'landscape']),
-        marginTop: twips,
-        marginRight: twips,
-        marginBottom: twips,
-        marginLeft: twips,
-        pageBorder: z.boolean(),
-      })
-      .catchall(z.unknown())
-      .refine(
-        (section) =>
-          Object.entries(section).every(
-            ([key, value]) => SECTION_KEYS.has(key) && settingValue(value, 0),
-          ),
-        'Invalid section settings',
-      )
+    section: sectionSettingsSchema.optional(),
+    sectionEdits: z
+      .record(z.string().regex(/^[0-9]{1,9}$/), sectionEditSchema)
+      .refine((edits) => Object.keys(edits).length <= 500, 'Too many section edits')
       .optional(),
     pageColor: z
       .string()

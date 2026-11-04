@@ -9,6 +9,10 @@ import {
   type StyleInfo,
   readSectionSettings,
   readSections,
+  applySectionSettings,
+  applySectionStartType,
+  applyTitlePg,
+  applyPageNumType,
   type StyleUpsert,
   type NumberingDef,
 } from '@genoffice/docx-engine'
@@ -43,6 +47,10 @@ import {
   buildInkImages,
   type InkStroke,
 } from '../../../apps/docs/src/renderer/editor/ink'
+import {
+  applySectPrRewrites,
+  type SectPrRewrite,
+} from '../../../apps/docs/src/renderer/sectpr-rewrite'
 import { readBlocks, type SelectionScope } from './read'
 import type {
   SessionDescriptor,
@@ -51,6 +59,7 @@ import type {
   DocumentPresentation,
   DocumentSettings,
   PendingListDefinitions,
+  SectionEntry,
 } from '@genoffice/docs-editor/shared/protocol'
 export type { SessionDescriptor, StepRequest, Commit } from '@genoffice/docs-editor/shared/protocol'
 
@@ -232,6 +241,29 @@ export class DocxSession {
       }),
     ) as DocumentPresentation
   }
+  /** Every section of the file with the session's edits applied. */
+  private sectionEntries(settings: DocumentSettings): SectionEntry[] {
+    const edits = this.root.overlays.settings.sectionEdits ?? {}
+    const sections = readSections(this.original)
+    return sections.map((sec, index) => {
+      const final = index === sections.length - 1
+      const edit = final ? undefined : edits[String(sec.lastBlockIndex)]
+      const type = edit?.startType ?? sec.startType
+      return {
+        blockIndex: sec.lastBlockIndex,
+        startType: type === 'nextColumn' ? 'nextPage' : type,
+        section: final ? (settings.section ?? sec.settings) : (edit?.section ?? sec.settings),
+        titlePg: final ? (settings.titlePg ?? sec.titlePg) : (edit?.titlePg ?? sec.titlePg),
+        pageNumbering: final
+          ? (settings.pageNumbering ?? {})
+          : (edit?.pageNumbering ?? {
+              ...(sec.pageNumberFmt ? { fmt: sec.pageNumberFmt } : {}),
+              ...(sec.pageNumberStart !== undefined ? { start: sec.pageNumberStart } : {}),
+            }),
+        final,
+      }
+    })
+  }
   /** w:pgNumType of the final section as opened. */
   private originalPageNumbering(): NonNullable<DocumentSettings['pageNumbering']> {
     const last = readSections(this.original).at(-1)
@@ -243,7 +275,7 @@ export class DocxSession {
   /** The document settings as the view shows them: session edits over the opened file. */
   private settings(): DocumentSettings {
     const edits = this.root.overlays.settings
-    return {
+    const base: DocumentSettings = {
       section: edits.section ?? readSectionSettings(this.original),
       pageColor: edits.pageColor !== undefined ? edits.pageColor : readPageColor(this.original),
       mirrorMargins: edits.mirrorMargins ?? this.original.mirrorMargins ?? false,
@@ -279,6 +311,11 @@ export class DocxSession {
         ...(this.original.footerParas ? { paras: this.original.footerParas } : {}),
       },
     }
+    return {
+      ...base,
+      sections: this.sectionEntries(base),
+      ...(edits.sectionEdits ? { sectionEdits: edits.sectionEdits } : {}),
+    }
   }
   /** Layout / Design settings edits: one history entry without document steps. */
   applySettings(input: {
@@ -296,6 +333,13 @@ export class DocxSession {
     if (this.readonly) throw new Error('Document is read-only')
     if (input.expectedRevision !== this.revision) throw new Error('Stale document version')
     const edit = documentSettingsSchema.parse(input.settings)
+    // Section edits address the closing paragraph of a non-final section of the opened file.
+    if (edit.sectionEdits) {
+      const sections = readSections(this.original)
+      const editable = new Set(sections.slice(0, -1).map((sec) => String(sec.lastBlockIndex)))
+      for (const key of Object.keys(edit.sectionEdits))
+        if (!editable.has(key)) throw new Error('Unknown section')
+    }
     // Ink anchors to paragraphs of the opened file (the save re-anchors by docxIndex).
     if (edit.inks) {
       const anchors = new Set(this.original.blocks.map((block) => block.docxIndex))
@@ -715,7 +759,31 @@ export class DocxSession {
       : this.original.inks?.length
         ? buildInkImages(annotationsFromParsed(this.original.inks), plan.saveBlockIndexByDocx)
         : undefined
-    return saveDocx(this.original, plan.saveBlocks, {
+    // Page setup of non-final sections lives in their closing paragraphs' sectPr.
+    const rewrites = new Map<number, SectPrRewrite>()
+    const sectionEdits = this.root.overlays.settings.sectionEdits ?? {}
+    const originalSections = readSections(this.original)
+    for (const [key, edit] of Object.entries(sectionEdits)) {
+      const sec = originalSections.slice(0, -1).find((item) => String(item.lastBlockIndex) === key)
+      const block =
+        sec && this.original.blocks.find((item) => item.docxIndex === sec.lastBlockIndex)
+      if (!sec || !block?.originalXml || !sec.sectPrXml) continue
+      let sectPr = sec.sectPrXml
+      if (edit.section) sectPr = applySectionSettings(sectPr, edit.section)
+      if (edit.startType) sectPr = applySectionStartType(sectPr, edit.startType)
+      if (edit.titlePg !== undefined) sectPr = applyTitlePg(sectPr, edit.titlePg)
+      if (edit.pageNumbering)
+        sectPr = applyPageNumType(sectPr, edit.pageNumbering.fmt, edit.pageNumbering.start)
+      rewrites.set(sec.lastBlockIndex, {
+        from: sec.sectPrXml,
+        to: sectPr,
+        originalXml: block.originalXml,
+      })
+    }
+    const saveBlocks = rewrites.size
+      ? applySectPrRewrites(plan.saveBlocks, plan.saveBlockIndexByDocx, rewrites)
+      : plan.saveBlocks
+    return saveDocx(this.original, saveBlocks, {
       newPictures: plan.newPictures,
       ...(this.root.overlays.numbering.length ||
       this.root.overlays.restartNums.length ||

@@ -108,6 +108,61 @@ it('saves first-page and even-page header and footer parts', async () => {
   })
 })
 
+it('edits the page setup of a non-final section and saves it into that section', async () => {
+  const pgMar =
+    '<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/>'
+  const session = await DocxSession.open(
+    await buildDocx({
+      bodyXml:
+        '<w:p><w:r><w:t>One</w:t></w:r></w:p>' +
+        `<w:p><w:pPr><w:sectPr><w:pgSz w:w="12240" w:h="15840"/>${pgMar}</w:sectPr></w:pPr></w:p>` +
+        '<w:p><w:r><w:t>Two</w:t></w:r></w:p>',
+    }),
+  )
+  const sections = session.presentation().settings!.sections!
+  expect(sections).toHaveLength(2)
+  expect(sections.map((entry) => entry.final)).toEqual([false, true])
+  const first = sections[0]!
+  apply(session, {
+    sectionEdits: {
+      [String(first.blockIndex)]: {
+        section: {
+          ...first.section,
+          orientation: 'landscape',
+          pageWidth: 15840,
+          pageHeight: 12240,
+        },
+        startType: 'continuous',
+        pageNumbering: { fmt: 'lowerRoman', start: 3 },
+        titlePg: true,
+      },
+    },
+  })
+  expect(session.presentation().settings!.sections![0]).toMatchObject({
+    section: { orientation: 'landscape', pageWidth: 15840 },
+    startType: 'continuous',
+    titlePg: true,
+    pageNumbering: { fmt: 'lowerRoman', start: 3 },
+  })
+  const reopened = await DocxSession.open(await session.save())
+  const saved = reopened.presentation().settings!.sections!
+  expect(saved).toHaveLength(2)
+  expect(saved[0]).toMatchObject({
+    section: { orientation: 'landscape', pageWidth: 15840, pageHeight: 12240 },
+    startType: 'continuous',
+    titlePg: true,
+    pageNumbering: { fmt: 'lowerRoman', start: 3 },
+  })
+  // The final section keeps the file's own geometry.
+  expect(saved[1]!.section.pageWidth).toBe(sections[1]!.section.pageWidth)
+  expect(() => apply(session, { sectionEdits: { '999': { titlePg: true } } })).toThrow(
+    'Unknown section',
+  )
+  expect(() =>
+    apply(session, { sectionEdits: { [String(sections[1]!.blockIndex)]: { titlePg: true } } }),
+  ).toThrow('Unknown section')
+})
+
 it('refuses settings that could carry markup or exceed page bounds', async () => {
   const session = await DocxSession.open(
     await buildDocx({ bodyXml: '<w:p><w:r><w:t>Settings</w:t></w:r></w:p>' }),
