@@ -721,3 +721,14 @@ Review protection foundation (2026-10-29):
 - [x] Consolidate outputs up to 20,000 cells commit as one staged revision (1000-operation stages); verified natively with 2,400 formulas. Left-label matching still reads label columns in 2000-row bands up to 200,000 source rows.
 
 - [x] Goal Seek reports an unreachable target (formula independent of the changing cell) in the dialog and writes nothing (native test). A quadratic target solves to its root (native test); error-valued formulas remain untested.
+
+## Known limitations (summary for review)
+
+Desktop menu parity that the VS Code extension cannot or does not yet provide:
+
+- **No VS Code API (reported in the UI as host limits):** PDF/image export, printing and print preview, mail merge, screenshots, spelling dictionaries, password-to-open encryption, Zotero.
+- **Needs a section model in the DOCX session:** per-section page setup, header/footer, page numbers and Link to Previous (section breaks, the final section's settings, first/even headers and page number format are supported).
+- **Needs host-side calculation state:** calculation results and cache freshness are not bound to the host's workbook root (the calculation mode is).
+- **Performance bound:** Subtotal is capped at 10,000 source cells (each group recomputes the candidate).
+- **Untested variants:** Goal Seek on error-valued formulas, font-color context filter, Text to Number / table / range-protection / clipboard context-menu entries, Flash Fill beyond 2,000 rows.
+- **Platform:** the Windows VSIX behavior cannot be checked on the Linux CI/dev host used here.
