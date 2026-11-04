@@ -259,7 +259,7 @@ function activeCell(accessor: IAccessor) {
   return { ...target, row, col }
 }
 
-async function filterBySelectedCell(accessor: IAccessor, by: FilterBy): Promise<boolean> {
+export async function filterBySelectedCell(accessor: IAccessor, by: FilterBy): Promise<boolean> {
   const cell = activeCell(accessor)
   if (!cell) return false
   const { unitId, subUnitId, worksheet, row, col } = cell

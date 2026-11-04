@@ -198,6 +198,8 @@ import { nextSheetName } from '../../../apps/sheets/src/renderer/sheet-default-n
 import { registerExcelShortcuts } from '../../../apps/sheets/src/renderer/excel-shortcuts'
 import { PASTE_SPECIAL_OPEN_SHELL_COMMAND } from '../../../apps/sheets/src/renderer/paste-special-model'
 import {
+  FILTER_BY_COMMAND_ID,
+  filterBySelectedCell,
   installCellContextMenu,
   registerPasteSpecialOpener,
   setContextMenuCommandSink,
@@ -1653,6 +1655,56 @@ export class WorkbookRuntime implements EditorProjection {
       'sheet.command.set-row-is-auto-height': sink('autofit-row-height'),
       'sheet.command.set-col-auto-width': sink('autofit-col-width'),
     }
+    // Filter by the selected cell's value or color: the filter itself is a session edit, so create it
+    // through the canonical path first and wait for its projection before the criteria are applied.
+    const filterBy = async (
+      accessor: Parameters<typeof filterBySelectedCell>[0],
+      params?: { by?: Parameters<typeof filterBySelectedCell>[1] },
+    ) => {
+      if (!params?.by) return false
+      const filterService = this.runtime.univer.__getInjector().get(SheetsFilterService)
+      // The projection of the new filter reinstalls the workbook, so the target is read again each time.
+      const hasModel = () => {
+        const workbook = this.runtime.univerAPI.getActiveWorkbook()
+        const sheetId = workbook?.getActiveSheet()?.getSheetId()
+        return !!workbook && !!sheetId && !!filterService.getFilterModel(workbook.getId(), sheetId)
+      }
+      try {
+        if (!hasModel()) {
+          await this.sortFilterCommand('filter-toggle')
+          for (let waited = 0; !hasModel() && waited < 5000; waited += 50)
+            await new Promise<void>((resolve) => setTimeout(resolve, 50))
+          if (!hasModel()) return false
+        }
+        // The criteria are applied through the same frozen context a header popup opens with.
+        const workbook = this.runtime.univerAPI.getActiveWorkbook()
+        const sheet = workbook?.getActiveSheet()
+        const range = sheet?.getActiveRange()?.getRange()
+        if (!workbook || !sheet || !range) return false
+        const context = await this.prepareFilterPopup({
+          unitId: workbook.getId(),
+          subUnitId: sheet.getSheetId(),
+          col: range.startColumn,
+        } as IOpenFilterPanelOperationParams)
+        this.filterPopupContext = context
+        try {
+          return await filterBySelectedCell(accessor, params.by)
+        } finally {
+          this.filterPopupContext = undefined
+        }
+      } catch (error) {
+        this.report(error)
+        return false
+      }
+    }
+    commands.unregisterCommand(FILTER_BY_COMMAND_ID)
+    this.disposables.push(
+      commands.registerCommand({
+        id: FILTER_BY_COMMAND_ID,
+        type: CommandType.COMMAND,
+        handler: filterBy as (accessor: never, params?: never) => Promise<boolean>,
+      }),
+    )
     for (const [id, handler] of Object.entries(handlers)) {
       commands.unregisterCommand(id)
       this.disposables.push(

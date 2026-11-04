@@ -1238,3 +1238,36 @@ test('Calculation Options records the calculation mode as one workbook edit', as
   ).toEqual({ mode: 'auto' })
   expect(errors).toEqual([])
 })
+
+test('Filter by Selected Cell value from the context menu records a filter edit', async ({
+  page,
+}) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(String(error)))
+  await page.goto(base)
+  await page.evaluate(async () => {
+    const { mountManualToolbar } = await import(
+      /* @vite-ignore */ String('/packages/sheets-editor/tests/fixtures/manual-toolbar.tsx')
+    )
+    ;(window as any).toolbar = await mountManualToolbar(true)
+    ;(window as any).toolbar.select('A2')
+  })
+  const revision = () => page.evaluate(() => (window as any).toolbar.revision())
+  // The context-menu commands install once Univer reports its Rendered stage.
+  await page.waitForTimeout(1500)
+  const before = await revision()
+  expect(
+    await page.evaluate(() =>
+      (window as any).toolbar.facade().executeCommand('genoffice.ctx.filter-by', { by: 'value' }),
+    ),
+  ).toBe(true)
+  // The filter is created, then the criteria of the selected cell's column are recorded.
+  await expect.poll(revision).toBeGreaterThanOrEqual(before + 2)
+  const filter = await page.evaluate(
+    () => (window as any).toolbar.snapshot().sheets[0].features.filterEdits,
+  )
+  expect(filter.filter.columns.length).toBeGreaterThan(0)
+  expect(JSON.stringify(filter.filter.columns[0])).toContain('North')
+  expect(filter.hiddenRows.length).toBeGreaterThan(0)
+  expect(errors).toEqual([])
+})
