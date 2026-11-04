@@ -5452,6 +5452,28 @@
                     "properties": {
                       "op": {
                         "type": "string",
+                        "const": "set_calculation_mode"
+                      },
+                      "mode": {
+                        "type": "string",
+                        "enum": [
+                          "auto",
+                          "manual",
+                          "autoNoTable"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "mode"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
                         "const": "set_protected_ranges"
                       },
                       "sheetId": {

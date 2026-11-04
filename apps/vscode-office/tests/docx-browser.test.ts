@@ -394,6 +394,38 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     // The Header & Footer contextual tab follows the strip editor; Close commits it.
     await page.locator('[data-tip="Return to the document body"]').click()
     await expect.poll(() => session.presentation().settings!.header!.text).toContain('Quarterly')
+    // Different First Page adds a first-page strip that edits its own header part.
+    await page.locator('.page-hf-header').first().dblclick()
+    await page.getByRole('button', { name: /Different First Page/ }).click()
+    expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
+    await expect.poll(() => session.presentation().settings!.titlePg).toBe(true)
+    await expect.poll(() => page.locator('.page-hf-header').count()).toBe(2)
+    await page.locator('[data-tip="Return to the document body"]').click()
+    await page.locator('.page-hf-header').nth(1).dblclick()
+    const firstEditor = page
+      .locator('.page-hf-header')
+      .nth(1)
+      .locator('.page-hf-edit-surface [contenteditable="true"]')
+      .first()
+    await firstEditor.waitFor()
+    await firstEditor.click()
+    await page.keyboard.type('Cover')
+    // Page Number → Format Page Numbers writes the final section's pgNumType.
+    await page.locator('[data-tip="Page Number"]').first().click()
+    await page
+      .locator('[data-rb-panel] button', { hasText: /^Format/ })
+      .first()
+      .click()
+    await page.getByLabel('Number Format').selectOption('lowerRoman')
+    await page.getByPlaceholder(/./).last().fill('4')
+    await page.locator('.modal .btn-primary').click()
+    expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
+    await expect
+      .poll(() => session.presentation().settings!.pageNumbering)
+      .toEqual({ fmt: 'lowerRoman', start: 4 })
+    await page.locator('[data-tip="Return to the document body"]').click()
+    await expect.poll(() => session.presentation().settings!.headerFirst?.text).toContain('Cover')
+    expect(session.presentation().settings!.header!.text).toContain('Quarterly')
     // Review → New Comment: the desktop composer anchors a comment with its list in one entry.
     await editor.evaluate((element) => {
       const tiptap = (element as unknown as { editor: TiptapLike }).editor
