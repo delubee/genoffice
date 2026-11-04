@@ -356,6 +356,8 @@ export const documentSettingsSchema = z
       .nullable()
       .optional(),
     mirrorMargins: z.boolean().optional(),
+    titlePg: z.boolean().optional(),
+    evenAndOddHeaders: z.boolean().optional(),
     header: headerFooterSchema.optional(),
     comments: commentsSchema.optional(),
     footnotes: notesSchema.optional(),

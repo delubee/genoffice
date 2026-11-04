@@ -50,6 +50,22 @@ it('applies Layout and Design settings as history entries and saves them to the 
   expect(reopened.presentation().settings!.section!.marginLeft).toBe(720)
 })
 
+it('saves Different First Page and Different Odd & Even Pages', async () => {
+  const session = await DocxSession.open(
+    await buildDocx({ bodyXml: '<w:p><w:r><w:t>Pages</w:t></w:r></w:p>' }),
+  )
+  expect(session.presentation().settings).toMatchObject({
+    titlePg: false,
+    evenAndOddHeaders: false,
+  })
+  apply(session, { titlePg: true, evenAndOddHeaders: true })
+  const zip = await JSZip.loadAsync(await session.save())
+  expect(await zip.file('word/document.xml')!.async('string')).toContain('<w:titlePg')
+  expect(await zip.file('word/settings.xml')!.async('string')).toContain('<w:evenAndOddHeaders')
+  const reopened = await DocxSession.open(await session.save())
+  expect(reopened.presentation().settings).toMatchObject({ titlePg: true, evenAndOddHeaders: true })
+})
+
 it('refuses settings that could carry markup or exceed page bounds', async () => {
   const session = await DocxSession.open(
     await buildDocx({ bodyXml: '<w:p><w:r><w:t>Settings</w:t></w:r></w:p>' }),

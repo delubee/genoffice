@@ -664,3 +664,8 @@ Review protection foundation (2026-10-29):
 - [ ] File CF rules on sheets with pending structural edits are not projected (source coordinates); cfvo formula/reference thresholds are not pre-resolved as on the desktop.
 - [x] Allow-edit ranges permit cell writes inside them on a protected sheet.
 - [ ] Browser suite under full load: `function confirmation preserves an unfinished grid draft` and `Sort & Filter group toggles smart source regions` failed once each after the table preset was added (130/132); both pass alone. Watch for a focus-timing regression.
+
+## Docs Header & Footer page options
+
+- [x] Different First Page and Different Odd & Even Pages are document settings saved as `w:titlePg` / `w:evenAndOddHeaders`.
+- [ ] First-page and even-page header/footer content (variants), Link to Previous and page number formats still report a host limitation.

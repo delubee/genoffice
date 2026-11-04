@@ -289,8 +289,8 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
         linked: null,
         headerDistTwips: runtime.settings.section?.headerDist ?? 720,
         footerDistTwips: runtime.settings.section?.footerDist ?? 720,
-        titlePg: false,
-        evenOddHf: false,
+        titlePg: runtime.settings.titlePg ?? false,
+        evenOddHf: runtime.settings.evenAndOddHeaders ?? false,
       }
     : null
   /** The Header & Footer contextual tab, as the desktop's onHfAction for the default strips. */
@@ -368,9 +368,15 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
           })
         break
       }
+      case 'titlePg':
+        void runtime.applySettings({ titlePg: action.on })
+        break
+      case 'evenOddHf':
+        void runtime.applySettings({ evenAndOddHeaders: action.on })
+        break
       default:
         runtime.reportError(
-          'Different first page, odd/even pages, Link to Previous and page number formats are not available in the VS Code editor yet.',
+          'Link to Previous and page number formats are not available in the VS Code editor yet.',
         )
     }
   }

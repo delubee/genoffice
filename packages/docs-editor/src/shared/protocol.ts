@@ -45,6 +45,9 @@ export interface DocumentSettings {
   section?: SectionSettings
   pageColor?: string | null
   mirrorMargins?: boolean
+  /** Header & Footer → Different First Page / Different Odd & Even Pages */
+  titlePg?: boolean
+  evenAndOddHeaders?: boolean
   watermark?: string | null
   /** default page header / footer of the document */
   header?: HeaderFooter
