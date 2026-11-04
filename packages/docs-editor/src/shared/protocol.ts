@@ -58,6 +58,19 @@ export interface SectionEdit {
   titlePg?: boolean
   pageNumbering?: { fmt?: string; start?: number }
 }
+export type HfPartKind = 'header' | 'footer'
+export type HfPartVariant = 'default' | 'first' | 'even'
+/** The strip a section shows (read-only output; present when the file has several sections). */
+export interface SectionStrip {
+  section: number
+  kind: HfPartKind
+  variant: HfPartVariant
+  value: HeaderFooter | null
+  /** the section whose part is shown (an inherited strip is owned by an earlier section) */
+  owner: number
+  /** Word's Link to Previous: null for the first section */
+  linked: boolean | null
+}
 /** Document settings the Layout and Design tabs edit (final section, page color, watermark). */
 export interface DocumentSettings {
   section?: SectionSettings
@@ -65,6 +78,14 @@ export interface DocumentSettings {
   sections?: SectionEntry[]
   /** edits to non-final sections */
   sectionEdits?: Record<string, SectionEdit>
+  /** the header/footer strips of every section (read-only output) */
+  sectionStrips?: SectionStrip[]
+  /** write a strip of one section (a command: the session keeps the resulting per-part state) */
+  sectionHfEdit?: { section: number; kind: HfPartKind; variant: HfPartVariant; hf: HeaderFooter }
+  /** Link to Previous on or off for one section's strip (a command) */
+  sectionHfLink?: { section: number; kind: HfPartKind; variant: HfPartVariant; on: boolean }
+  /** session-held pending parts and links of the sections (set by the two commands above) */
+  sectionHfState?: { edits: Record<string, HeaderFooter>; links: Record<string, true> }
   pageColor?: string | null
   mirrorMargins?: boolean
   /** Header & Footer → Different First Page / Different Odd & Even Pages */

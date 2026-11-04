@@ -7,6 +7,7 @@ import {
   readPageColor,
   previewFontSettings,
   type StyleInfo,
+  type HeaderFooter,
   readSectionSettings,
   readSections,
   applySectionSettings,
@@ -51,6 +52,15 @@ import {
   applySectPrRewrites,
   type SectPrRewrite,
 } from '../../../apps/docs/src/renderer/sectpr-rewrite'
+import {
+  hfLinked,
+  hfSaveOptions,
+  resolveHf,
+  withHfEdit,
+  withHfLink,
+  type HfSectionState,
+} from '../../../apps/docs/src/renderer/hf-sections'
+import { hfFromPart, hfVariantsFromParsed } from '../../../apps/docs/src/renderer/doc-state'
 import { readBlocks, type SelectionScope } from './read'
 import type {
   SessionDescriptor,
@@ -60,6 +70,7 @@ import type {
   DocumentSettings,
   PendingListDefinitions,
   SectionEntry,
+  SectionStrip,
 } from '@genoffice/docs-editor/shared/protocol'
 export type { SessionDescriptor, StepRequest, Commit } from '@genoffice/docs-editor/shared/protocol'
 
@@ -241,6 +252,48 @@ export class DocxSession {
       }),
     ) as DocumentPresentation
   }
+  /** The header/footer state of every section: the file's parts with the session's pending edits. */
+  private hfSectionState(pending = this.root.overlays.settings.sectionHfState): HfSectionState {
+    return {
+      sections: readSections(this.original),
+      edits: pending?.edits ?? {},
+      links: pending?.links ?? {},
+      docStrips: {
+        header: hfFromPart({
+          text: this.original.headerText ?? '',
+          hasPageNumber: !!this.original.headerHasPageNumber,
+          paras: this.original.headerParas ?? [],
+        }),
+        footer: hfFromPart({
+          text: this.original.footerText ?? '',
+          hasPageNumber: !!this.original.footerHasPageNumber,
+          paras: this.original.footerParas ?? [],
+        }),
+        variants: hfVariantsFromParsed(this.original),
+      },
+      parsed: this.original,
+    }
+  }
+  /** The strip each section shows (header and footer, default/first/even), following Word's inheritance. */
+  private sectionStrips(): SectionStrip[] {
+    const state = this.hfSectionState()
+    if (state.sections.length < 2) return []
+    const strips: SectionStrip[] = []
+    for (let section = 0; section < state.sections.length; section++)
+      for (const kind of ['header', 'footer'] as const)
+        for (const variant of ['default', 'first', 'even'] as const) {
+          const resolved = resolveHf(state, section, kind, variant)
+          strips.push({
+            section,
+            kind,
+            variant,
+            value: resolved.value,
+            owner: resolved.owner,
+            linked: hfLinked(state, section, kind, variant),
+          })
+        }
+    return strips
+  }
   /** Every section of the file with the session's edits applied. */
   private sectionEntries(settings: DocumentSettings): SectionEntry[] {
     const edits = this.root.overlays.settings.sectionEdits ?? {}
@@ -314,6 +367,7 @@ export class DocxSession {
     return {
       ...base,
       sections: this.sectionEntries(base),
+      sectionStrips: this.sectionStrips(),
       ...(edits.sectionEdits ? { sectionEdits: edits.sectionEdits } : {}),
     }
   }
@@ -355,6 +409,7 @@ export class DocxSession {
         for (const [name, item] of Object.entries(value)) collect(item, name)
     }
     collect([
+      ...Object.values(this.original.hfParts ?? {}).map((part) => part.paras),
       this.original.headerParas,
       this.original.footerParas,
       ...[
@@ -372,6 +427,7 @@ export class DocxSession {
         for (const [name, item] of Object.entries(value)) check(item, name)
     }
     check([
+      edit.sectionHfEdit?.hf.paras,
       edit.header?.paras,
       edit.footer?.paras,
       edit.headerFirst?.paras,
@@ -380,7 +436,7 @@ export class DocxSession {
       edit.footerEven?.paras,
     ])
     const overlays = structuredClone(this.root.overlays)
-    const { styles, numbering, ...settings } = edit
+    const { styles, numbering, sectionHfEdit, sectionHfLink, ...settings } = edit
     if (styles) this.withStyles(overlays, styles)
     if (numbering) {
       const merged = this.withListDefinitions(numbering, overlays)
@@ -389,6 +445,34 @@ export class DocxSession {
       overlays.levelEdits = merged.levelEdits
     }
     overlays.settings = { ...overlays.settings, ...settings } as DocumentSettings
+    if (sectionHfEdit || sectionHfLink) {
+      const count = readSections(this.original).length
+      if ((sectionHfEdit ?? sectionHfLink)!.section >= count)
+        throw new Error('Unknown section strip')
+      const state = this.hfSectionState(overlays.settings.sectionHfState)
+      if (sectionHfEdit) {
+        const next = withHfEdit(
+          state,
+          sectionHfEdit.section,
+          sectionHfEdit.kind,
+          sectionHfEdit.variant,
+          sectionHfEdit.hf as HeaderFooter,
+        )
+        if (!next) throw new Error('Unknown section strip')
+        overlays.settings.sectionHfState = { edits: next.edits, links: next.links }
+      }
+      if (sectionHfLink) {
+        const next = withHfLink(
+          this.hfSectionState(overlays.settings.sectionHfState),
+          sectionHfLink.section,
+          sectionHfLink.kind,
+          sectionHfLink.variant,
+          sectionHfLink.on,
+        )
+        if (!next) throw new Error('Unknown section strip')
+        overlays.settings.sectionHfState = { edits: next.edits, links: next.links }
+      }
+    }
     const fromVersion = this.collabVersion
     this.commitRoot(this.root.doc, overlays)
     const commit: Commit = {
@@ -853,6 +937,7 @@ export class DocxSession {
           this.root.overlays.settings[key] ? [[key, this.root.overlays.settings[key]]] : [],
         ),
       ),
+      ...(this.root.overlays.settings.sectionHfState ? hfSaveOptions(this.hfSectionState()) : {}),
       ...(this.root.overlays.settings.watermark !== undefined
         ? { watermark: this.root.overlays.settings.watermark }
         : {}),

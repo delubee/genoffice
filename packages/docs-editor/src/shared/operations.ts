@@ -373,6 +373,22 @@ const sectionEditSchema = z.strictObject({
 export const documentSettingsSchema = z
   .object({
     section: sectionSettingsSchema.optional(),
+    sectionHfEdit: z
+      .strictObject({
+        section: z.number().int().min(0).max(1000),
+        kind: z.enum(['header', 'footer']),
+        variant: z.enum(['default', 'first', 'even']),
+        hf: headerFooterSchema,
+      })
+      .optional(),
+    sectionHfLink: z
+      .strictObject({
+        section: z.number().int().min(0).max(1000),
+        kind: z.enum(['header', 'footer']),
+        variant: z.enum(['default', 'first', 'even']),
+        on: z.boolean(),
+      })
+      .optional(),
     sectionEdits: z
       .record(z.string().regex(/^[0-9]{1,9}$/), sectionEditSchema)
       .refine((edits) => Object.keys(edits).length <= 500, 'Too many section edits')

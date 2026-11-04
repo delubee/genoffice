@@ -163,6 +163,57 @@ it('edits the page setup of a non-final section and saves it into that section',
   ).toThrow('Unknown section')
 })
 
+it('keeps a header per section and relinks a section to the previous one', async () => {
+  const pgMar =
+    '<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/>'
+  const sect = `<w:sectPr><w:pgSz w:w="12240" w:h="15840"/>${pgMar}</w:sectPr>`
+  const session = await DocxSession.open(
+    await buildDocx({
+      bodyXml:
+        '<w:p><w:r><w:t>One</w:t></w:r></w:p>' +
+        `<w:p><w:pPr>${sect}</w:pPr></w:p>` +
+        '<w:p><w:r><w:t>Two</w:t></w:r></w:p>' +
+        `<w:p><w:pPr>${sect}</w:pPr></w:p>` +
+        '<w:p><w:r><w:t>Three</w:t></w:r></w:p>',
+    }),
+  )
+  const strips = () => session.presentation().settings!.sectionStrips!
+  const header = (section: number) =>
+    strips().find((s) => s.section === section && s.kind === 'header' && s.variant === 'default')!
+  expect(strips()).toHaveLength(3 * 2 * 3)
+  expect(header(1).linked).toBe(true)
+  // Section 2 gets its own header; section 3 (no part of its own) inherits it.
+  apply(session, {
+    sectionHfEdit: { section: 1, kind: 'header', variant: 'default', hf: { text: 'Chapter two' } },
+  })
+  expect(header(1)).toMatchObject({ value: { text: 'Chapter two' }, owner: 1, linked: false })
+  expect(header(2)).toMatchObject({ value: { text: 'Chapter two' }, owner: 1, linked: true })
+  expect(header(0).value?.text ?? '').toBe('')
+  const reopened = await DocxSession.open(await session.save())
+  const saved = reopened.presentation().settings!.sectionStrips!
+  const savedHeader = (section: number) =>
+    saved.find((s) => s.section === section && s.kind === 'header' && s.variant === 'default')!
+  expect(savedHeader(1).value?.text).toBe('Chapter two')
+  expect(savedHeader(2).value?.text).toBe('Chapter two')
+  expect(savedHeader(0).value?.text ?? '').toBe('')
+  // Link to Previous on section 2 drops its own part: it shows the (empty) first section's strip again.
+  apply(session, { sectionHfLink: { section: 1, kind: 'header', variant: 'default', on: true } })
+  expect(header(1).linked).toBe(true)
+  expect(header(1).value?.text ?? '').toBe('')
+  const relinked = await DocxSession.open(await session.save())
+  const relinkedHeader = relinked
+    .presentation()
+    .settings!.sectionStrips!.find(
+      (s) => s.section === 1 && s.kind === 'header' && s.variant === 'default',
+    )!
+  expect(relinkedHeader.linked).toBe(true)
+  expect(() =>
+    apply(session, {
+      sectionHfEdit: { section: 9, kind: 'header', variant: 'default', hf: { text: 'x' } },
+    }),
+  ).toThrow()
+})
+
 it('refuses settings that could carry markup or exceed page bounds', async () => {
   const session = await DocxSession.open(
     await buildDocx({ bodyXml: '<w:p><w:r><w:t>Settings</w:t></w:r></w:p>' }),
