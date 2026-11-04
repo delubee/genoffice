@@ -107,6 +107,8 @@ export interface CandidateMaterial {
   writableSheetIds: readonly string[]
   /** Indexed source permits view-only changes, including protected sheets; never content writes. */
   viewWritableSheetIds?: readonly string[]
+  /** protected sheets that carry Allow Edit Ranges */
+  allowEditSheetIds?: readonly string[]
   allocation: { stateId: string; sheetIds: Record<string, string> }
 }
 
@@ -630,12 +632,18 @@ export async function computeCandidateState(
       !!target &&
       isWorksheetViewOperation(op) &&
       material.viewWritableSheetIds?.includes(target.id) === true
-    if (target && !material.writableSheetIds.includes(target.id) && !viewWrite)
+    // Review → Allow Edit Ranges: a protected sheet admits cell writes inside them.
+    const allowEdit =
+      !!target &&
+      !!permissions &&
+      material.allowEditSheetIds?.includes(target.id) === true &&
+      insideAllowEditRanges(permissions, op)
+    if (target && !material.writableSheetIds.includes(target.id) && !viewWrite && !allowEdit)
       throw new Error('unverified_writable_target')
     if (
       workbookMetadata?.readOnly ||
       permissions?.readOnly ||
-      (permissions?.protected && !viewWrite)
+      (permissions?.protected && !viewWrite && !allowEdit)
     )
       throw new Error('protected_target')
     assertMergeOperation(
@@ -2815,4 +2823,47 @@ export function sessionTablesOf(sheet: { features?: unknown }): SessionTable[] {
       },
     })
   return result
+}
+
+/**
+ * Review → Allow Edit Ranges: on a protected sheet, cell writes that stay
+ * inside a range without its own password pass, as the desktop guard lets
+ * them (password ranges would need the range password).
+ */
+function insideAllowEditRanges(
+  sheet: { features?: Record<string, unknown> | undefined },
+  op: import('./workbook-dsl').WorkbookOperation,
+): boolean {
+  let area: ReturnType<typeof parseRange>
+  if (op.op === 'set_cell' || op.op === 'set_formula' || op.op === 'clear_cell')
+    area = parseRange(op.address)
+  else if (op.op === 'clear_range') area = parseRange(op.range)
+  else if (op.op === 'set_range' && op.start) {
+    const start = parseRange(op.start)
+    area = {
+      ...start,
+      endRow: start.startRow + op.values.length - 1,
+      endColumn: start.startColumn + (op.values[0]?.length ?? 1) - 1,
+    }
+  } else return false
+  const ranges = (
+    (sheet.features?.protectedRangeEdits ?? sheet.features?.protectedRanges ?? []) as {
+      sqref: string
+      hasPassword?: boolean
+    }[]
+  )
+    .filter((range) => !range.hasPassword)
+    .flatMap((range) =>
+      range.sqref
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((ref) => parseRange(ref)),
+    )
+  return ranges.some(
+    (range) =>
+      range.startRow <= area.startRow &&
+      range.endRow >= area.endRow &&
+      range.startColumn <= area.startColumn &&
+      range.endColumn >= area.endColumn,
+  )
 }

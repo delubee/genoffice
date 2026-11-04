@@ -88,6 +88,21 @@ it(
             { op: 'set_cell', sheetId, address: 'B2', value: 1 },
           ]),
         ).rejects.toThrow()
+        // Allow Edit Ranges open cells of the protected sheet, as the desktop guard does.
+        // Excel edits Allow Edit Ranges while the sheet is unprotected, then protects it.
+        const open = await run(state, opened.original.sidecarSessionId, [
+          { op: 'set_protected_ranges', sheetId, ranges: [{ name: 'Inputs', sqref: 'B2:C3' }] },
+        ])
+        const ranged = await run(open.nextState, opened.original.sidecarSessionId, protect)
+        const edited = await run(ranged.nextState, opened.original.sidecarSessionId, [
+          { op: 'set_cell', sheetId, address: 'C3', value: 7 },
+        ])
+        expect(edited.nextState.sheets[0]!.cells.C3!.rawValue).toBe(7)
+        await expect(
+          run(ranged.nextState, opened.original.sidecarSessionId, [
+            { op: 'set_range', sheetId, start: 'C3', values: [[1, 2]] },
+          ]),
+        ).rejects.toThrow(/protected_target|unverified_writable_target/)
         const staged = await new SessionPackageWriter(client, opened.metadata).stage(
           opened.original.path,
           first.nextState,

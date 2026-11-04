@@ -662,5 +662,5 @@ Review protection foundation (2026-10-29):
 - [x] Desktop cell / header context menu (cell-context-menu.ts) enabled in the plugin; Univer built-ins (clear, insert/delete rows/columns/cells, freeze, hide/unhide, AutoFit) replaced by the ribbon's canonical paths; dialog entries reach the shared ribbon dispatcher.
 - [ ] Context menu: Filter by selected cell value/color (needs smart-toggle-filter in the view), Text to Number, table row/column entries, range protection entries and clipboard entries use Univer defaults; verify natively.
 - [ ] File CF rules on sheets with pending structural edits are not projected (source coordinates); cfvo formula/reference thresholds are not pre-resolved as on the desktop.
-- [ ] Allow-edit ranges do not yet permit edits inside a protected sheet (desktop guard allows them).
+- [x] Allow-edit ranges permit cell writes inside them on a protected sheet.
 - [ ] Browser suite under full load: `function confirmation preserves an unfinished grid draft` and `Sort & Filter group toggles smart source regions` failed once each after the table preset was added (130/132); both pass alone. Watch for a focus-timing regression.

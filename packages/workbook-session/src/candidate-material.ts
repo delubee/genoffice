@@ -280,6 +280,7 @@ export async function prepareCandidateMaterial(input: {
   const hiddenRows: Record<string, number[]> = {}
   const completeSheetIds: string[] = [],
     writableSheetIds: string[] = [],
+    allowEditSheetIds: string[] = [],
     viewWritableSheetIds: string[] = []
   for (const sheet of state.sheets) {
     assertNotCancelled(input.signal)
@@ -378,6 +379,8 @@ export async function prepareCandidateMaterial(input: {
       ? sessionProtection.protected
       : protection !== null && protection !== undefined && protection.protected !== false
     if (!sheet.readOnly && !sheet.protected) writableSheetIds.push(sheet.id)
+    // Protected sheets admit only edits inside their Allow Edit Ranges.
+    if (!sheet.readOnly && sheet.protected) allowEditSheetIds.push(sheet.id)
     if (!sheet.readOnly) viewWritableSheetIds.push(sheet.id)
     const { styles: _styles, sheet: _metadata, ...featureState } = features!
     sheet.features = { ...sheet.features, ...JSON.parse(JSON.stringify(featureState)) }
@@ -396,6 +399,7 @@ export async function prepareCandidateMaterial(input: {
     hiddenRows,
     referenceRanges: Object.fromEntries([...ranges].map(([id, selected]) => [id, [...selected]])),
     writableSheetIds,
+    allowEditSheetIds,
     viewWritableSheetIds,
     allocation: {
       stateId: randomUUID(),
