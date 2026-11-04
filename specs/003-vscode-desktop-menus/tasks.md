@@ -681,3 +681,8 @@ Review protection foundation (2026-10-29):
 
 - [x] Layout → Breaks inserts a section-closing paragraph (validated `w:sectPr` with plain page geometry) and records the final section's start type (`sectionStart` → `w:type`); verified through the DOCX browser test and saved XML.
 - [ ] Per-section Layout edits, Link to Previous, section-specific headers/footers and page numbering still apply to the final section only.
+
+## Native suite checkpoint (0d1d406b)
+
+- Full `minimum` native run: 60 passing, 2 pending, 3 failing. `Product workspace skill commands` and `Product worksheet dimensions` are the pre-existing failures; `Workbook native shortcuts UI` passed this time. `Desktop Get Data UI` (CSV import) failed in the full run with the Go To dialog staying open and passes alone (same Go To isolation flake as the Column Header Filter and Insert Link tests).
+- [ ] Harden the tests that open Go To (clear notifications, retry) so the full run is clean.
