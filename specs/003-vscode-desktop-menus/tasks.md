@@ -692,3 +692,9 @@ Review protection foundation (2026-10-29):
 - All Go To tests now share `tests/integration/goto-helper.ts` (clears notifications, retries a stuck dialog); `Desktop Get Data UI` no longer fails in the full run.
 - Full `minimum` run: 60 passing, 2 pending, 3 failing: the two pre-existing product failures plus `Desktop Home AutoFit UI`, which fails on the default Xvfb screen (`A80` width assertion, also without the helper change) and passes with `xvfb-run -s "-screen 0 1920x1200x24"`. It is screen-size sensitive, not a regression.
 - [x] The native suite runs under `xvfb-run -a -s "-screen 0 1920x1200x24"` (CI workflow updated); use the same locally.
+
+## Native suite checkpoint (1920x1200 Xvfb)
+
+- Full `minimum` run: 61 passing, 2 pending, 2 failing. `Product workspace skill commands` was a stale `0.1.0` expectation and now compares with the extension's package version.
+- `Product worksheet dimensions` still fails here: 13 characters measure 104 px (Normal-font MDW 8) instead of 91 px (MDW 7). The expectation assumes the Calibri metrics; this host lacks the font, so it is environment-dependent.
+- [ ] Make `Product worksheet dimensions` independent of the host's installed fonts (derive the expected pixels from the measured MDW) or install the fixture font in CI.

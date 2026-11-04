@@ -33,7 +33,10 @@ suite('Product workspace skill commands', () => {
       )
       const status = await inspect()
       controlledDigest = status.currentDigest
-      assert.equal(status.version, '0.1.0')
+      assert.equal(
+        status.version,
+        vscode.extensions.getExtension('genoffice.genoffice-workbook')!.packageJSON.version,
+      )
       assert.equal(status.userModified, false)
       assert.equal(status.tools.registered, true)
       assert.ok(
