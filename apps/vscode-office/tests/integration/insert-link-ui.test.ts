@@ -7,6 +7,7 @@ import { chromium, type Frame } from '@playwright/test'
 import { applyCellEditsToXlsx } from '@genoffice/xlsx-gateway/gateway/xlsx-gateway'
 import { manualWorkbook } from '../fixtures/manual-workbook'
 import type { WorkbookDocument } from '../../src/extension/workbook-document'
+import { gotoReference } from './goto-helper'
 
 suite('Desktop Insert Link UI', () => {
   test('edits original links through the shared dialog with cancel, validation, save and native history', async function () {
@@ -61,11 +62,7 @@ suite('Desktop Insert Link UI', () => {
         if (!frame) await new Promise((resolve) => setTimeout(resolve, 100))
       }
       assert.ok(frame)
-      await vscode.commands.executeCommand('genoffice.workbook.goto')
-      const goTo = frame.getByRole('dialog', { name: 'Go To', exact: true })
-      await goTo.getByRole('textbox', { name: 'Reference', exact: true }).fill('Data!A2')
-      await goTo.getByRole('button', { name: 'Go', exact: true }).click()
-      await goTo.waitFor({ state: 'hidden' })
+      await gotoReference(frame, 'Data!A2')
       await frame.getByRole('tab', { name: 'Insert', exact: true }).click()
       const insert = frame.locator('.workbook-desktop-header')
       assert.equal(await insert.locator('.ribbon-group').count(), 10)

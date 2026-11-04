@@ -6,6 +6,7 @@ import { chromium, expect, type Frame } from '@playwright/test'
 import { applyCellEditsToXlsx } from '@genoffice/xlsx-gateway/gateway/xlsx-gateway'
 import { manualWorkbook } from '../fixtures/manual-workbook'
 import type { WorkbookDocument } from '../../src/extension/workbook-document'
+import { gotoReference } from './goto-helper'
 
 suite('Desktop Color Filter UI', () => {
   test('persists fill colors, multiple choices and imported popup editing through native history and reopen', async function () {
@@ -78,11 +79,7 @@ suite('Desktop Color Filter UI', () => {
       await vscode.commands.executeCommand('workbench.action.closeAuxiliaryBar')
       await vscode.commands.executeCommand('workbench.action.closeSidebar')
       await vscode.commands.executeCommand('workbench.action.closePanel')
-      await vscode.commands.executeCommand('genoffice.workbook.goto')
-      const go = frame.getByRole('dialog', { name: 'Go To', exact: true })
-      await go.getByRole('textbox', { name: 'Reference', exact: true }).fill('Data!A1:B5')
-      await go.getByRole('button', { name: 'Go', exact: true }).click()
-      await go.waitFor({ state: 'hidden' })
+      await gotoReference(frame, 'Data!A1:B5')
       await frame.locator('#ribbon-tab-data').click()
       const band = frame.locator('.workbook-shared-sort-filter')
       await band.getByRole('button', { name: /^Filter\b/ }).click()
@@ -118,18 +115,15 @@ suite('Desktop Color Filter UI', () => {
               ),
           )
           .toBeGreaterThan(150)
-        const index = await target
-          .locator('.workbook-grid canvas')
-          .evaluateAll(
-            (elements) =>
-              elements
-                .map((canvas, index) => ({
-                  index,
-                  area:
-                    canvas.getBoundingClientRect().width * canvas.getBoundingClientRect().height,
-                }))
-                .sort((a, b) => b.area - a.area)[0]!.index,
-          )
+        const index = await target.locator('.workbook-grid canvas').evaluateAll(
+          (elements) =>
+            elements
+              .map((canvas, index) => ({
+                index,
+                area: canvas.getBoundingClientRect().width * canvas.getBoundingClientRect().height,
+              }))
+              .sort((a, b) => b.area - a.area)[0]!.index,
+        )
         const box = (await target.locator('.workbook-grid canvas').nth(index).boundingBox())!
         await target.page().mouse.click(box.x + 46 + 140 - 9, box.y + 20 + 20 - 9)
         await expect(popup(target)).toBeVisible()

@@ -5,6 +5,7 @@ import { suite, test } from 'mocha'
 import { chromium, type Browser, type Frame } from '@playwright/test'
 import { manualWorkbook } from '../fixtures/manual-workbook'
 import type { WorkbookDocument } from '../../src/extension/workbook-document'
+import { gotoReference } from './goto-helper'
 
 type Api = { getDocument(uri: vscode.Uri): WorkbookDocument | undefined }
 
@@ -31,11 +32,7 @@ async function viewOf(browser: Browser, name: string) {
 }
 
 async function goTo(frame: Frame, reference: string) {
-  await vscode.commands.executeCommand('genoffice.workbook.goto')
-  const go = frame.getByRole('dialog', { name: 'Go To', exact: true })
-  await go.getByRole('textbox', { name: 'Reference', exact: true }).fill(reference)
-  await go.getByRole('button', { name: 'Go', exact: true }).click()
-  await go.waitFor({ state: 'hidden' })
+  await gotoReference(frame, reference)
 }
 
 async function settle(document: WorkbookDocument, revision: number) {

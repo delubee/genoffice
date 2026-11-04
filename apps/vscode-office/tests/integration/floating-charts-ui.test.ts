@@ -14,6 +14,7 @@ import {
 } from '@genoffice/xlsx-gateway/gateway/xlsx-gateway'
 import { manualWorkbook } from '../fixtures/manual-workbook'
 import type { WorkbookDocument } from '../../src/extension/workbook-document'
+import { gotoReference } from './goto-helper'
 
 suite('Desktop Floating Charts UI', () => {
   test('moves source drawings through native history and preserves chart XML before cascading deletion', async function () {
@@ -117,11 +118,7 @@ suite('Desktop Floating Charts UI', () => {
       await vscode.commands.executeCommand('redo')
       assert.deepEqual(document.engine.state, moved)
       const navigate = async (reference: string) => {
-        await vscode.commands.executeCommand('genoffice.workbook.goto')
-        const dialog = frame.getByRole('dialog', { name: 'Go To', exact: true })
-        await dialog.getByRole('textbox', { name: 'Reference', exact: true }).fill(reference)
-        await dialog.getByRole('button', { name: 'Go', exact: true }).click()
-        await dialog.waitFor({ state: 'hidden' })
+        await gotoReference(frame, reference)
       }
       const movedAnchor = (moved.sheets[0]!.features!.visualEdits as any)[source.id].anchor
       await navigate(`Data!${formatAddress(movedAnchor.toRow, movedAnchor.toColumn)}`)

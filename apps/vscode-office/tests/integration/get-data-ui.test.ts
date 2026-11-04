@@ -5,6 +5,7 @@ import { suite, test } from 'mocha'
 import { chromium, type Frame } from '@playwright/test'
 import { manualWorkbook } from '../fixtures/manual-workbook'
 import type { WorkbookDocument } from '../../src/extension/workbook-document'
+import { gotoReference } from './goto-helper'
 
 suite('Desktop Get Data UI', () => {
   test('imports a CSV through the shared group as one revision and keeps it across history and reopen', async function () {
@@ -46,17 +47,16 @@ suite('Desktop Get Data UI', () => {
       await vscode.commands.executeCommand('workbench.action.closeSidebar')
       await vscode.commands.executeCommand('workbench.action.closePanel')
       await frame.page().setViewportSize({ width: 1200, height: 900 })
-      await vscode.commands.executeCommand('genoffice.workbook.goto')
-      const go = frame.getByRole('dialog', { name: 'Go To', exact: true })
-      await go.getByRole('textbox', { name: 'Reference', exact: true }).fill('Data!E3:F4')
-      await go.getByRole('button', { name: 'Go', exact: true }).click()
-      await go.waitFor({ state: 'hidden' })
+      await gotoReference(frame, 'Data!E3:F4')
       await frame.locator('#ribbon-tab-data').click()
 
       // Refresh All mirrors the desktop message for a workbook without pivots.
       const revision = document.engine.descriptor.revision
       await frame.getByRole('button', { name: 'Refresh All', exact: true }).click()
-      await frame.getByRole('alert').filter({ hasText: /no pivot tables/i }).waitFor()
+      await frame
+        .getByRole('alert')
+        .filter({ hasText: /no pivot tables/i })
+        .waitFor()
       assert.equal(document.engine.descriptor.revision, revision)
 
       // A cancelled pick writes nothing.

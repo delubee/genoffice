@@ -5,6 +5,7 @@ import { chromium, type Frame } from '@playwright/test'
 import JSZip from 'jszip'
 import { manualWorkbook } from '../fixtures/manual-workbook'
 import type { WorkbookDocument } from '../../src/extension/workbook-document'
+import { gotoReference } from './goto-helper'
 
 suite('Desktop Function Library UI', () => {
   test('inserts and edits shared function arguments with source previews, native history and independent reopen', async function () {
@@ -45,11 +46,7 @@ suite('Desktop Function Library UI', () => {
       await document.whenViewReady()
       let frame = await findFrame()
       const goTo = async (reference: string) => {
-        await vscode.commands.executeCommand('genoffice.workbook.goto')
-        const go = frame.getByRole('dialog', { name: 'Go To', exact: true })
-        await go.getByRole('textbox', { name: 'Reference', exact: true }).fill(reference)
-        await go.getByRole('button', { name: 'Go', exact: true }).click()
-        await go.waitFor({ state: 'hidden' })
+        await gotoReference(frame, reference)
       }
       await goTo('C4')
       await frame.getByRole('tab', { name: 'Formulas', exact: true }).click()

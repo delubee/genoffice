@@ -4,6 +4,7 @@ import { suite, test } from 'mocha'
 import { chromium, type Browser, type Frame } from '@playwright/test'
 import { manualWorkbook } from '../fixtures/manual-workbook'
 import type { WorkbookDocument } from '../../src/extension/workbook-document'
+import { gotoReference } from './goto-helper'
 
 type Api = { getDocument(uri: vscode.Uri): WorkbookDocument | undefined }
 
@@ -67,11 +68,7 @@ suite('Desktop Get Data bulk UI', () => {
       const opened = await openWorkbook(browser, api, 'get-data-bulk-csv.xlsx')
       uri = opened.uri
       const { document, frame } = opened
-      await vscode.commands.executeCommand('genoffice.workbook.goto')
-      const go = frame.getByRole('dialog', { name: 'Go To', exact: true })
-      await go.getByRole('textbox', { name: 'Reference', exact: true }).fill('Data!C2')
-      await go.getByRole('button', { name: 'Go', exact: true }).click()
-      await go.waitFor({ state: 'hidden' })
+      await gotoReference(frame, 'Data!C2')
       await frame.locator('#ribbon-tab-data').click()
       // 700 rows × 12 columns = 8,400 cells: five bounded stages, one commit.
       const lines = Array.from({ length: 700 }, (_, row) =>

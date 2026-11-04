@@ -7,6 +7,7 @@ import { chromium, type Frame } from '@playwright/test'
 import { applyCellEditsToXlsx } from '@genoffice/xlsx-gateway/gateway/xlsx-gateway'
 import { manualWorkbook } from '../fixtures/manual-workbook'
 import type { WorkbookDocument } from '../../src/extension/workbook-document'
+import { gotoReference } from './goto-helper'
 
 suite('Desktop Insert Charts UI', () => {
   test('inserts every shared desktop chart family with saved references, exact history and reopened rendering', async function () {
@@ -67,11 +68,7 @@ suite('Desktop Insert Charts UI', () => {
       const document = api.getDocument(uri)!
       await document.whenViewReady()
       const frame = await getFrame()
-      await vscode.commands.executeCommand('genoffice.workbook.goto')
-      const goTo = frame.getByRole('dialog', { name: 'Go To', exact: true })
-      await goTo.getByRole('textbox', { name: 'Reference', exact: true }).fill('Data!A78:C81')
-      await goTo.getByRole('button', { name: 'Go', exact: true }).click()
-      await goTo.waitFor({ state: 'hidden' })
+      await gotoReference(frame, 'Data!A78:C81')
       await frame.getByRole('tab', { name: 'Insert', exact: true }).click()
       const initial = structuredClone(document.engine.state)
       const labels = [
@@ -133,11 +130,7 @@ suite('Desktop Insert Charts UI', () => {
       // leaves already-visible cells in place, and the right-edge pencil can
       // otherwise remain clipped outside the actual Webview viewport.
       for (const reference of ['Data!N78', 'Data!H78']) {
-        await vscode.commands.executeCommand('genoffice.workbook.goto')
-        const chartGoTo = frame.getByRole('dialog', { name: 'Go To', exact: true })
-        await chartGoTo.getByRole('textbox', { name: 'Reference', exact: true }).fill(reference)
-        await chartGoTo.getByRole('button', { name: 'Go', exact: true }).click()
-        await chartGoTo.waitFor({ state: 'hidden' })
+        await gotoReference(frame, reference)
       }
       const beforeProperties = structuredClone(document.engine.state)
       const editButton = frame.locator('.xlsx-print-visual').nth(8).locator('.chart-edit-button')
@@ -174,11 +167,7 @@ suite('Desktop Insert Charts UI', () => {
       assert.deepEqual(document.engine.state, beforeProperties)
       await vscode.commands.executeCommand('redo')
       assert.deepEqual(document.engine.state, afterProperties)
-      await vscode.commands.executeCommand('genoffice.workbook.goto')
-      const sourceGoTo = frame.getByRole('dialog', { name: 'Go To', exact: true })
-      await sourceGoTo.getByRole('textbox', { name: 'Reference', exact: true }).fill('Data!A78:C81')
-      await sourceGoTo.getByRole('button', { name: 'Go', exact: true }).click()
-      await sourceGoTo.waitFor({ state: 'hidden' })
+      await gotoReference(frame, 'Data!A78:C81')
       await frame.locator('.workbook-desktop-header [data-tip="Recommended Charts"]').click()
       const dialog = frame.getByRole('dialog', { name: 'Recommended Charts', exact: true })
       await dialog.waitFor()

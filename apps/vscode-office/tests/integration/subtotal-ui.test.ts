@@ -7,6 +7,7 @@ import { chromium, expect, type Frame } from '@playwright/test'
 import { applyCellEditsToXlsx } from '@genoffice/xlsx-gateway/gateway/xlsx-gateway'
 import { manualWorkbook } from '../fixtures/manual-workbook'
 import type { WorkbookDocument } from '../../src/extension/workbook-document'
+import { gotoReference } from './goto-helper'
 
 suite('Desktop Subtotal UI', () => {
   test('creates offset subtotals, outline and grand total in one history entry and preserves references after reopen', async function () {
@@ -74,11 +75,7 @@ suite('Desktop Subtotal UI', () => {
       await vscode.commands.executeCommand('workbench.action.closeSidebar')
       await vscode.commands.executeCommand('workbench.action.closePanel')
       await frame.page().setViewportSize({ width: 1200, height: 900 })
-      await vscode.commands.executeCommand('genoffice.workbook.goto')
-      const go = frame.getByRole('dialog', { name: 'Go To', exact: true })
-      await go.getByRole('textbox', { name: 'Reference', exact: true }).fill('Data!B3:C6')
-      await go.getByRole('button', { name: 'Go', exact: true }).click()
-      await go.waitFor({ state: 'hidden' })
+      await gotoReference(frame, 'Data!B3:C6')
       const before = structuredClone(document.engine.state)
       const revision = document.engine.descriptor.revision
       await frame.locator('#ribbon-tab-data').click()

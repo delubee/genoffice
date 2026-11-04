@@ -6,6 +6,7 @@ import { chromium, type Frame } from '@playwright/test'
 import { applyCellEditsToXlsx } from '@genoffice/xlsx-gateway/gateway/xlsx-gateway'
 import { manualWorkbook } from '../fixtures/manual-workbook'
 import type { WorkbookDocument } from '../../src/extension/workbook-document'
+import { gotoReference } from './goto-helper'
 
 suite('Desktop Advanced Filter UI', () => {
   test('applies raw-number AND criteria and preserves imported conditions through history and independent reopen', async function () {
@@ -69,11 +70,7 @@ suite('Desktop Advanced Filter UI', () => {
       await vscode.commands.executeCommand('workbench.action.closeAuxiliaryBar')
       await vscode.commands.executeCommand('workbench.action.closeSidebar')
       await vscode.commands.executeCommand('workbench.action.closePanel')
-      await vscode.commands.executeCommand('genoffice.workbook.goto')
-      const go = frame.getByRole('dialog', { name: 'Go To', exact: true })
-      await go.getByRole('textbox', { name: 'Reference', exact: true }).fill('Data!A1:B6')
-      await go.getByRole('button', { name: 'Go', exact: true }).click()
-      await go.waitFor({ state: 'hidden' })
+      await gotoReference(frame, 'Data!A1:B6')
       await frame.locator('#ribbon-tab-data').click()
       await frame
         .locator('.workbook-shared-sort-filter')

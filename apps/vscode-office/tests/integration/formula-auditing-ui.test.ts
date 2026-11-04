@@ -5,6 +5,7 @@ import { chromium, type Frame } from '@playwright/test'
 import JSZip from 'jszip'
 import { manualWorkbook } from '../fixtures/manual-workbook'
 import type { WorkbookDocument } from '../../src/extension/workbook-document'
+import { gotoReference } from './goto-helper'
 
 suite('Desktop Formula Auditing UI', () => {
   for (const protectedSheet of [false, true]) {
@@ -64,11 +65,7 @@ suite('Desktop Formula Auditing UI', () => {
         let frame = await findFrame()
         await document.bridge!.request('view.flush', {})
         const goTo = async (reference: string) => {
-          await vscode.commands.executeCommand('genoffice.workbook.goto')
-          const dialog = frame.getByRole('dialog', { name: 'Go To', exact: true })
-          await dialog.getByRole('textbox', { name: 'Reference', exact: true }).fill(reference)
-          await dialog.getByRole('button', { name: 'Go', exact: true }).click()
-          await dialog.waitFor({ state: 'hidden' })
+          await gotoReference(frame, reference)
         }
         await goTo('C100001')
         await frame.getByRole('tab', { name: 'Formulas', exact: true }).click()

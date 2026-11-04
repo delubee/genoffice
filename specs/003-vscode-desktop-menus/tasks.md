@@ -686,3 +686,9 @@ Review protection foundation (2026-10-29):
 
 - Full `minimum` native run: 60 passing, 2 pending, 3 failing. `Product workspace skill commands` and `Product worksheet dimensions` are the pre-existing failures; `Workbook native shortcuts UI` passed this time. `Desktop Get Data UI` (CSV import) failed in the full run with the Go To dialog staying open and passes alone (same Go To isolation flake as the Column Header Filter and Insert Link tests).
 - [ ] Harden the tests that open Go To (clear notifications, retry) so the full run is clean.
+
+## Native suite checkpoint (Go To helper)
+
+- All Go To tests now share `tests/integration/goto-helper.ts` (clears notifications, retries a stuck dialog); `Desktop Get Data UI` no longer fails in the full run.
+- Full `minimum` run: 60 passing, 2 pending, 3 failing: the two pre-existing product failures plus `Desktop Home AutoFit UI`, which fails on the default Xvfb screen (`A80` width assertion, also without the helper change) and passes with `xvfb-run -s "-screen 0 1920x1200x24"`. It is screen-size sensitive, not a regression.
+- [ ] Pin the Xvfb screen size for the native suite (or make the AutoFit assertion viewport-independent).

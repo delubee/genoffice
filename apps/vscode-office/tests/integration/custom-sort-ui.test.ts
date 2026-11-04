@@ -6,6 +6,7 @@ import { chromium, type Frame } from '@playwright/test'
 import { applyCellEditsToXlsx } from '@genoffice/xlsx-gateway/gateway/xlsx-gateway'
 import { manualWorkbook } from '../fixtures/manual-workbook'
 import type { WorkbookDocument } from '../../src/extension/workbook-document'
+import { gotoReference } from './goto-helper'
 
 suite('Desktop Custom Sort UI', () => {
   test('sorts by two keys while preserving typed payloads and styles across history/save/reopen', async function () {
@@ -70,11 +71,7 @@ suite('Desktop Custom Sort UI', () => {
       await vscode.commands.executeCommand('workbench.action.closeAuxiliaryBar')
       await vscode.commands.executeCommand('workbench.action.closeSidebar')
       await vscode.commands.executeCommand('workbench.action.closePanel')
-      await vscode.commands.executeCommand('genoffice.workbook.goto')
-      const go = frame.getByRole('dialog', { name: 'Go To', exact: true })
-      await go.getByRole('textbox', { name: 'Reference', exact: true }).fill('Data!A1:C4')
-      await go.getByRole('button', { name: 'Go', exact: true }).click()
-      await go.waitFor({ state: 'hidden' })
+      await gotoReference(frame, 'Data!A1:C4')
       const before = structuredClone(document.engine.state)
       const revision = document.engine.descriptor.revision
       await frame.locator('#ribbon-tab-data').click()

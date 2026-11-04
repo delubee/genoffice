@@ -7,6 +7,7 @@ import { chromium, type Browser, type Frame } from '@playwright/test'
 import { applyCellEditsToXlsx } from '@genoffice/xlsx-gateway/gateway/xlsx-gateway'
 import { manualWorkbook } from '../fixtures/manual-workbook'
 import type { WorkbookDocument } from '../../src/extension/workbook-document'
+import { gotoReference } from './goto-helper'
 
 async function workbookFrame(browser: Browser): Promise<Frame> {
   const started = Date.now()
@@ -130,11 +131,7 @@ suite('Desktop Insert Symbol UI', () => {
         'pending',
       )
       const goto = async (reference: string) => {
-        await vscode.commands.executeCommand('genoffice.workbook.goto')
-        const dialog = frame.getByRole('dialog', { name: 'Go To', exact: true })
-        await dialog.getByRole('textbox', { name: 'Reference', exact: true }).fill(reference)
-        await dialog.getByRole('button', { name: 'Go', exact: true }).click()
-        await dialog.waitFor({ state: 'hidden' })
+        await gotoReference(frame, reference)
       }
       const open = async (category = 'Greek') => {
         await frame.getByRole('tab', { name: 'Insert', exact: true }).click()

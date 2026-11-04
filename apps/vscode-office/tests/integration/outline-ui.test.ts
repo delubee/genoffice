@@ -7,6 +7,7 @@ import { suite, test } from 'mocha'
 import { chromium, expect, type Frame } from '@playwright/test'
 import { manualWorkbook } from '../fixtures/manual-workbook'
 import type { WorkbookDocument } from '../../src/extension/workbook-document'
+import { gotoReference } from './goto-helper'
 
 suite('Desktop Outline UI', () => {
   test('groups and ungroups nested axes with summary settings, native history and reopen', async function () {
@@ -47,11 +48,7 @@ suite('Desktop Outline UI', () => {
       await vscode.commands.executeCommand('workbench.action.closeAuxiliaryBar')
       await vscode.commands.executeCommand('workbench.action.closeSidebar')
       await vscode.commands.executeCommand('workbench.action.closePanel')
-      await vscode.commands.executeCommand('genoffice.workbook.goto')
-      const go = frame.getByRole('dialog', { name: 'Go To', exact: true })
-      await go.getByRole('textbox', { name: 'Reference', exact: true }).fill('Data!A2:A3')
-      await go.getByRole('button', { name: 'Go', exact: true }).click()
-      await go.waitFor({ state: 'hidden' })
+      await gotoReference(frame, 'Data!A2:A3')
       const before = structuredClone(document.engine.state)
       const revision = document.engine.descriptor.revision
       await frame.locator('#ribbon-tab-data').click()

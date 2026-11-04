@@ -5,6 +5,7 @@ import { chromium, type Frame } from '@playwright/test'
 import JSZip from 'jszip'
 import { manualWorkbook } from '../fixtures/manual-workbook'
 import type { WorkbookDocument } from '../../src/extension/workbook-document'
+import { gotoReference } from './goto-helper'
 
 suite('Desktop Page Layout UI', () => {
   test('echoes source settings and saves shared page controls with native history and unchanged cell XML', async function () {
@@ -63,11 +64,7 @@ suite('Desktop Page Layout UI', () => {
       let document = api.getDocument(uri)!
       await document.whenViewReady()
       let frame = await findFrame()
-      await vscode.commands.executeCommand('genoffice.workbook.goto')
-      const go = frame.getByRole('dialog', { name: 'Go To', exact: true })
-      await go.getByRole('textbox', { name: 'Reference', exact: true }).fill('B4:C50')
-      await go.getByRole('button', { name: 'Go', exact: true }).click()
-      await go.waitFor({ state: 'hidden' })
+      await gotoReference(frame, 'B4:C50')
       await frame.getByRole('tab', { name: 'Page Layout', exact: true }).click()
       let header = frame.locator('.workbook-desktop-header')
       assert.equal(
