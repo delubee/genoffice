@@ -126,9 +126,11 @@ suite('Desktop Insert Symbol UI', () => {
         readySource.cells.find((cell) => cell.address === 'B1')!.calculationState,
         'ready',
       )
+      // Tool reads calculate the cache-less C1 on demand; the editor view still sees it pending,
+      // which the dialog's pending-result guard below depends on.
       assert.equal(
         readySource.cells.find((cell) => cell.address === 'C1')!.calculationState,
-        'pending',
+        'ready',
       )
       const goto = async (reference: string) => {
         await gotoReference(frame, reference)
