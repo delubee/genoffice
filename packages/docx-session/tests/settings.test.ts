@@ -66,6 +66,20 @@ it('saves Different First Page and Different Odd & Even Pages', async () => {
   expect(reopened.presentation().settings).toMatchObject({ titlePg: true, evenAndOddHeaders: true })
 })
 
+it('saves the Page Number Format of the final section', async () => {
+  const session = await DocxSession.open(
+    await buildDocx({ bodyXml: '<w:p><w:r><w:t>Pages</w:t></w:r></w:p>' }),
+  )
+  apply(session, { pageNumbering: { fmt: 'lowerRoman', start: 3 } })
+  const zip = await JSZip.loadAsync(await session.save())
+  expect(await zip.file('word/document.xml')!.async('string')).toMatch(
+    /<w:pgNumType\b[^>]*w:fmt="lowerRoman"[^>]*w:start="3"|<w:pgNumType\b[^>]*w:start="3"[^>]*w:fmt="lowerRoman"/,
+  )
+  const reopened = await DocxSession.open(await session.save())
+  expect(reopened.presentation().settings!.pageNumbering).toEqual({ fmt: 'lowerRoman', start: 3 })
+  expect(() => apply(session, { pageNumbering: { fmt: '"/><w:evil/>' } })).toThrow()
+})
+
 it('refuses settings that could carry markup or exceed page bounds', async () => {
   const session = await DocxSession.open(
     await buildDocx({ bodyXml: '<w:p><w:r><w:t>Settings</w:t></w:r></w:p>' }),

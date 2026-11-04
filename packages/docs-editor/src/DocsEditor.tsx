@@ -7,6 +7,7 @@ import { FontDialog } from '../../../apps/docs/src/renderer/components/FontDialo
 import { ParagraphDialog } from '../../../apps/docs/src/renderer/components/ParagraphDialog'
 import type { StyleInfo } from '@genoffice/docx-engine'
 import { DocsRibbon, numberingContext } from './DocsRibbon'
+import { PageNumberDialog } from './PageNumberDialog'
 import { ZoomDialog } from '../../../apps/docs/src/renderer/components/ZoomDialog'
 import { InkOverlay } from '../../../apps/docs/src/renderer/components/InkOverlay'
 import { rasterizeStroke, type InkTool } from '../../../apps/docs/src/renderer/editor/ink'
@@ -133,6 +134,7 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
   }
   const [zoomDialog, setZoomDialog] = useState(false)
   const [protectDialog, setProtectDialog] = useState(false)
+  const [pageNumberDialog, setPageNumberDialog] = useState(false)
   const [compare, setCompare] = useState<{ otherName: string; entries: CompareEntry[] } | null>(
     null,
   )
@@ -368,6 +370,9 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
           })
         break
       }
+      case 'pageNumberFormat':
+        setPageNumberDialog(true)
+        break
       case 'titlePg':
         void runtime.applySettings({ titlePg: action.on })
         break
@@ -375,9 +380,7 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
         void runtime.applySettings({ evenAndOddHeaders: action.on })
         break
       default:
-        runtime.reportError(
-          'Link to Previous and page number formats are not available in the VS Code editor yet.',
-        )
+        runtime.reportError('Link to Previous is not available in the VS Code editor yet.')
     }
   }
   const strip = (kind: 'header' | 'footer') => {
@@ -502,6 +505,7 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
           hfEditing={hfEditing}
           onHfAction={onHfAction}
           onProtect={() => setProtectDialog(true)}
+          onPageNumberFormat={() => setPageNumberDialog(true)}
           onCompare={compareWithFile}
           panes={{
             nav: showNav,
@@ -752,6 +756,16 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
                 )
               const { openPassword: _open, ...settings } = result
               if (Object.keys(settings).length) void runtime.applySettings(settings)
+            }}
+          />
+        )}
+        {pageNumberDialog && (
+          <PageNumberDialog
+            value={runtime.settings.pageNumbering ?? {}}
+            onClose={() => setPageNumberDialog(false)}
+            onApply={(pageNumbering) => {
+              setPageNumberDialog(false)
+              void runtime.applySettings({ pageNumbering })
             }}
           />
         )}

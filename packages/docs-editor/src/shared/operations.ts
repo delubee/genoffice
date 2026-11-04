@@ -357,6 +357,22 @@ export const documentSettingsSchema = z
       .optional(),
     mirrorMargins: z.boolean().optional(),
     titlePg: z.boolean().optional(),
+    pageNumbering: z
+      .strictObject({
+        fmt: z
+          .enum([
+            'decimal',
+            'numberInDash',
+            'lowerLetter',
+            'upperLetter',
+            'lowerRoman',
+            'upperRoman',
+            'chineseCounting',
+          ])
+          .optional(),
+        start: z.number().int().min(0).max(9999).optional(),
+      })
+      .optional(),
     evenAndOddHeaders: z.boolean().optional(),
     header: headerFooterSchema.optional(),
     comments: commentsSchema.optional(),

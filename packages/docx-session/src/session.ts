@@ -8,6 +8,7 @@ import {
   previewFontSettings,
   type StyleInfo,
   readSectionSettings,
+  readSections,
   type StyleUpsert,
   type NumberingDef,
 } from '@genoffice/docx-engine'
@@ -231,6 +232,14 @@ export class DocxSession {
       }),
     ) as DocumentPresentation
   }
+  /** w:pgNumType of the final section as opened. */
+  private originalPageNumbering(): NonNullable<DocumentSettings['pageNumbering']> {
+    const last = readSections(this.original).at(-1)
+    return {
+      ...(last?.pageNumberFmt ? { fmt: last.pageNumberFmt } : {}),
+      ...(last?.pageNumberStart !== undefined ? { start: last.pageNumberStart } : {}),
+    }
+  }
   /** The document settings as the view shows them: session edits over the opened file. */
   private settings(): DocumentSettings {
     const edits = this.root.overlays.settings
@@ -238,6 +247,7 @@ export class DocxSession {
       section: edits.section ?? readSectionSettings(this.original),
       pageColor: edits.pageColor !== undefined ? edits.pageColor : readPageColor(this.original),
       mirrorMargins: edits.mirrorMargins ?? this.original.mirrorMargins ?? false,
+      pageNumbering: edits.pageNumbering ?? this.originalPageNumbering(),
       titlePg: edits.titlePg ?? this.original.titlePg ?? false,
       evenAndOddHeaders: edits.evenAndOddHeaders ?? this.original.evenAndOddHeaders ?? false,
       watermark:
@@ -704,6 +714,9 @@ export class DocxSession {
         : {}),
       ...(this.root.overlays.settings.mirrorMargins !== undefined
         ? { mirrorMargins: this.root.overlays.settings.mirrorMargins }
+        : {}),
+      ...(this.root.overlays.settings.pageNumbering
+        ? { pgNumType: this.root.overlays.settings.pageNumbering }
         : {}),
       ...(this.root.overlays.settings.titlePg !== undefined
         ? { titlePg: this.root.overlays.settings.titlePg }

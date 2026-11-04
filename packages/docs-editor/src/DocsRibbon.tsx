@@ -35,6 +35,7 @@ export function DocsRibbon({
   hfEditing,
   onHfAction,
   onProtect,
+  onPageNumberFormat,
   onCompare,
   onInsertNote,
   onTableDialog,
@@ -80,6 +81,7 @@ export function DocsRibbon({
   hfEditing: RibbonProps['hfEditing']
   onHfAction: RibbonProps['onHfAction']
   onProtect(): void
+  onPageNumberFormat(): void
   onCompare(): void
   onInsertNote(kind: 'footnote' | 'endnote'): void
   onTableDialog: RibbonProps['onTableDialog']
@@ -210,7 +212,7 @@ export function DocsRibbon({
         .catch((error) => runtime.reportError(error)),
     header: runtime.settings.header ?? null,
     onHeader: (header) => void runtime.applySettings({ header }),
-    onPageNumFormat: unavailable('Page numbers'),
+    onPageNumFormat: onPageNumberFormat,
     onInsertField: (instr) => {
       editor
         .chain()

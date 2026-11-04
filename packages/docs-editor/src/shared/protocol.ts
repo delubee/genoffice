@@ -47,6 +47,8 @@ export interface DocumentSettings {
   mirrorMargins?: boolean
   /** Header & Footer → Different First Page / Different Odd & Even Pages */
   titlePg?: boolean
+  /** Page Number Format of the (final) section: w:pgNumType fmt / start */
+  pageNumbering?: { fmt?: string; start?: number }
   evenAndOddHeaders?: boolean
   watermark?: string | null
   /** default page header / footer of the document */

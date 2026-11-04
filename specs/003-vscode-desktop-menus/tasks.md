@@ -668,4 +668,5 @@ Review protection foundation (2026-10-29):
 ## Docs Header & Footer page options
 
 - [x] Different First Page and Different Odd & Even Pages are document settings saved as `w:titlePg` / `w:evenAndOddHeaders`.
-- [ ] First-page and even-page header/footer content (variants), Link to Previous and page number formats still report a host limitation.
+- [x] Page Number Format (fmt/start) of the final section is a document setting saved as `w:pgNumType`.
+- [ ] First-page and even-page header/footer content (variants) and Link to Previous still report a host limitation.
