@@ -1,3 +1,4 @@
+import JSZip from 'jszip'
 import { it, expect } from 'vitest'
 import { chromium } from '@playwright/test'
 import { createServer } from 'node:http'
@@ -481,14 +482,23 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     await page.locator('.ribbon-tab', { hasText: /^Review$/ }).click()
     const track = page.locator('[data-tip^="Track Changes: record all edits"]').first()
     await track.click()
-    await editor.evaluate((element) =>
-      (
-        element as unknown as { editor: { commands: { focus(at: string): void } } }
-      ).editor.commands.focus('end'),
-    )
+    expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
+    // A header strip opened earlier can hold focus for a moment; wait until the body editor owns it.
+    await expect
+      .poll(() =>
+        editor.evaluate((element) => {
+          ;(
+            element as unknown as { editor: { commands: { focus(at: string): void } } }
+          ).editor.commands.focus('end')
+          return element === document.activeElement
+        }),
+      )
+      .toBe(true)
     await page.keyboard.type('tracked')
     expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
-    expect(JSON.stringify(session.content())).toContain('"type":"ins"')
+    await expect
+      .poll(() => JSON.stringify(session.content()), { timeout: 10_000 })
+      .toContain('"type":"ins"')
     await track.click()
     // View → Zoom… applies the desktop dialog's 200% to the page.
     await page.setViewportSize({ width: 1800, height: 900 })
@@ -593,6 +603,26 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     await page.keyboard.press('Escape')
     expect(await page.getByRole('dialog').count()).toBe(0)
     expect(session.content()).toEqual(beforeTheme)
+    // Layout → Breaks → Continuous: a section-closing paragraph plus the final section's start type.
+    await page
+      .locator('.ribbon-tab', { hasText: /^Layout$/ })
+      .first()
+      .click()
+    await page
+      .locator('.rb-big', { hasText: /^Breaks$/ })
+      .first()
+      .click()
+    await page
+      .locator('[data-rb-panel] button', { hasText: /^Continuous/ })
+      .first()
+      .click()
+    expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
+    await expect.poll(() => session.presentation().settings!.sectionStart).toBe('continuous')
+    const sectioned = await JSZip.loadAsync(await session.save())
+    const sectionXml = await sectioned.file('word/document.xml')!.async('string')
+    expect(sectionXml.match(/<w:sectPr\b/g)).toHaveLength(2)
+    expect(sectionXml).toMatch(/<w:type w:val="continuous"\/>/)
+    await bridge.request('view.resync', projection())
     for (let step = 0; step < 500; step++) {
       try {
         session.history('undo')

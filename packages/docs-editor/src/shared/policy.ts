@@ -406,6 +406,24 @@ function generatedField(attrs: Record<string, unknown>): boolean {
     GENERATED_FIELD_XML.some((pattern) => pattern.test(attrs.genXml as string))
   )
 }
+/** Layout → Breaks: a paragraph that only closes a section with plain page geometry. */
+const SECTION_BREAK_XML = new RegExp(
+  '^<w:p><w:pPr><w:sectPr>' +
+    '(?:<w:type w:val="(?:nextPage|continuous|evenPage|oddPage)"/>)?' +
+    '<w:pgSz w:w="[0-9]{1,6}" w:h="[0-9]{1,6}"(?: w:orient="(?:portrait|landscape)")?/>' +
+    '<w:pgMar w:top="-?[0-9]{1,6}" w:right="[0-9]{1,6}" w:bottom="-?[0-9]{1,6}" w:left="[0-9]{1,6}"' +
+    ' w:header="[0-9]{1,6}" w:footer="[0-9]{1,6}" w:gutter="[0-9]{1,6}"/>' +
+    '(?:<w:cols w:num="[0-9]{1,2}" w:space="[0-9]{1,6}"/>)?' +
+    '</w:sectPr></w:pPr></w:p>$',
+)
+function sectionBreak(attrs: Record<string, unknown>): boolean {
+  return (
+    attrs.blockType === 'passthrough' &&
+    attrs.docxIndex == null &&
+    typeof attrs.genXml === 'string' &&
+    SECTION_BREAK_XML.test(attrs.genXml)
+  )
+}
 /** Insert → Equation: OMML must be exactly what the engine derives from the LaTeX source. */
 function derivedMath(latex: unknown, check: (omml: string) => boolean): boolean {
   if (typeof latex !== 'string' || !latex.trim() || latex.length > 10_000) return false
@@ -532,6 +550,7 @@ export function validateAndNormalize(
           node.type === 'docProtected' &&
           (newPicture(node.attrs ?? {}) ||
             generatedField(node.attrs ?? {}) ||
+            sectionBreak(node.attrs ?? {}) ||
             generatedEquation(node.attrs ?? {}))
         if (node.type === 'docProtected' && !picture)
           throw new Error('Cannot create protected objects')

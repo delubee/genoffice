@@ -20,7 +20,7 @@ import {
   editorBlockTexts,
   type CompareEntry,
 } from '../../../apps/docs/src/renderer/editor/compare'
-import { parseDocx } from '@genoffice/docx-engine'
+import { parseDocx, applySectionSettings } from '@genoffice/docx-engine'
 import {
   CellMarginsDialog,
   DeleteCellsDialog,
@@ -386,6 +386,33 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
         runtime.reportError('Link to Previous is not available in the VS Code editor yet.')
     }
   }
+  /**
+   * Layout → Breaks: a paragraph closing the section above it with the current page geometry; the
+   * following (final) section starts as the chosen type, as the desktop writes it.
+   */
+  const insertSectionBreak = (type: 'nextPage' | 'continuous' | 'evenPage' | 'oddPage') => {
+    const section = runtime.settings.section
+    if (!section) return runtime.reportError('The document has no page settings to break.')
+    const sectPr = applySectionSettings(
+      '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr>',
+      { ...section, pageBorder: false },
+    )
+    const { $head } = editor.state.selection
+    editor
+      .chain()
+      .focus()
+      .insertContentAt($head.depth > 0 ? $head.after(1) : $head.pos, {
+        type: 'docProtected',
+        attrs: {
+          blockType: 'passthrough',
+          label: 'Section break paragraph',
+          previewText: '',
+          genXml: `<w:p><w:pPr>${sectPr}</w:pPr></w:p>`,
+        },
+      })
+      .run()
+    void runtime.applySettings({ sectionStart: type })
+  }
   const strip = (key: HfKey) => {
     const kind = baseKind(key)
     const value = runtime.settings[key] ?? { text: '' }
@@ -516,6 +543,7 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
           onHfAction={onHfAction}
           onProtect={() => setProtectDialog(true)}
           onPageNumberFormat={() => setPageNumberDialog(true)}
+          onSectionBreak={insertSectionBreak}
           onCompare={compareWithFile}
           panes={{
             nav: showNav,

@@ -36,6 +36,7 @@ export function DocsRibbon({
   onHfAction,
   onProtect,
   onPageNumberFormat,
+  onSectionBreak,
   onCompare,
   onInsertNote,
   onTableDialog,
@@ -82,6 +83,7 @@ export function DocsRibbon({
   onHfAction: RibbonProps['onHfAction']
   onProtect(): void
   onPageNumberFormat(): void
+  onSectionBreak: RibbonProps['onInsertSectionBreak']
   onCompare(): void
   onInsertNote(kind: 'footnote' | 'endnote'): void
   onTableDialog: RibbonProps['onTableDialog']
@@ -164,7 +166,7 @@ export function DocsRibbon({
     section: runtime.settings.section ?? null,
     onSection: (section) => void runtime.applySettings({ section }),
     activeSection: null,
-    onInsertSectionBreak: unavailable('Section breaks'),
+    onInsertSectionBreak: onSectionBreak,
     onPaperSizeAll: (pageWidth, pageHeight, orientation) => {
       const section = runtime.settings.section
       if (!section) return

@@ -47,6 +47,8 @@ export interface DocumentSettings {
   mirrorMargins?: boolean
   /** Header & Footer → Different First Page / Different Odd & Even Pages */
   titlePg?: boolean
+  /** how the final section starts (the type of the last Layout → Breaks entry) */
+  sectionStart?: 'nextPage' | 'continuous' | 'evenPage' | 'oddPage'
   /** Page Number Format of the (final) section: w:pgNumType fmt / start */
   pageNumbering?: { fmt?: string; start?: number }
   evenAndOddHeaders?: boolean

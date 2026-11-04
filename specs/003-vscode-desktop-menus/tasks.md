@@ -676,3 +676,8 @@ Review protection foundation (2026-10-29):
 
 - Full `minimum` native run: 60 passing, 2 pending, 3 failing. `Product workspace skill commands` and `Product worksheet dimensions` are the pre-existing failures; `Workbook native shortcuts UI` timed out waiting for the frame in the full run but passes alone (suite-isolation flake).
 - [x] `Workbook native shortcuts UI` retries Ctrl+F with focus recovery (the full-run timeout was not reproduced; rerun the full suite to confirm).
+
+## Docs section breaks
+
+- [x] Layout → Breaks inserts a section-closing paragraph (validated `w:sectPr` with plain page geometry) and records the final section's start type (`sectionStart` → `w:type`); verified through the DOCX browser test and saved XML.
+- [ ] Per-section Layout edits, Link to Previous, section-specific headers/footers and page numbering still apply to the final section only.

@@ -357,6 +357,7 @@ export const documentSettingsSchema = z
       .optional(),
     mirrorMargins: z.boolean().optional(),
     titlePg: z.boolean().optional(),
+    sectionStart: z.enum(['nextPage', 'continuous', 'evenPage', 'oddPage']).optional(),
     pageNumbering: z
       .strictObject({
         fmt: z

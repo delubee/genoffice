@@ -248,6 +248,7 @@ export class DocxSession {
       pageColor: edits.pageColor !== undefined ? edits.pageColor : readPageColor(this.original),
       mirrorMargins: edits.mirrorMargins ?? this.original.mirrorMargins ?? false,
       pageNumbering: edits.pageNumbering ?? this.originalPageNumbering(),
+      ...(edits.sectionStart ? { sectionStart: edits.sectionStart } : {}),
       titlePg: edits.titlePg ?? this.original.titlePg ?? false,
       evenAndOddHeaders: edits.evenAndOddHeaders ?? this.original.evenAndOddHeaders ?? false,
       watermark:
@@ -736,6 +737,9 @@ export class DocxSession {
         : {}),
       ...(this.root.overlays.settings.mirrorMargins !== undefined
         ? { mirrorMargins: this.root.overlays.settings.mirrorMargins }
+        : {}),
+      ...(this.root.overlays.settings.sectionStart
+        ? { sectionStartType: this.root.overlays.settings.sectionStart }
         : {}),
       ...(this.root.overlays.settings.pageNumbering
         ? { pgNumType: this.root.overlays.settings.pageNumbering }
