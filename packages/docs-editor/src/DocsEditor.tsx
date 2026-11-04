@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { OfficeFileActions, OFFICE_ACTION_LABELS } from '@genoffice/ui/chrome'
 import { EditorContent } from '@tiptap/react'
 import type { DocumentRuntime } from './runtime'
+import type { SectionEdit } from './shared/protocol'
 import { getLang, LocaleScope, t } from '../../../apps/docs/src/renderer/i18n/locale'
 import { FontDialog } from '../../../apps/docs/src/renderer/components/FontDialog'
 import { ParagraphDialog } from '../../../apps/docs/src/renderer/components/ParagraphDialog'
@@ -276,6 +277,39 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
     onDeleteAll: (resolvedOnly: boolean) => deleteAllComments(review(), resolvedOnly),
     onGoto: (direction: 1 | -1) => void gotoComment(review(), direction),
   }
+  // The section under the cursor, as the desktop's activeSection: Layout and Header & Footer options edit it.
+  const sectionList = runtime.settings.sections ?? []
+  const activeSectionIndex = (() => {
+    if (sectionList.length < 2) return 0
+    const { doc, selection } = editor.state
+    let docx: number | null = null
+    for (let child = Math.min(selection.$head.index(0), doc.childCount - 1); child >= 0; child--) {
+      const index = doc.child(child).attrs.docxIndex
+      if (typeof index === 'number') {
+        docx = index
+        break
+      }
+    }
+    const found = sectionList.findIndex((entry) => docx !== null && entry.blockIndex >= docx)
+    return found < 0 ? sectionList.length - 1 : found
+  })()
+  const activeEntry = sectionList[activeSectionIndex]
+  const activeIsFinal = !activeEntry || activeEntry.final
+  /** Apply a section edit to the section under the cursor (the final section keeps its top-level settings). */
+  const editSection = (edit: SectionEdit) => {
+    if (activeIsFinal) {
+      void runtime.applySettings({
+        ...(edit.section ? { section: edit.section } : {}),
+        ...(edit.startType ? { sectionStart: edit.startType } : {}),
+        ...(edit.titlePg !== undefined ? { titlePg: edit.titlePg } : {}),
+        ...(edit.pageNumbering ? { pageNumbering: edit.pageNumbering } : {}),
+      })
+      return
+    }
+    const key = String(activeEntry.blockIndex)
+    const edits = runtime.settings.sectionEdits ?? {}
+    void runtime.applySettings({ sectionEdits: { ...edits, [key]: { ...edits[key], ...edit } } })
+  }
   type HfKey = 'header' | 'footer' | 'headerFirst' | 'footerFirst' | 'headerEven' | 'footerEven'
   const baseKind = (key: HfKey): 'header' | 'footer' =>
     key.startsWith('header') ? 'header' : 'footer'
@@ -285,13 +319,13 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
   const hfEditing: HfEditingInfo | null = hfOpen
     ? {
         kind: baseKind(hfOpen),
-        section: 0,
-        sectionCount: 1,
+        section: activeSectionIndex,
+        sectionCount: Math.max(1, sectionList.length),
         variant: hfOpen.endsWith('First') ? 'first' : hfOpen.endsWith('Even') ? 'even' : 'default',
         linked: null,
         headerDistTwips: runtime.settings.section?.headerDist ?? 720,
         footerDistTwips: runtime.settings.section?.footerDist ?? 720,
-        titlePg: runtime.settings.titlePg ?? false,
+        titlePg: activeEntry?.titlePg ?? runtime.settings.titlePg ?? false,
         evenOddHf: runtime.settings.evenAndOddHeaders ?? false,
       }
     : null
@@ -377,7 +411,7 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
         setPageNumberDialog(true)
         break
       case 'titlePg':
-        void runtime.applySettings({ titlePg: action.on })
+        editSection({ titlePg: action.on })
         break
       case 'evenOddHf':
         void runtime.applySettings({ evenAndOddHeaders: action.on })
@@ -544,6 +578,11 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
           onProtect={() => setProtectDialog(true)}
           onPageNumberFormat={() => setPageNumberDialog(true)}
           onSectionBreak={insertSectionBreak}
+          sectionTarget={{
+            index: sectionList.length > 1 ? activeSectionIndex : null,
+            section: activeEntry?.section ?? runtime.settings.section ?? null,
+            onSection: (section) => editSection({ section }),
+          }}
           onCompare={compareWithFile}
           panes={{
             nav: showNav,
@@ -799,11 +838,11 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
         )}
         {pageNumberDialog && (
           <PageNumberDialog
-            value={runtime.settings.pageNumbering ?? {}}
+            value={activeEntry?.pageNumbering ?? runtime.settings.pageNumbering ?? {}}
             onClose={() => setPageNumberDialog(false)}
             onApply={(pageNumbering) => {
               setPageNumberDialog(false)
-              void runtime.applySettings({ pageNumbering })
+              editSection({ pageNumbering })
             }}
           />
         )}

@@ -1,4 +1,4 @@
 import { defineConfig } from 'vitest/config'
 export default defineConfig({
-  test: { include: ['tests/docx-browser.test.ts'], environment: 'node', testTimeout: 60000 },
+  test: { include: ['tests/docx-browser.test.ts', 'tests/docx-sections-browser.test.ts'], environment: 'node', testTimeout: 60000 },
 })

@@ -37,6 +37,7 @@ export function DocsRibbon({
   onProtect,
   onPageNumberFormat,
   onSectionBreak,
+  sectionTarget,
   onCompare,
   onInsertNote,
   onTableDialog,
@@ -84,6 +85,12 @@ export function DocsRibbon({
   onProtect(): void
   onPageNumberFormat(): void
   onSectionBreak: RibbonProps['onInsertSectionBreak']
+  /** The section under the cursor: Layout edits address it (null in a single-section document). */
+  sectionTarget: {
+    index: number | null
+    section: RibbonProps['section']
+    onSection: RibbonProps['onSection']
+  }
   onCompare(): void
   onInsertNote(kind: 'footnote' | 'endnote'): void
   onTableDialog: RibbonProps['onTableDialog']
@@ -163,9 +170,9 @@ export function DocsRibbon({
       void runtime
         .officeAction({ action: 'chat', scope: 'document', instruction: '' })
         .catch((error) => runtime.reportError(error)),
-    section: runtime.settings.section ?? null,
-    onSection: (section) => void runtime.applySettings({ section }),
-    activeSection: null,
+    section: sectionTarget.section,
+    onSection: sectionTarget.onSection,
+    activeSection: sectionTarget.index,
     onInsertSectionBreak: onSectionBreak,
     onPaperSizeAll: (pageWidth, pageHeight, orientation) => {
       const section = runtime.settings.section

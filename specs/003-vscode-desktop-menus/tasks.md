@@ -739,6 +739,6 @@ Desktop menu parity that the VS Code extension cannot or does not yet provide:
 ## Docs per-section settings (plan B)
 
 - [x] Step 1-2 (session): `settings.sections` lists every section of the file (start type, page setup, different first page, page numbering) and `settings.sectionEdits` edits non-final sections of the opened file, keyed by the closing paragraph's docxIndex; saved by rewriting that paragraph's sectPr (docx-session test).
-- [ ] Step 2 (view): derive the cursor's section in the editor and route the Layout tab and the Header & Footer options to it.
+- [x] Step 2 (view): the cursor's section is derived from the editor selection (as the desktop's `activeSection`); the Layout tab, page number format and Different First Page edit it (browser test: margins of the first of two sections). New, unsaved section breaks and start-type edits from the ribbon are not routed yet.
 - [ ] Step 3: per-section headers/footers and Link to Previous (engine `sectionHf` / `sectionHfUnlink`).
 - [ ] Step 4: page preview with the desktop `PaginationPreview`.
