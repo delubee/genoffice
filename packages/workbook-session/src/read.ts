@@ -1,3 +1,4 @@
+import type { SaveCalculationValue } from './calculation/save-values'
 import { sheetProtectionOf } from '@genoffice/xlsx-gateway/domain/session-candidate'
 import {
   projectDataValidationRules,
@@ -101,6 +102,11 @@ export async function readCurrentRange(input: {
   limit?: number
   /** Presentation includes merge geometry and off-page anchor values. */
   includeMerges?: boolean
+  /**
+   * Fresh formula results of this root, requested only when the range holds a formula whose
+   * cached value is not current (tools and search want results, the editor view has its own).
+   */
+  calculate?: () => Promise<ReadonlyMap<string, SaveCalculationValue['value']> | null>
 }) {
   const { state, source } = input,
     sheet = logicalSheet(state, input.logicalSheetId),
@@ -240,11 +246,41 @@ export async function readCurrentRange(input: {
     }
   }
   assertNotCancelled(input.signal)
-  const cells = points.map(({ address, original }) => {
-    const record =
-      sheet.cells[address] ??
-      (original ? base.get(formatAddress(original.row, original.column)) : undefined) ??
-      blank()
+  const recordOf = ({ address, original }: (typeof points)[number]) =>
+    sheet.cells[address] ??
+    (original ? base.get(formatAddress(original.row, original.column)) : undefined) ??
+    blank()
+  const pending = points.some((point) => {
+    const record = recordOf(point)
+    return !!record.formula && record.calculationState !== 'ready'
+  })
+  const calculated = pending && input.calculate ? await input.calculate() : null
+  assertNotCancelled(input.signal)
+  const cells = points.map((point) => {
+    const { address } = point
+    let record = recordOf(point)
+    const fresh = record.formula ? calculated?.get(`${sheet.id}!${address}`) : undefined
+    if (record.formula && record.calculationState !== 'ready' && fresh !== undefined) {
+      const error = typeof fresh === 'object' && fresh !== null
+      const value = error ? fresh.error : fresh
+      record = {
+        ...record,
+        kind: error
+          ? 'error'
+          : value === null
+            ? 'blank'
+            : typeof value === 'number'
+              ? record.kind === 'date'
+                ? 'date'
+                : 'number'
+              : typeof value === 'boolean'
+                ? 'boolean'
+                : 'string',
+        rawValue: value,
+        cachedValue: value,
+        calculationState: error ? 'error' : 'ready',
+      }
+    }
     let displayValue = record.rawValue === null ? '' : String(record.rawValue)
     if (typeof record.rawValue === 'number' && record.numberFormat)
       displayValue = numfmt.format(

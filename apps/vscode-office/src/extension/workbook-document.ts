@@ -7,7 +7,10 @@ import {
   type OriginalBase,
   type WorkbookState,
 } from '@genoffice/workbook-session/domain'
-import { calculateSaveValues } from '@genoffice/workbook-session/calculation/save-values'
+import {
+  calculateLiveValues,
+  calculateSaveValues,
+} from '@genoffice/workbook-session/calculation/save-values'
 import { WorkbookTransactions } from '@genoffice/workbook-session/transactions'
 import { FileResourceStore } from '@genoffice/workbook-session/store'
 import { openWorkbookSnapshot } from '@genoffice/workbook-session/open'
@@ -102,6 +105,28 @@ export class WorkbookDocument implements vscode.CustomDocument {
   pauseFileChecks() {
     return this.fileWatcher?.pause() ?? (() => {})
   }
+  /**
+   * Fresh formula results of an immutable root, calculated once on demand for tool and search
+   * reads (the editor view calculates for itself). A root that cannot be calculated exactly keeps
+   * its `pending` formula cells.
+   */
+  private readonly liveCalculations = new WeakMap<
+    object,
+    Promise<Awaited<ReturnType<typeof calculateLiveValues>>>
+  >()
+  private liveCalculation(state: Readonly<WorkbookState>) {
+    let work = this.liveCalculations.get(state)
+    if (!work) {
+      work = calculateLiveValues({
+        state,
+        source: this.source,
+        sourceSessionId: this.actor.original.sidecarSessionId,
+        signal: AbortSignal.timeout(8_000),
+      })
+      this.liveCalculations.set(state, work)
+    }
+    return work
+  }
   /** Fresh formula results of a frozen root for the saved file's cached values. */
   calculateForSave(state: Readonly<WorkbookState>, signal: AbortSignal) {
     return calculateSaveValues({
@@ -138,6 +163,7 @@ export class WorkbookDocument implements vscode.CustomDocument {
           logicalSheetId: sheetId,
           range,
           signal,
+          calculate: () => this.liveCalculation(state),
         }),
       release: actor.opened.retain(),
     }

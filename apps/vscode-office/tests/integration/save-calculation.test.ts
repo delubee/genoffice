@@ -51,6 +51,19 @@ suite('Saved formula caches', () => {
           { op: 'set_cell', sheetId: document.engine.state.sheets[0]!.id, address: 'C1', value: 5 },
         ],
       })
+      // Tool and search reads see the host's results instead of `pending` formula cells.
+      const snapshot = document.snapshot()
+      try {
+        const read = await snapshot.read(document.engine.state.sheets[0]!.id, 'C1:C2')
+        const formula = read.cells.find((cell) => cell.address === 'C2')!
+        assert.equal(formula.calculationState, 'ready')
+        assert.equal(formula.cachedValue, 15)
+        assert.equal(formula.rawValue, 15)
+        const other = await snapshot.read(document.engine.state.sheets[1]!.id, 'B1')
+        assert.equal(other.cells[0]!.cachedValue, 22)
+      } finally {
+        snapshot.release()
+      }
       await vscode.commands.executeCommand('workbench.action.files.save')
       const zip = await JSZip.loadAsync(await vscode.workspace.fs.readFile(uri))
       const data = await zip.file('xl/worksheets/sheet1.xml')!.async('string')

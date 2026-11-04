@@ -1,3 +1,4 @@
+import { formatAddress } from '@genoffice/xlsx-gateway/domain/cell-address'
 import type { WorkbookState } from '../domain'
 import type { WorkbookSource } from '../ports'
 import { loadCalculationSource } from './source'
@@ -58,4 +59,18 @@ export async function calculateSaveValues(input: {
   } catch {
     return null
   }
+}
+
+/** The same results keyed by `${sheetId}!${address}`, for reads of the frozen root. */
+export async function calculateLiveValues(input: {
+  state: Readonly<WorkbookState>
+  source: WorkbookSource
+  sourceSessionId: string
+  signal?: AbortSignal
+}): Promise<Map<string, SaveCalculationValue['value']> | null> {
+  const values = await calculateSaveValues(input)
+  if (!values) return null
+  return new Map(
+    values.map((item) => [`${item.sheetId}!${formatAddress(item.row, item.column)}`, item.value]),
+  )
 }
