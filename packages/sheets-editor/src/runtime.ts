@@ -7486,8 +7486,8 @@ export class WorkbookRuntime implements EditorProjection {
     if (!target || !state) throw new Error(t('appSelectSourceRangeFirst'))
     const bounds = parseRange(target.address)
     if (bounds.endRow <= bounds.startRow) throw new Error(t('appSelectRangeWithHeader'))
-    if (rangeCellCount(bounds) > 2000)
-      throw new Error('Subtotal supports at most 2000 source cells.')
+    if (rangeCellCount(bounds) > 10_000)
+      throw new Error('Subtotal supports at most 10,000 source cells.')
     const frozen = { stateId: state.stateId, revision: this.revision }
     const data = (await this.host.read(
       target.sheetId,

@@ -276,8 +276,11 @@ export async function computeCandidateState(
     const sheet = current.sheets.find((sheet) => sheet.id === subtotal.sheetId)
     if (!sheet) throw new Error('unknown_sheet')
     const bounds = parseRange(subtotal.range)
-    if ((bounds.endRow - bounds.startRow + 1) * (bounds.endColumn - bounds.startColumn + 1) > 2000)
-      throw new Error('Subtotal supports at most 2000 source cells.')
+    if (
+      (bounds.endRow - bounds.startRow + 1) * (bounds.endColumn - bounds.startColumn + 1) >
+      10_000
+    )
+      throw new Error('Subtotal supports at most 10,000 source cells.')
     const groupCol = columnIndex(subtotal.groupColumn),
       valueCol = columnIndex(subtotal.valueColumn)
     const labels: unknown[] = []
