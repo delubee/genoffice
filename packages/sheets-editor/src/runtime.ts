@@ -6781,7 +6781,7 @@ export class WorkbookRuntime implements EditorProjection {
       // One staged commit (a single history entry) carries the writes beyond the batch ceiling. Runs of
       // changed rows are written as value blocks, which the host applies far faster than cell by cell.
       const width = original[0]!.length
-      const band = Math.max(1, Math.floor(1000 / width))
+      const band = Math.max(1, Math.min(500, Math.floor(1000 / width)))
       const stages: WorkbookOperation[][] = []
       let row = 0
       while (row < original.length) {
@@ -6853,7 +6853,7 @@ export class WorkbookRuntime implements EditorProjection {
     }
     const rowCount = endRow - selected.startRow + 1
     if (rowCount < 2) throw new Error('Flash Fill needs at least two rows with source data.')
-    if (rowCount > 2000) throw new Error('Flash Fill supports at most 2000 rows at a time.')
+    if (rowCount > 50_000) throw new Error('Flash Fill supports at most 50,000 rows at a time.')
     const firstSource = Math.max(0, column - 6),
       width = column - firstSource + 1,
       valuesByAddress = new Map<string, ViewCell>(),
@@ -6924,7 +6924,36 @@ export class WorkbookRuntime implements EditorProjection {
       })
     }
     if (!operations.length) throw new Error('There are no blank target cells to fill.')
-    await this.enqueue(operations, frozen)
+    if (operations.length > 2000) {
+      // Runs of consecutive filled rows commit as value blocks in one staged revision.
+      const stages: WorkbookOperation[][] = []
+      let run: { row: number; values: string[] } | null = null
+      const flush = () => {
+        if (run)
+          stages.push([
+            {
+              op: 'set_range',
+              sheetId: target.sheetId,
+              start: formatAddress(run.row, column),
+              values: run.values.map((value) => [value]),
+            },
+          ])
+        run = null
+      }
+      for (const operation of operations) {
+        if (operation.op !== 'set_cell') continue
+        const row = parseAddress(operation.address).row
+        const value = String(operation.value ?? '')
+        if (run && row === run.row + run.values.length && run.values.length < 500)
+          run.values.push(value)
+        else {
+          flush()
+          run = { row, values: [value] }
+        }
+      }
+      flush()
+      await this.enqueueStaged(stages, frozen)
+    } else await this.enqueue(operations, frozen)
     return operations.length
   }
   private textToColumnsWork: Promise<number> | undefined
@@ -7032,7 +7061,7 @@ export class WorkbookRuntime implements EditorProjection {
       // One staged commit carries the writes beyond the batch ceiling, as value blocks of changed rows.
       const stages: WorkbookOperation[][] = []
       const width = maxLength + 1
-      const band = Math.max(1, Math.floor(1000 / width))
+      const band = Math.max(1, Math.min(500, Math.floor(1000 / width)))
       const changedRows = new Set(
         operations.map((op) => parseAddress((op as { address: string }).address).row),
       )

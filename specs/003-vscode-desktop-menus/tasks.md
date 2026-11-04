@@ -711,7 +711,7 @@ Review protection foundation (2026-10-29):
 ## Large-selection Data commands
 
 - [x] Remove Duplicates (up to 200,000 selected cells) and Text to Columns (up to 100,000 source cells, 200,000 output cells) read in 2000-cell row bands and write changed rows as staged value blocks in one revision; both verified natively with more than 2000 cells.
-- [ ] Flash Fill (2000 rows per run), Fill/Sort/Consolidate/Subtotal large-range variants and the other 2000-cell caps (chart selections, presentation reads) are unchanged.
+- [x] Flash Fill fills up to 50,000 rows per run (value blocks in one staged revision; native test with 2,500 rows). Fill/Sort-adjacent variants and the other 2000-cell caps (chart selections, presentation reads) are unchanged.
 
 - [x] Custom Sort beyond 2000 cells (up to 200,000): the session candidate sorts large ranges directly on the snapshot (values), the existing row permutation moves typed payloads and styles; verified natively with 3,603 cells including undo, redo and the saved XML. Formulas in the range still refuse the sort.
 
