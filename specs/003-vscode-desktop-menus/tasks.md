@@ -713,3 +713,7 @@ Review protection foundation (2026-10-29):
 - [x] Custom Sort beyond 2000 cells (up to 200,000): the session candidate sorts large ranges directly on the snapshot (values), the existing row permutation moves typed payloads and styles; verified natively with 3,603 cells including undo, redo and the saved XML. Formulas in the range still refuse the sort.
 
 - [x] Subtotal accepts source ranges up to 10,000 cells (verified natively with 2,102 cells, 30 groups, one revision, undo). Each group inserts a row through a full candidate recomputation, so time grows with groups x cells (about 54 s for 100 groups over 3,002 cells); a bulk row-insert plan is needed before raising the cap further.
+
+## Native suite checkpoint (d6b84c93)
+
+- Full `minimum` native run under `xvfb-run -a -s "-screen 0 1920x1200x24"`: 67 passing, 2 pending, 0 failing (includes the large Remove Duplicates, Text to Columns, Custom Sort and Subtotal tests).
