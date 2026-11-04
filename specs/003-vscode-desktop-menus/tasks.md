@@ -1,5 +1,8 @@
 # Work remaining for full desktop menu parity
 
+> **Status (2026-11-04, scope narrowed):** the goal is "every desktop Docs and Sheets menu function that VS Code can host is replicated; the rest is reported as a host limit". The native suite is 67 passing, 0 failing. Anything the extension cannot do is listed under *Known limitations* at the end of this file and is reported in the UI rather than hidden.
+
+
 - [x] Extract the desktop Sheets command band without maintaining duplicate UI.
 - [x] Expose browser-only office chrome and isolate Paste Special's UI model.
 - [x] Add controlled locale scopes for desktop component reuse in embedded hosts.
