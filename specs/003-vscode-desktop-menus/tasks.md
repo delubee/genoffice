@@ -717,3 +717,5 @@ Review protection foundation (2026-10-29):
 ## Native suite checkpoint (d6b84c93)
 
 - Full `minimum` native run under `xvfb-run -a -s "-screen 0 1920x1200x24"`: 67 passing, 2 pending, 0 failing (includes the large Remove Duplicates, Text to Columns, Custom Sort and Subtotal tests).
+
+- [x] Consolidate outputs up to 20,000 cells commit as one staged revision (1000-operation stages); verified natively with 2,400 formulas. Left-label matching still reads label columns in 2000-row bands up to 200,000 source rows.

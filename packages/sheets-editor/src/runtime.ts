@@ -7999,8 +7999,8 @@ export class WorkbookRuntime implements EditorProjection {
     })
 
     const maxColumns = Math.max(...areas.map((area) => area.columns))
-    if (!config.leftLabels && Math.max(...areas.map((area) => area.rows)) * maxColumns > 2000)
-      throw new Error('Consolidate output exceeds the 2,000-cell transaction limit.')
+    if (!config.leftLabels && Math.max(...areas.map((area) => area.rows)) * maxColumns > 20_000)
+      throw new Error('Consolidate output exceeds the 20,000-cell limit.')
     let matrix: ReturnType<typeof buildPositionMatrix>
     if (config.leftLabels) {
       const labelCount = areas.reduce((total, area) => total + area.rows, 0)
@@ -8044,8 +8044,8 @@ export class WorkbookRuntime implements EditorProjection {
         labelsByArea.push(labels)
       }
       const uniqueLabels = new Set(labelsByArea.flat().filter((label) => label !== ''))
-      if (uniqueLabels.size * maxColumns > 2000)
-        throw new Error('Consolidate output exceeds the 2,000-cell transaction limit.')
+      if (uniqueLabels.size * maxColumns > 20_000)
+        throw new Error('Consolidate output exceeds the 20,000-cell limit.')
       const built = buildLabelMatrix(config.fn, areas, labelsByArea, outputOrigin)
       if (typeof built === 'string') throw new Error(built)
       matrix = built
@@ -8055,8 +8055,8 @@ export class WorkbookRuntime implements EditorProjection {
     const rows = matrix.length,
       columns = matrix[0]?.length ?? 0
     if (!rows || !columns) throw new Error('Consolidate sources contain no output cells.')
-    if (rows * columns > 2000)
-      throw new Error('Consolidate output exceeds the 2,000-cell transaction limit.')
+    if (rows * columns > 20_000)
+      throw new Error('Consolidate output exceeds the 20,000-cell limit.')
     if (outputOrigin.row + rows > MAX_GRID_ROWS || outputOrigin.column + columns > MAX_GRID_COLUMNS)
       throw new Error('Consolidate output exceeds the worksheet grid.')
     const targetSheet = state.sheets.find((item) => item.id === target.sheetId)
@@ -8104,7 +8104,13 @@ export class WorkbookRuntime implements EditorProjection {
           : { op: 'set_formula', sheetId: target.sheetId, address, formula: cell.f }
       }),
     )
-    await this.enqueue(operations, frozen, { failureInDialog: true })
+    if (operations.length > 2000) {
+      // Output beyond the batch ceiling commits as one staged revision of 1000-operation stages.
+      const stages: WorkbookOperation[][] = []
+      for (let at = 0; at < operations.length; at += 1000)
+        stages.push(operations.slice(at, at + 1000))
+      await this.enqueueStaged(stages, frozen)
+    } else await this.enqueue(operations, frozen, { failureInDialog: true })
     return { rows, columns }
   }
   async setDataValidation(
