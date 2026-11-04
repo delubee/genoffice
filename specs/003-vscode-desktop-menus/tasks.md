@@ -720,4 +720,4 @@ Review protection foundation (2026-10-29):
 
 - [x] Consolidate outputs up to 20,000 cells commit as one staged revision (1000-operation stages); verified natively with 2,400 formulas. Left-label matching still reads label columns in 2000-row bands up to 200,000 source rows.
 
-- [x] Goal Seek reports an unreachable target (formula independent of the changing cell) in the dialog and writes nothing (native test). Nonlinear and error-valued variants remain untested.
+- [x] Goal Seek reports an unreachable target (formula independent of the changing cell) in the dialog and writes nothing (native test). A quadratic target solves to its root (native test); error-valued formulas remain untested.
