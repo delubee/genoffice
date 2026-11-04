@@ -1271,3 +1271,35 @@ test('Filter by Selected Cell value from the context menu records a filter edit'
   expect(filter.hiddenRows.length).toBeGreaterThan(0)
   expect(errors).toEqual([])
 })
+
+test('Filter by Selected Cell color from the context menu records a color filter edit', async ({
+  page,
+}) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(String(error)))
+  await page.goto(base)
+  await page.evaluate(async () => {
+    const { mountManualToolbar } = await import(
+      /* @vite-ignore */ String('/packages/sheets-editor/tests/fixtures/manual-toolbar.tsx')
+    )
+    ;(window as any).toolbar = await mountManualToolbar(true)
+    ;(window as any).toolbar.select('A2')
+  })
+  const revision = () => page.evaluate(() => (window as any).toolbar.revision())
+  await page.waitForTimeout(1500)
+  // B2 gets a fill through the fixture's canonical edit, then the filter targets that colour.
+  await page.evaluate(() => (window as any).toolbar.seedClearTargets())
+  await page.evaluate(() => (window as any).toolbar.select('B2'))
+  let before = await revision()
+  expect(
+    await page.evaluate(() =>
+      (window as any).toolbar.facade().executeCommand('genoffice.ctx.filter-by', { by: 'fill' }),
+    ),
+  ).toBe(true)
+  await expect.poll(revision).toBeGreaterThanOrEqual(before + 2)
+  const filter = await page.evaluate(
+    () => (window as any).toolbar.snapshot().sheets[0].features.filterEdits,
+  )
+  expect(JSON.stringify(filter.filter.columns[0]).toLowerCase()).toContain('ffff00')
+  expect(errors).toEqual([])
+})
