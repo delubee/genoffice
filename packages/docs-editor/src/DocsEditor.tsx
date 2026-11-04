@@ -466,7 +466,7 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
    * following (final) section starts as the chosen type, as the desktop writes it.
    */
   const insertSectionBreak = (type: 'nextPage' | 'continuous' | 'evenPage' | 'oddPage') => {
-    const section = runtime.settings.section
+    const section = activeEntry?.section ?? runtime.settings.section
     if (!section) return runtime.reportError('The document has no page settings to break.')
     const sectPr = applySectionSettings(
       '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr>',
@@ -486,7 +486,8 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
         },
       })
       .run()
-    void runtime.applySettings({ sectionStart: type })
+    // The section after the break starts as chosen: that is the type of the sectPr closing it.
+    editSection({ startType: type })
   }
   const strip = (key: HfKey) => {
     const kind = baseKind(key)

@@ -125,6 +125,38 @@ it('edits the page setup and page numbering of the section under the cursor', as
     await expect.poll(() => header(1).value?.text).toContain('Chapter two')
     expect(header(1).linked).toBe(false)
     expect(header(0).value?.text ?? '').toBe('')
+    // Link to Previous drops the section's own strip again.
+    await page.locator('.ribbon-tab', { hasText: /^Insert$/ }).click()
+    await page.locator('.rb-big', { hasText: /^Header$/ }).click()
+    await page.locator('[data-rb-panel] button', { hasText: 'Edit Header' }).click()
+    await page
+      .locator('.page-hf-header .page-hf-edit-surface [contenteditable="true"]')
+      .first()
+      .waitFor()
+    await page.getByRole('button', { name: /Link to Previous/ }).click()
+    expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
+    await expect.poll(() => header(1).linked).toBe(true)
+    expect(header(1).value?.text ?? '').toBe('')
+    await page.locator('[data-tip="Return to the document body"]').click()
+    // Layout → Breaks → Continuous with the caret in the first section starts the section after the break as continuous.
+    await page.getByText('First section', { exact: true }).click()
+    await page
+      .locator('.ribbon-tab', { hasText: /^Layout$/ })
+      .first()
+      .click()
+    await page
+      .locator('.rb-big', { hasText: /^Breaks$/ })
+      .first()
+      .click()
+    await page
+      .locator('[data-rb-panel] button', { hasText: /^Continuous/ })
+      .first()
+      .click()
+    expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
+    await expect
+      .poll(() => session.presentation().settings!.sections![0]!.startType)
+      .toBe('continuous')
+    expect(session.presentation().settings!.sectionStart).toBeUndefined()
     expect(errors).toEqual([])
   } finally {
     await browser.close()
