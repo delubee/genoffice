@@ -469,7 +469,7 @@
 
 - [x] Render the shared desktop Calculation Options, Calculate Now and Calculate Sheet controls in the plugin Formulas tab.
 - [x] Reuse the desktop automatic/manual calculation veto, active-sheet calculation request and F9/Shift+F9 behavior in the plugin editor runtime.
-- [ ] Bind manual/automatic mode and calculation results to the host-owned workbook root, saved `calcPr`, canonical freshness and history/save/reopen behavior; current plugin controls still operate on the editor projection.
+- [x] Calculation Options (automatic/manual) is a `set_calculation_mode` session edit saved into `calcPr/@calcMode` and read back on reopen. Calculation results/cache freshness binding to the host root remains open.
 
 ## Data ribbon implementation follow-up
 

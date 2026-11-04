@@ -5427,6 +5427,11 @@ export class WorkbookRuntime implements EditorProjection {
       this.outlineProjection = undefined
       this.outlineGutter?.refresh()
       this.state = state
+      // The saved calculation mode (an unsaved Calculation Options edit wins over the file's calcPr).
+      const savedMode =
+        (state.features?.calcModeEdits as { mode?: string } | undefined)?.mode ??
+        (state.features?.originalMetadata as { calcMode?: string } | undefined)?.calcMode
+      setManualCalculation(this.runtime, savedMode === 'manual')
       this.watchValues.clear()
       this.revision = revision
       this.loaded.clear()
@@ -8165,6 +8170,9 @@ export class WorkbookRuntime implements EditorProjection {
     setManualCalculation(this.runtime, manual)
     this.changed()
     if (!manual) this.recalculate()
+    // The mode is part of the workbook: it enters history and the saved calcPr.
+    // A rejected edit is surfaced by the pending-error state `enqueue` records.
+    this.enqueue([{ op: 'set_calculation_mode', mode: manual ? 'manual' : 'auto' }]).catch(() => {})
   }
   enqueue(
     operations: readonly WorkbookOperation[],

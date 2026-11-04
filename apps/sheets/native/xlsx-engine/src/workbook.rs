@@ -12,6 +12,7 @@ pub(crate) fn read_sheet_declarations(
         Option<WorkbookProtectionInfo>,
         usize,
         bool,
+        Option<String>,
     ),
     SidecarError,
 > {
@@ -21,6 +22,7 @@ pub(crate) fn read_sheet_declarations(
     let mut protection = None;
     let mut active_tab = 0usize;
     let mut date_1904 = false;
+    let mut calc_mode = None;
     loop {
         match reader.read_event()? {
             Event::Start(element) | Event::Empty(element)
@@ -28,6 +30,11 @@ pub(crate) fn read_sheet_declarations(
             {
                 date_1904 = attribute_value(&reader, &element, b"date1904")?
                     .is_some_and(|value| value == "1" || value == "true");
+            }
+            Event::Start(element) | Event::Empty(element)
+                if element.local_name().as_ref() == b"calcPr" =>
+            {
+                calc_mode = attribute_value(&reader, &element, b"calcMode")?;
             }
             Event::Start(element) | Event::Empty(element)
                 if element.local_name().as_ref() == b"workbookView" =>
@@ -75,7 +82,7 @@ pub(crate) fn read_sheet_declarations(
             _ => {}
         }
     }
-    Ok((sheets, protection, active_tab, date_1904))
+    Ok((sheets, protection, active_tab, date_1904, calc_mode))
 }
 
 pub(crate) fn read_workbook_relationships(

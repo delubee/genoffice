@@ -1207,3 +1207,34 @@ test('the desktop cell context menu routes built-in and shared entries to sessio
   await expect.poll(revision).toBe(before + 1)
   expect(errors).toEqual([])
 })
+
+test('Calculation Options records the calculation mode as one workbook edit', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(String(error)))
+  await page.goto(base)
+  await page.evaluate(async () => {
+    const { mountManualToolbar } = await import(
+      /* @vite-ignore */ String('/packages/sheets-editor/tests/fixtures/manual-toolbar.tsx')
+    )
+    ;(window as any).toolbar = await mountManualToolbar(true)
+  })
+  const revision = () => page.evaluate(() => (window as any).toolbar.revision())
+  await page
+    .getByRole('tablist', { name: 'Ribbon', exact: true })
+    .getByRole('tab', { name: 'Formulas', exact: true })
+    .click()
+  const before = await revision()
+  await page.getByRole('button', { name: 'Calculation Options', exact: true }).click()
+  await page.getByRole('option', { name: /^Manual/ }).click()
+  await expect.poll(revision).toBe(before + 1)
+  expect(
+    await page.evaluate(() => (window as any).toolbar.snapshot().features.calcModeEdits),
+  ).toEqual({ mode: 'manual' })
+  await page.getByRole('button', { name: 'Calculation Options', exact: true }).click()
+  await page.getByRole('option', { name: /^Automatic/ }).click()
+  await expect.poll(revision).toBe(before + 2)
+  expect(
+    await page.evaluate(() => (window as any).toolbar.snapshot().features.calcModeEdits),
+  ).toEqual({ mode: 'auto' })
+  expect(errors).toEqual([])
+})

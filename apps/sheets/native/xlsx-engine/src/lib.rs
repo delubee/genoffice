@@ -277,7 +277,7 @@ impl WorkbookSessions {
         let theme_colors = color_context.palette_hex();
         let theme_fonts = visuals::read_theme_fonts(&mut archive)?;
         let shared_strings = Arc::new(read_shared_strings(&mut archive, &color_context)?);
-        let (declarations, workbook_protection, active_tab, date_1904) =
+        let (declarations, workbook_protection, active_tab, date_1904, calc_mode) =
             read_sheet_declarations(&mut archive)?;
         let relationships = read_workbook_relationships(&mut archive)?;
         let (styles, dxf_styles, normal_font_name) = visuals::read_styles(
@@ -535,6 +535,7 @@ impl WorkbookSessions {
             normal_font_name,
             workbook_protection,
             date1904: date_1904,
+            calc_mode,
             short_date_format: short_date_format.map(ToOwned::to_owned),
         })
     }

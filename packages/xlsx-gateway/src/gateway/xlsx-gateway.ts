@@ -869,6 +869,7 @@ export async function planCellEditsToXlsx(
   redactionStates: readonly SheetRedactionState[] = [],
   invalidateFormulaCaches = false,
   nameReferencePlan: NameReferencePlan | null = null,
+  calcModeState: { readonly mode: 'auto' | 'manual' | 'autoNoTable' } | null = null,
 ): Promise<MutationPlan> {
   // A pending pivot pins final coordinates for its source and output; shifts
   // on either sheet, and sheet renames (worksheetSource@sheet), would desync
@@ -1606,6 +1607,8 @@ export async function planCellEditsToXlsx(
   if (workbookProtectionState !== null) {
     workbookXml = applyWorkbookProtection(workbookXml, workbookProtectionState.lockStructure)
   }
+
+  if (calcModeState !== null) workbookXml = applyCalcMode(workbookXml, calcModeState.mode)
 
   if (themeState !== null) {
     const themePath = 'xl/theme/theme1.xml'
@@ -3154,6 +3157,21 @@ function serializeRunProperties(run: WorkbookRichRun): string {
   }
   if (run.vertAlign !== undefined) parts.push(`<vertAlign val="${run.vertAlign}"/>`)
   return parts.length === 0 ? '' : `<rPr>${parts.join('')}</rPr>`
+}
+
+/// Formulas > Calculation Options: rewrite calcPr/@calcMode (`auto` is the default and is omitted).
+function applyCalcMode(workbookXml: string, mode: 'auto' | 'manual' | 'autoNoTable'): string {
+  const attribute = mode === 'auto' ? '' : ` calcMode="${mode}"`
+  if (/<calcPr\b/.test(workbookXml))
+    return workbookXml.replace(
+      /<calcPr\b([^>]*?)(\/?>)/,
+      (_full, attributes: string, close: string) =>
+        `<calcPr${attributes.replace(/\s*calcMode="[^"]*"/, '')}${attribute}${close}`,
+    )
+  if (mode === 'auto') return workbookXml
+  const anchor = workbookXml.includes('</definedNames>') ? '</definedNames>' : '</sheets>'
+  if (!workbookXml.includes(anchor)) return workbookXml
+  return workbookXml.replace(anchor, `${anchor}<calcPr${attribute}/>`)
 }
 
 function ensureFullCalcOnLoad(workbookXml: string): string {

@@ -224,6 +224,8 @@ export class SessionPackageWriter implements PackageWriter {
       const protectedRangeStates: SheetProtectedRangesState[] = []
       const workbookLock = state.features?.workbookProtectionEdits as
         { lockStructure: boolean } | undefined
+      const calcMode = state.features?.calcModeEdits as
+        { mode: 'auto' | 'manual' | 'autoNoTable' } | undefined
       const dvStates: SheetDvState[] = []
       const cfStates: SheetCfState[] = []
       for (const sheet of state.sheets) {
@@ -625,6 +627,7 @@ export class SessionPackageWriter implements PackageWriter {
         sheetProtections.length ||
         protectedRangeStates.length ||
         workbookLock !== undefined ||
+        calcMode !== undefined ||
         pivotCacheRefreshPaths.length ||
         pivotRefreshUpdates.length ||
         hyperlinkEdits.length ||
@@ -644,6 +647,7 @@ export class SessionPackageWriter implements PackageWriter {
           sheetProtections,
           protectedRangeStates,
           workbookProtectionState: workbookLock ?? null,
+          calcModeState: calcMode ?? null,
           pivotCacheRefreshPaths,
           pivotRefreshUpdates,
           hyperlinkEdits,
@@ -715,12 +719,14 @@ export class SessionPackageWriter implements PackageWriter {
       if (tableAdditions.length || tableEdits.length)
         await writeStage({ edits: [], tableAdditions, tableEdits })
       const sparklineAdditions = state.sheets.flatMap((sheet) =>
-        ((sheet.features?.sparklineAdditions ?? []) as unknown as SessionSparklineGroup[]).map((group) => ({
-          sheetName: sheet.name,
-          type: group.type,
-          ...(group.color === undefined ? {} : { color: group.color }),
-          cells: sparklineCells(sheet.name, group),
-        })),
+        ((sheet.features?.sparklineAdditions ?? []) as unknown as SessionSparklineGroup[]).map(
+          (group) => ({
+            sheetName: sheet.name,
+            type: group.type,
+            ...(group.color === undefined ? {} : { color: group.color }),
+            cells: sparklineCells(sheet.name, group),
+          }),
+        ),
       )
       if (sparklineAdditions.length) await writeStage({ edits: [], sparklineAdditions })
       for (let start = 0; start < pivots.length; start += 20)

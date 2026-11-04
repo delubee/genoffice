@@ -6,6 +6,7 @@ export const SESSION_OPERATION_NAMES = [
   'filter_pivot',
   'protect_sheet',
   'protect_workbook',
+  'set_calculation_mode',
   'set_protected_ranges',
   'set_thread',
   'add_table',

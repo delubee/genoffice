@@ -116,6 +116,7 @@ export interface StreamingSaveRequest {
   readonly formulaValues?: readonly SheetFormulaValues[] | undefined
   readonly themeState?: WorkbookThemeState | null | undefined
   readonly workbookProtectionState?: { readonly lockStructure: boolean } | null | undefined
+  readonly calcModeState?: { readonly mode: 'auto' | 'manual' | 'autoNoTable' } | null | undefined
   readonly protectedRangeStates?: readonly SheetProtectedRangesState[] | undefined
   readonly tabColorStates?: readonly SheetTabColorState[] | undefined
   readonly redactionStates?: readonly SheetRedactionState[] | undefined
@@ -192,6 +193,7 @@ export async function saveWorkbookViaSidecar(
       request.redactionStates ?? [],
       request.invalidateFormulaCaches ?? false,
       request.nameReferencePlan ?? null,
+      request.calcModeState ?? null,
     )
 
     const replacements = await writePlanContents(workDir, 'replace', plan.replaced)

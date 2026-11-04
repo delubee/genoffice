@@ -592,6 +592,11 @@ export async function computeCandidateState(
       affected.push('workbook')
       continue
     }
+    if (op.op === 'set_calculation_mode') {
+      workbookFeatures = { ...workbookFeatures, calcModeEdits: { mode: op.mode } }
+      affected.push('workbook')
+      continue
+    }
     if (op.op === 'add_defined_name' || op.op === 'delete_defined_name') {
       workbookFeatures = {
         ...workbookFeatures,

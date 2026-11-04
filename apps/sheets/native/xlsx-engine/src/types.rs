@@ -34,6 +34,9 @@ pub struct WorkbookMetadata {
     /// workbookPr/@date1904: serial dates count from 1904-01-01.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub date1904: bool,
+    /// calcPr/@calcMode (`auto` when absent in the file).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub calc_mode: Option<String>,
     /// System short-date pattern applied to builtin numFmtIds 14/22, echoed
     /// so the renderer's own short-date affordances match.
     #[serde(skip_serializing_if = "Option::is_none")]

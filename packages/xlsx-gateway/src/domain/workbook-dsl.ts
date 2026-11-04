@@ -898,6 +898,12 @@ const protectWorkbookSchema = z.object({
   locked: z.boolean(),
 })
 
+// Formulas > Calculation Options: the saved calcPr/@calcMode.
+const setCalculationModeSchema = z.object({
+  op: z.literal('set_calculation_mode'),
+  mode: z.enum(['auto', 'manual', 'autoNoTable']),
+})
+
 // Review > Allow Edit Ranges: the sheet's complete set of ranges that stay
 // editable while it is protected ([] removes them all).
 const setProtectedRangesSchema = z.object({
@@ -1045,10 +1051,26 @@ const setConditionalFormatsSchema = z.object({
             .array(
               z
                 .object({
-                  startRow: z.number().int().min(0).max(MAX_GRID_ROWS - 1),
-                  endRow: z.number().int().min(0).max(MAX_GRID_ROWS - 1),
-                  startColumn: z.number().int().min(0).max(MAX_GRID_COLUMNS - 1),
-                  endColumn: z.number().int().min(0).max(MAX_GRID_COLUMNS - 1),
+                  startRow: z
+                    .number()
+                    .int()
+                    .min(0)
+                    .max(MAX_GRID_ROWS - 1),
+                  endRow: z
+                    .number()
+                    .int()
+                    .min(0)
+                    .max(MAX_GRID_ROWS - 1),
+                  startColumn: z
+                    .number()
+                    .int()
+                    .min(0)
+                    .max(MAX_GRID_COLUMNS - 1),
+                  endColumn: z
+                    .number()
+                    .int()
+                    .min(0)
+                    .max(MAX_GRID_COLUMNS - 1),
                 })
                 .strict(),
             )
@@ -1581,6 +1603,7 @@ export const workbookOperationSchema = z.discriminatedUnion('op', [
   filterPivotSchema,
   setConditionalFormatsSchema,
   protectWorkbookSchema,
+  setCalculationModeSchema,
   setProtectedRangesSchema,
   setThreadSchema,
   editTableSchema,
@@ -1742,6 +1765,7 @@ export type LayoutOperation =
   | z.infer<typeof filterPivotSchema>
   | z.infer<typeof setConditionalFormatsSchema>
   | z.infer<typeof protectWorkbookSchema>
+  | z.infer<typeof setCalculationModeSchema>
   | z.infer<typeof setProtectedRangesSchema>
   | z.infer<typeof setThreadSchema>
   | z.infer<typeof editTableSchema>
@@ -1832,6 +1856,7 @@ const LAYOUT_OPS = new Set([
   'filter_pivot',
   'set_conditional_formats',
   'protect_workbook',
+  'set_calculation_mode',
   'set_protected_ranges',
   'set_thread',
   'edit_table',
@@ -2883,6 +2908,8 @@ export function layoutOpLabel(op: LayoutOperation): string {
       return op.thread ? `Comment at ${op.address}` : `Delete comment at ${op.address}`
     case 'protect_workbook':
       return op.locked ? 'Protect workbook structure' : 'Unprotect workbook structure'
+    case 'set_calculation_mode':
+      return `Calculation mode: ${op.mode}`
     case 'set_protected_ranges':
       return `Allow edit ranges: ${op.ranges.map((range) => range.sqref).join(', ') || 'none'}`
     case 'edit_pivot':

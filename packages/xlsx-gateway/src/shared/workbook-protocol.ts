@@ -843,6 +843,8 @@ export const workbookFileSchema = z
       .optional(),
     /// workbookPr/@date1904: serial dates count from 1904-01-01.
     date1904: z.boolean().optional(),
+    /// calcPr/@calcMode; absent means the file did not state it (automatic).
+    calcMode: z.string().optional(),
     /// System short-date pattern the sidecar applied to builtin numFmtIds 14/22.
     shortDateFormat: z.string().optional(),
   })
@@ -2190,6 +2192,12 @@ export const workbookSaveRequestSchema = z
       .strict()
       .nullable()
       .default(null),
+    /// Desired calcPr/@calcMode (null = untouched).
+    calcModeState: z
+      .object({ mode: z.enum(['auto', 'manual', 'autoNoTable']) })
+      .strict()
+      .nullable()
+      .default(null),
     /// Full allow-edit-range snapshots for sheets whose set changed.
     protectedRangeStates: z
       .array(
@@ -2246,6 +2254,7 @@ export const workbookSaveRequestSchema = z
       request.definedNamesState !== null ||
       request.themeState !== null ||
       request.workbookProtectionState !== null ||
+      request.calcModeState !== null ||
       request.protectedRangeStates.length > 0 ||
       request.visualAdditions.length > 0 ||
       (request.cellImageAdditions?.length ?? 0) > 0 ||

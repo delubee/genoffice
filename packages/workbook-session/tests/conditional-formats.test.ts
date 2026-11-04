@@ -17,13 +17,6 @@ import { readCurrentRange } from '../src/read'
 import { useSessionTestResources } from './helpers'
 const resources = useSessionTestResources()
 
-const rows: [string, string, number][] = [
-  ['North', 'Apples', 12.5],
-  ['South', 'Pears', 7],
-  ['North', 'Pears', 3],
-  ['East', 'Apples', 10],
-]
-
 async function salesWorkbook() {
   const cells = [
     ['Region', 'Amount'],
