@@ -67,11 +67,23 @@ suite('Workbook native shortcuts UI', () => {
       const query = find.getByRole('combobox', { name: 'Find what', exact: true })
       await query.fill('00123')
       await find.getByRole('status').filter({ hasText: '2 of 2' }).waitFor()
-      await frame.page().keyboard.press(`${modifier}+f`)
-      await frame.waitForFunction(
-        (element) => window.document.activeElement === element,
-        await query.elementHandle(),
-      )
+      // Under a full suite run the window can lose focus to a notification or panel; retry the shortcut.
+      const queryHandle = await query.elementHandle()
+      for (let attempt = 0; attempt < 5; attempt++) {
+        await vscode.commands.executeCommand('notifications.clearAll')
+        await frame.page().bringToFront()
+        await frame.page().keyboard.press(`${modifier}+f`)
+        const focusedNow = await frame
+          .waitForFunction((element) => window.document.activeElement === element, queryHandle, {
+            timeout: 6_000,
+          })
+          .then(
+            () => true,
+            () => false,
+          )
+        if (focusedNow) break
+        assert.ok(attempt < 4, 'Find and Replace did not take focus after repeated Ctrl+F')
+      }
       const focused = await query.evaluate((element) => ({
         focused: window.document.activeElement === element,
         start: (element as HTMLInputElement).selectionStart,
