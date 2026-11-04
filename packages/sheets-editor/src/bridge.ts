@@ -21,6 +21,7 @@ const candidateRequestSchema = z.strictObject({
       .optional(),
     writableSheetIds: z.array(z.string()),
     viewWritableSheetIds: z.array(z.string()).optional(),
+    allowEditSheetIds: z.array(z.string()).optional(),
     allocation: z.strictObject({
       stateId: z.string().min(1),
       sheetIds: z.record(z.string(), z.string().min(1)),
