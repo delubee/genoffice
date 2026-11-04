@@ -2,7 +2,12 @@ import * as vscode from 'vscode'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { rm } from 'node:fs/promises'
-import { WorkbookError, type OriginalBase } from '@genoffice/workbook-session/domain'
+import {
+  WorkbookError,
+  type OriginalBase,
+  type WorkbookState,
+} from '@genoffice/workbook-session/domain'
+import { calculateSaveValues } from '@genoffice/workbook-session/calculation/save-values'
 import { WorkbookTransactions } from '@genoffice/workbook-session/transactions'
 import { FileResourceStore } from '@genoffice/workbook-session/store'
 import { openWorkbookSnapshot } from '@genoffice/workbook-session/open'
@@ -96,6 +101,15 @@ export class WorkbookDocument implements vscode.CustomDocument {
   }
   pauseFileChecks() {
     return this.fileWatcher?.pause() ?? (() => {})
+  }
+  /** Fresh formula results of a frozen root for the saved file's cached values. */
+  calculateForSave(state: Readonly<WorkbookState>, signal: AbortSignal) {
+    return calculateSaveValues({
+      state,
+      source: this.source,
+      sourceSessionId: this.actor.original.sidecarSessionId,
+      signal,
+    })
   }
   requestHistory(direction: 'undo' | 'redo') {
     return requestNativeHistory(this, direction)

@@ -1,3 +1,4 @@
+import type { SaveCalculationValue } from './calculation/save-values'
 import { sessionPivotAdditions } from '@genoffice/xlsx-gateway/domain/session-candidate'
 import {
   sparklineCells,
@@ -76,6 +77,8 @@ export class SessionPackageWriter implements PackageWriter {
     rawState: Readonly<WorkbookState>,
     targetPath: string,
     signal?: AbortSignal,
+    /** Fresh formula results to cache in the saved file (see calculateSaveValues). */
+    calculated: readonly SaveCalculationValue[] | null = null,
   ) {
     assertNotCancelled(signal)
     const state = workbookStateSchema.parse(rawState),
@@ -467,6 +470,16 @@ export class SessionPackageWriter implements PackageWriter {
               column: point.column,
               value: cell.kind === 'error' ? { error: String(cell.cachedValue) } : cell.cachedValue,
             })
+        }
+        // Fresh results replace whatever the edited cells carried.
+        for (const result of calculated ?? []) {
+          if (result.sheetId !== sheet.id) continue
+          const at = formulaCells.findIndex(
+            (cell) => cell.row === result.row && cell.column === result.column,
+          )
+          const entry = { row: result.row, column: result.column, value: result.value }
+          if (at >= 0) formulaCells[at] = entry
+          else formulaCells.push(entry)
         }
         if (formulaCells.length) formulaValues.push({ sheetName: sheet.name, cells: formulaCells })
         for (const visual of (sheet.features?.visuals ??
