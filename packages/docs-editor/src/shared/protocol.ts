@@ -54,6 +54,11 @@ export interface DocumentSettings {
   /** default page header / footer of the document */
   header?: HeaderFooter
   footer?: HeaderFooter
+  /** first-page and even-page parts (Header & Footer → Different First Page / Odd & Even) */
+  headerFirst?: HeaderFooter
+  footerFirst?: HeaderFooter
+  headerEven?: HeaderFooter
+  footerEven?: HeaderFooter
   /** the full comment list (threads, replies, resolved state) */
   comments?: CommentInfo[]
   footnotes?: NoteInfo[]

@@ -276,18 +276,18 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
     onDeleteAll: (resolvedOnly: boolean) => deleteAllComments(review(), resolvedOnly),
     onGoto: (direction: 1 | -1) => void gotoComment(review(), direction),
   }
-  const [hfEdit, setHfEdit] = useState<{ header: number | null; footer: number | null }>({
-    header: null,
-    footer: null,
-  })
-  const [hfOpen, setHfOpen] = useState<'header' | 'footer' | null>(null)
+  type HfKey = 'header' | 'footer' | 'headerFirst' | 'footerFirst' | 'headerEven' | 'footerEven'
+  const baseKind = (key: HfKey): 'header' | 'footer' =>
+    key.startsWith('header') ? 'header' : 'footer'
+  const [hfEdit, setHfEdit] = useState<Partial<Record<HfKey, number | null>>>({})
+  const [hfOpen, setHfOpen] = useState<HfKey | null>(null)
   const hfHandle = useRef<HfEditorHandle | null>(null)
   const hfEditing: HfEditingInfo | null = hfOpen
     ? {
-        kind: hfOpen,
+        kind: baseKind(hfOpen),
         section: 0,
         sectionCount: 1,
-        variant: 'default',
+        variant: hfOpen.endsWith('First') ? 'first' : hfOpen.endsWith('Even') ? 'even' : 'default',
         linked: null,
         headerDistTwips: runtime.settings.section?.headerDist ?? 720,
         footerDistTwips: runtime.settings.section?.footerDist ?? 720,
@@ -298,7 +298,10 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
   /** The Header & Footer contextual tab, as the desktop's onHfAction for the default strips. */
   const onHfAction = (action: HfAction) => {
     const sub = hfHandle.current?.editor
-    const value = (kind: 'header' | 'footer') => runtime.settings[kind] ?? { text: '' }
+    // Actions on the open strip target its variant; otherwise the default part.
+    const part = (kind: 'header' | 'footer'): HfKey =>
+      hfOpen && baseKind(hfOpen) === kind ? hfOpen : kind
+    const value = (kind: 'header' | 'footer') => runtime.settings[part(kind)] ?? { text: '' }
     switch (action.type) {
       case 'close':
         hfHandle.current?.exit()
@@ -310,12 +313,12 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
         break
       case 'remove':
         hfHandle.current?.exit()
-        void runtime.applySettings({ [action.kind]: { text: '' } })
+        void runtime.applySettings({ [part(action.kind)]: { text: '' } })
         break
       case 'pageNumber':
         hfHandle.current?.exit()
         void runtime.applySettings({
-          [action.kind]: {
+          [part(action.kind)]: {
             text: PAGE_MARK,
             pageNumber: true,
             paras: [{ align: action.align, runs: [{ text: PAGE_MARK }] }],
@@ -332,7 +335,7 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
         hfHandle.current?.exit()
         for (const kind of ['header', 'footer'] as const)
           if (hfHasPageField(value(kind)))
-            void runtime.applySettings({ [kind]: hfWithoutPageMarks(value(kind)) })
+            void runtime.applySettings({ [part(kind)]: hfWithoutPageMarks(value(kind)) })
         break
       case 'field':
         if (sub)
@@ -383,25 +386,32 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
         runtime.reportError('Link to Previous is not available in the VS Code editor yet.')
     }
   }
-  const strip = (kind: 'header' | 'footer') => {
-    const value = runtime.settings[kind] ?? { text: '' }
-    // Word shows an empty strip only while editing it.
-    if (!value.text && !value.paras?.length && hfEdit[kind] == null) return null
+  const strip = (key: HfKey) => {
+    const kind = baseKind(key)
+    const value = runtime.settings[key] ?? { text: '' }
+    // Word shows an empty strip only while editing it. A variant strip exists while its option is on.
+    if (key === kind && !value.text && !value.paras?.length && hfEdit[key] == null) return null
     return (
       <HeaderFooterArea
+        key={key}
         kind={kind}
         value={value}
         readOnly={!editor.isEditable}
-        editRequest={hfEdit[kind]}
-        onCommit={(next) => void runtime.applySettings({ [kind]: next })}
+        editRequest={hfEdit[key] ?? null}
+        onCommit={(next) => void runtime.applySettings({ [key]: next })}
         onEditingChange={(editing, handle) => {
           hfHandle.current = editing ? handle : null
-          setHfOpen(editing ? kind : null)
-          if (!editing) setHfEdit((current) => ({ ...current, [kind]: null }))
+          setHfOpen(editing ? key : null)
+          if (!editing) setHfEdit((current) => ({ ...current, [key]: null }))
         }}
       />
     )
   }
+  /** Edit entries of the variants that are switched on, as Word's first/even page headers. */
+  const variantKeys = (kind: 'header' | 'footer'): HfKey[] => [
+    ...(runtime.settings.titlePg ? [`${kind}First` as HfKey] : []),
+    ...(runtime.settings.evenAndOddHeaders ? [`${kind}Even` as HfKey] : []),
+  ]
   const unavailable = (feature: string) => () =>
     runtime.reportError(`${feature} is not available in the VS Code editor yet.`)
   /** Right-click on the page, as the desktop: a click outside the selection moves the caret there. */
@@ -808,8 +818,10 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
               />
             ) : null}
             {strip('header')}
+            {variantKeys('header').map(strip)}
             <EditorContent editor={editor} />
             {strip('footer')}
+            {variantKeys('footer').map(strip)}
             {(['footnote', 'endnote'] as const).map((kind) => {
               const list = kind === 'footnote' ? footnotes : endnotes
               if (!list.length) return null

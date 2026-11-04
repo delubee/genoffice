@@ -263,6 +263,12 @@ export class DocxSession {
       themeColors: edits.themeColors ?? this.original.themeColors ?? null,
       footnotes: edits.footnotes ?? this.original.footnotes,
       endnotes: edits.endnotes ?? this.original.endnotes,
+      ...Object.fromEntries(
+        (['headerFirst', 'footerFirst', 'headerEven', 'footerEven'] as const).flatMap((key) => {
+          const value = edits[key] ?? this.original[key]
+          return value ? [[key, { text: value.text, paras: value.paras }]] : []
+        }),
+      ),
       header: edits.header ?? {
         text: this.original.headerText ?? '',
         ...(this.original.headerParas ? { paras: this.original.headerParas } : {}),
@@ -303,7 +309,16 @@ export class DocxSession {
       else if (value && typeof value === 'object')
         for (const [name, item] of Object.entries(value)) collect(item, name)
     }
-    collect([this.original.headerParas, this.original.footerParas])
+    collect([
+      this.original.headerParas,
+      this.original.footerParas,
+      ...[
+        this.original.headerFirst,
+        this.original.footerFirst,
+        this.original.headerEven,
+        this.original.footerEven,
+      ].map((part) => part?.paras),
+    ])
     const check = (value: unknown, key = '') => {
       if (HF_RAW_KEYS.has(key) && typeof value === 'string' && !fileRaw.has(value))
         throw new Error('Untrusted header or footer content')
@@ -311,7 +326,14 @@ export class DocxSession {
       else if (value && typeof value === 'object')
         for (const [name, item] of Object.entries(value)) check(item, name)
     }
-    check([edit.header?.paras, edit.footer?.paras])
+    check([
+      edit.header?.paras,
+      edit.footer?.paras,
+      edit.headerFirst?.paras,
+      edit.footerFirst?.paras,
+      edit.headerEven?.paras,
+      edit.footerEven?.paras,
+    ])
     const overlays = structuredClone(this.root.overlays)
     const { styles, numbering, ...settings } = edit
     if (styles) this.withStyles(overlays, styles)
@@ -754,6 +776,11 @@ export class DocxSession {
         : {}),
       ...(this.root.overlays.settings.header ? { header: this.root.overlays.settings.header } : {}),
       ...(this.root.overlays.settings.footer ? { footer: this.root.overlays.settings.footer } : {}),
+      ...Object.fromEntries(
+        (['headerFirst', 'footerFirst', 'headerEven', 'footerEven'] as const).flatMap((key) =>
+          this.root.overlays.settings[key] ? [[key, this.root.overlays.settings[key]]] : [],
+        ),
+      ),
       ...(this.root.overlays.settings.watermark !== undefined
         ? { watermark: this.root.overlays.settings.watermark }
         : {}),

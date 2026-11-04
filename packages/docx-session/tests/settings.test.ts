@@ -80,6 +80,34 @@ it('saves the Page Number Format of the final section', async () => {
   expect(() => apply(session, { pageNumbering: { fmt: '"/><w:evil/>' } })).toThrow()
 })
 
+it('saves first-page and even-page header and footer parts', async () => {
+  const session = await DocxSession.open(
+    await buildDocx({ bodyXml: '<w:p><w:r><w:t>Pages</w:t></w:r></w:p>' }),
+  )
+  apply(session, {
+    titlePg: true,
+    evenAndOddHeaders: true,
+    headerFirst: { text: 'Cover header' },
+    footerEven: { text: 'Even footer' },
+  })
+  const zip = await JSZip.loadAsync(await session.save())
+  const parts = await Promise.all(
+    Object.keys(zip.files)
+      .filter((name) => /^word\/(header|footer)\d+\.xml$/.test(name))
+      .map((name) => zip.file(name)!.async('string')),
+  )
+  expect(parts.some((xml) => xml.includes('Cover header'))).toBe(true)
+  expect(parts.some((xml) => xml.includes('Even footer'))).toBe(true)
+  expect(await zip.file('word/document.xml')!.async('string')).toMatch(
+    /<w:headerReference\b[^>]*w:type="first"/,
+  )
+  const reopened = await DocxSession.open(await session.save())
+  expect(reopened.presentation().settings).toMatchObject({
+    headerFirst: { text: 'Cover header' },
+    footerEven: { text: 'Even footer' },
+  })
+})
+
 it('refuses settings that could carry markup or exceed page bounds', async () => {
   const session = await DocxSession.open(
     await buildDocx({ bodyXml: '<w:p><w:r><w:t>Settings</w:t></w:r></w:p>' }),

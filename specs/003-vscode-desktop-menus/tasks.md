@@ -669,4 +669,5 @@ Review protection foundation (2026-10-29):
 
 - [x] Different First Page and Different Odd & Even Pages are document settings saved as `w:titlePg` / `w:evenAndOddHeaders`.
 - [x] Page Number Format (fmt/start) of the final section is a document setting saved as `w:pgNumType`.
-- [ ] First-page and even-page header/footer content (variants) and Link to Previous still report a host limitation.
+- [x] First-page and even-page header/footer parts are edited as extra strips while the option is on and saved as `w:type="first"|"even"` parts.
+- [ ] Link to Previous needs sections and still reports a host limitation.

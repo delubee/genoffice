@@ -456,6 +456,10 @@ export const documentSettingsSchema = z
       .optional(),
     endnotes: notesSchema.optional(),
     footer: headerFooterSchema.optional(),
+    headerFirst: headerFooterSchema.optional(),
+    footerFirst: headerFooterSchema.optional(),
+    headerEven: headerFooterSchema.optional(),
+    footerEven: headerFooterSchema.optional(),
     watermark: z
       .string()
       .min(1)
