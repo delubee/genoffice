@@ -102,6 +102,29 @@ it('edits the page setup and page numbering of the section under the cursor', as
     const settings = session.presentation().settings!
     expect(settings.sections![1]!.section.marginLeft).toBe(1440)
     expect(settings.section!.marginLeft).toBe(1440)
+    // Insert → Header → Edit Header in the second section writes that section's own strip only.
+    await page.getByText('Second section', { exact: true }).click()
+    await page.locator('.ribbon-tab', { hasText: /^Insert$/ }).click()
+    await page.locator('.rb-big', { hasText: /^Header$/ }).click()
+    await page.locator('[data-rb-panel] button', { hasText: 'Edit Header' }).click()
+    const headerEditor = page
+      .locator('.page-hf-header .page-hf-edit-surface [contenteditable="true"]')
+      .first()
+    await headerEditor.waitFor()
+    await headerEditor.click()
+    await page.keyboard.type('Chapter two')
+    await page.locator('[data-tip="Return to the document body"]').click()
+    expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
+    const header = (section: number) =>
+      session
+        .presentation()
+        .settings!.sectionStrips!.find(
+          (strip) =>
+            strip.section === section && strip.kind === 'header' && strip.variant === 'default',
+        )!
+    await expect.poll(() => header(1).value?.text).toContain('Chapter two')
+    expect(header(1).linked).toBe(false)
+    expect(header(0).value?.text ?? '').toBe('')
     expect(errors).toEqual([])
   } finally {
     await browser.close()
