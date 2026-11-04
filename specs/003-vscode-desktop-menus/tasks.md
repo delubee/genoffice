@@ -709,3 +709,5 @@ Review protection foundation (2026-10-29):
 
 - [x] Remove Duplicates (up to 200,000 selected cells) and Text to Columns (up to 100,000 source cells, 200,000 output cells) read in 2000-cell row bands and write changed rows as staged value blocks in one revision; both verified natively with more than 2000 cells.
 - [ ] Flash Fill (2000 rows per run), Fill/Sort/Consolidate/Subtotal large-range variants and the other 2000-cell caps (chart selections, presentation reads) are unchanged.
+
+- [ ] Sort beyond 2000 cells: the session candidate plans sorts through the in-memory adapter, which refuses range-level sorts above 2000 cells (`sort_range on an in-memory workbook is limited…`); lifting the view cap alone does not work. It needs a session-side bulk sort that expands into staged value blocks.
