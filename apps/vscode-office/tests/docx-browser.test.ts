@@ -299,10 +299,20 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     expect(session.content()).toEqual(beforeParagraph)
     session.history('redo')
     await bridge.request('view.resync', projection())
-    await page.locator('.style-gallery').getByText('Heading 1', { exact: true }).click()
+    if (!(await page.locator('.style-gallery-menu').isVisible()))
+      await page.locator('.rb-styles-gallery').click()
+    await page
+      .locator('.style-gallery-menu')
+      .getByText('Heading 1', { exact: true })
+      .evaluate((card) => (card as HTMLElement).click())
     expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
     expect(session.content().content![0]!.type).toBe('docHeading')
-    await page.locator('.style-gallery').getByText('Normal', { exact: true }).click()
+    if (!(await page.locator('.style-gallery-menu').isVisible()))
+      await page.locator('.rb-styles-gallery').click()
+    await page
+      .locator('.style-gallery-menu')
+      .getByText('Normal', { exact: true })
+      .evaluate((card) => (card as HTMLElement).click())
     expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
     await page.locator('.ribbon-tab', { hasText: /^Insert$/ }).click()
     await page.locator('[data-tip="Insert a table"]').click()
@@ -536,7 +546,7 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     expect(exports[1]!.content).toContain('Second')
     // Draw → Pen: a stroke on the page becomes an ink settings entry rasterized by the view.
     await page.locator('.ribbon-tab', { hasText: /^Draw$/ }).click()
-    await page.locator('[data-tip^="Pen: draw on the document"]').click()
+    await page.locator('[data-tip^="Draw: ink on the document"]').click()
     const box = (await page.locator('.office-docx-page').boundingBox())!
     await page.mouse.move(box.x + 120, box.y + 120)
     await page.mouse.down()
@@ -544,7 +554,7 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     await page.mouse.up()
     await expect.poll(() => session.presentation().settings!.inks!.length).toBe(1)
     expect(session.presentation().settings!.inks![0]!.raster?.base64.length).toBeGreaterThan(10)
-    await page.locator('[data-tip^="Select: exit drawing"]').click()
+    await page.locator('[data-tip^="Draw: ink on the document"]').click()
     // Review → Compare: a picked .docx is parsed and diffed by paragraph in the view.
     await page.locator('.ribbon-tab', { hasText: /^Review$/ }).click()
     const compareChooser = page.waitForEvent('filechooser')
