@@ -57,6 +57,15 @@ import type {
   WorkbookPivotDefinition,
   WorkbookRedactionsRequest,
   WorkbookRedactionsResult,
+  ExternalLinkRevealRequest,
+  ExternalLinksRequest,
+  ExternalLinksResult,
+  ExternalLinksUpdateResult,
+  ExternalLinkUsageResult,
+  WorkbookPickSelection,
+  WorkbookQueriesRequest,
+  WorkbookQueriesResult,
+  WorkbookTab,
 } from '@genoffice/xlsx-gateway/shared/workbook-protocol'
 
 export const localImageRequestSchema = z
@@ -580,7 +589,12 @@ export interface DesktopApi {
    * press for dismissing open popovers
    */
   onChromePressed(handler: () => void): () => void
-  selectWorkbook(): Promise<WorkbookFile | null>
+  selectWorkbook(): Promise<WorkbookFile | { passwordRequired: true; path: string } | null>
+  openEncryptedWorkbook(path: string, password: string): Promise<WorkbookFile | null>
+  updateWorkbookPassword(
+    sessionId: string,
+    newPassword: string,
+  ): Promise<{ sha256: string; fileBytes: number; passwordProtected: true }>
   /** multi-select xlsx picker; each file opens a secondary sidecar session for merge reads */
   selectWorkbooksForMerge(): Promise<WorkbookFile[] | null>
   /** open explicit spreadsheet paths (chat attachments) as merge-source sessions */
@@ -597,8 +611,30 @@ export interface DesktopApi {
   readWorkbookRange(request: WorkbookRangeRequest): Promise<WorkbookRangeResult>
   readWorkbookFormulas(request: WorkbookFormulaCellsRequest): Promise<WorkbookFormulaCellsResult>
   findWorkbookCells(request: WorkbookFindCellsRequest): Promise<WorkbookFindCellsResult>
+  /** The workbook's refreshable data connections (web queries for now). */
+  listWorkbookConnections(request: WorkbookConnectionsRequest): Promise<WorkbookConnectionsResult>
+  /** Fetch a web query's table: main resolves its URL from the workbook part. */
+  refreshWorkbookConnection(request: WorkbookRefreshRequest): Promise<WorkbookRefreshResult>
   readWorkbookRowOutline(request: WorkbookFormulaCellsRequest): Promise<WorkbookRowOutlineResult>
   recalcWorkbook(request: WorkbookRecalcRequest): Promise<WorkbookRecalcResult>
+  listExternalLinks(request: ExternalLinksRequest): Promise<ExternalLinksResult>
+  updateExternalLinks(request: ExternalLinksRequest): Promise<ExternalLinksUpdateResult>
+  /// The formula cells referencing each [n] link, with the value a break
+  /// would freeze them at — the file-level scan, not the model's view.
+  readExternalLinkUsage(request: ExternalLinksRequest): Promise<ExternalLinkUsageResult>
+  /// A single-workbook file picker for "Change Source" (a link's new source).
+  selectExternalLinkSource(): Promise<string | null>
+  /// Other open workbook tabs (the cross-workbook range picker's book list).
+  listWorkbookTabs(): Promise<{ tabs: WorkbookTab[] }>
+  /// Arms a cross-workbook pick from this tab; other sheets' grids become
+  /// the pick target until a selection or a cancel.
+  armWorkbookPick(wcId: number): Promise<{ pickId: string }>
+  sendWorkbookPickSelection(selection: WorkbookPickSelection): Promise<void>
+  cancelWorkbookPick(pickId: string): Promise<void>
+  onWorkbookPickArmed(listener: (payload: { pickId: string }) => void): () => void
+  onWorkbookPickSelected(listener: (selection: WorkbookPickSelection) => void): () => void
+  onWorkbookPickCancelled(listener: (payload: { pickId: string }) => void): () => void
+  revealLinkSource(request: ExternalLinkRevealRequest): void
   readWorkbookMedia(request: WorkbookMediaRequest): Promise<WorkbookMediaResult>
   readPivotDefinition(request: WorkbookPivotRequest): Promise<WorkbookPivotDefinition>
   /**
@@ -607,6 +643,8 @@ export interface DesktopApi {
    * see `workbookRedactionsResultSchema`.
    */
   readWorkbookRedactions(request: WorkbookRedactionsRequest): Promise<WorkbookRedactionsResult>
+  /** Data › Queries & Connections: the workbook's connections and where each loads (read-only) */
+  readWorkbookQueries(request: WorkbookQueriesRequest): Promise<WorkbookQueriesResult>
   readLocalImage(request: LocalImageRequest): Promise<LocalImageResult>
   captureScreenSources(): Promise<ScreenSourcesResult>
   /// null when the source vanished between listing and capture.
@@ -750,6 +788,64 @@ export interface GenerateImageResult {
   url?: string
   error?: string
 }
+
+/// A workbook's data connections that can be refreshed: a web query fills a
+/// range on a sheet, and its URL lives in the workbook's connection part.
+/// Text queries are not listed yet: a local path cannot go through the SSRF
+/// gate, so refreshing one would only fail (genoffice#2363 review).
+export const workbookConnectionSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    /** only web queries are refreshable for now */
+    kind: z.literal('web'),
+    /** the URL the query reads */
+    source: z.string(),
+    /** the sheet the query's rows land on */
+    sheetName: z.string(),
+    /** the A1 range the query fills, header row included */
+    range: z.string(),
+    /** rows at the top of the range that are the query's header (0 or 1) */
+    headerRows: z.number().int().min(0),
+    /** trailing rows that hold a ListObject's totals row, left untouched */
+    totalsRows: z.number().int().min(0),
+    /** true when the rows live in a ListObject, whose column names pin the header cells */
+    hasTable: z.boolean(),
+  })
+  .strict()
+
+export const workbookConnectionsRequestSchema = z
+  .object({
+    sessionId: z.string().uuid(),
+  })
+  .strict()
+
+export const workbookConnectionsResultSchema = z
+  .object({
+    connections: z.array(workbookConnectionSchema),
+  })
+  .strict()
+
+export const workbookRefreshRequestSchema = z
+  .object({
+    sessionId: z.string().uuid(),
+    /** the connection list's id; main resolves the URL from the workbook */
+    connectionId: z.string().min(1).max(200),
+  })
+  .strict()
+
+export const workbookRefreshResultSchema = z
+  .object({
+    headers: z.array(z.string()),
+    rows: z.array(z.array(z.string())),
+  })
+  .strict()
+
+export type WorkbookConnection = z.infer<typeof workbookConnectionSchema>
+export type WorkbookConnectionsRequest = z.infer<typeof workbookConnectionsRequestSchema>
+export type WorkbookConnectionsResult = z.infer<typeof workbookConnectionsResultSchema>
+export type WorkbookRefreshRequest = z.infer<typeof workbookRefreshRequestSchema>
+export type WorkbookRefreshResult = z.infer<typeof workbookRefreshResultSchema>
 
 export interface UserSkillEntry {
   name: string
