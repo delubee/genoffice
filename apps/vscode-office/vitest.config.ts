@@ -7,6 +7,7 @@ export default defineConfig({
       'tests/integration/**',
       'tests/python-full-output.test.ts',
       'tests/docx-browser.test.ts',
+      'tests/docx-sections-browser.test.ts',
     ],
     environment: 'node',
     testTimeout: 20_000,
