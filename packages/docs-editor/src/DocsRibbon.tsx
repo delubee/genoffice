@@ -168,7 +168,12 @@ export function DocsRibbon({
     showAi: false,
     onToggleAi: () =>
       void runtime
-        .officeAction({ action: 'chat', scope: 'document', instruction: '' })
+        .officeAction({
+          action: 'chat',
+          // The ribbon's AI entry asks about the selection when there is one.
+          scope: editor.state.selection.empty ? 'document' : 'selection',
+          instruction: '',
+        })
         .catch((error) => runtime.reportError(error)),
     section: sectionTarget.section,
     onSection: sectionTarget.onSection,

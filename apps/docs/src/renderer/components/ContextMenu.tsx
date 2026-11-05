@@ -85,6 +85,8 @@ interface EditorContextMenuProps {
   onViewImage: (src: string) => void
   onSaveImageAs: (src: string) => void
   onAiPreset: (instruction: string) => void
+  /** Host shells with a native chat (VS Code) offer "ask about the selection" for a non-empty selection */
+  askChat?: { label: string; onAsk: () => void }
   /** List items: restart numbering / continue numbering (shown when the cursor is on a docListItem) */
   onRestartNumbering?: () => void
   onContinueNumbering?: () => void
@@ -140,6 +142,7 @@ export function EditorContextMenu({
   onViewImage,
   onSaveImageAs,
   onAiPreset,
+  askChat,
   onRestartNumbering,
   onContinueNumbering,
   onSetNumberingValue,
@@ -662,6 +665,7 @@ export function EditorContextMenu({
         </>
       )}
       <div className="ctx-sep" />
+      {askChat && item(askChat.label, { disabled: !hasSelection, onClick: run(askChat.onAsk) })}
       {item(t('appSynonyms'), {
         disabled: !synonymText,
         ai: true,

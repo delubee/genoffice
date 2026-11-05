@@ -1,3 +1,4 @@
+import { OFFICE_ACTION_LABELS } from '@genoffice/ui/chrome'
 import { z } from 'zod'
 import type { SubtotalConfig } from '@genoffice/xlsx-gateway/domain/subtotal-plan'
 import {
@@ -3472,6 +3473,11 @@ export class WorkbookRuntime implements EditorProjection {
     if (!(await this.flushEditor())) throw new Error('Finish editing before inserting a summary.')
     await this.insertSummary(fn)
   }
+  /** Right-click → ask VS Code Chat about the selected range (the binding names the range). */
+  async askChatAboutSelection() {
+    if (!this.host.action) throw new Error('Native chat is unavailable in this host.')
+    await this.host.action({ action: 'chat', instruction: '', scope: 'selection' })
+  }
   async ribbonChat(instruction = '') {
     if (!this.host.action) throw new Error('Native chat is unavailable in this host.')
     await this.host.action({
@@ -4821,7 +4827,14 @@ export class WorkbookRuntime implements EditorProjection {
       keyCommands.registerCommand({ id, type: CommandType.COMMAND, handler })
     }
     // The desktop's cell / header context menu; dialog entries reach the ribbon dispatcher.
-    this.disposables.push(installCellContextMenu(this.runtime))
+    this.disposables.push(
+      installCellContextMenu(this.runtime, {
+        askChat: {
+          label: (lang) => OFFICE_ACTION_LABELS[lang].chatSelection,
+          ask: () => void this.askChatAboutSelection().catch(this.report),
+        },
+      }),
+    )
     setContextMenuCommandSink((command) => this.commandSink?.(command))
     this.disposables.push({
       dispose: registerPasteSpecialOpener(() =>

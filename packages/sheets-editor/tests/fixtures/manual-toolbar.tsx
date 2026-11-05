@@ -258,7 +258,11 @@ export async function mountManualToolbar(
   let submitError: string | undefined
   let submitCount = 0
   let releaseRead: (() => void) | undefined
+  const actions: unknown[] = []
   const host: EditorHost = {
+    async action(request) {
+      actions.push(request)
+    },
     async outline(sheetId, stateId) {
       if (stateId !== state.stateId) throw new Error('stale_outline_fixture')
       const captured = state
@@ -437,6 +441,9 @@ export async function mountManualToolbar(
   })
   const facade = (projection! as unknown as { runtime: { univerAPI: any } }).runtime.univerAPI
   return {
+    actions() {
+      return structuredClone(actions)
+    },
     diagnostics() {
       const runtime = projection as unknown as {
         pendingError: boolean
@@ -608,15 +615,27 @@ export async function mountManualToolbar(
     /** Leaf commands of the cell context menu, for menu parity audits. */
     contextMenuCommands() {
       const { IMenuManagerService, ContextMenuPosition } = uiModule
-      const injector = (projection as unknown as { runtime: { univer: any } }).runtime.univer.__getInjector()
+      const injector = (
+        projection as unknown as { runtime: { univer: any } }
+      ).runtime.univer.__getInjector()
       const out: { key: string; id: string; title?: string; params?: unknown }[] = []
       const walk = (items: any[]) => {
         for (const item of items ?? []) {
-          if (item.item?.id) out.push({ key: item.key, id: item.item.commandId ?? item.item.id, title: item.item.title, params: item.item.params })
+          if (item.item?.id)
+            out.push({
+              key: item.key,
+              id: item.item.commandId ?? item.item.id,
+              title: item.item.title,
+              params: item.item.params,
+            })
           walk(item.children)
         }
       }
-      for (const position of [ContextMenuPosition.MAIN_AREA, ContextMenuPosition.ROW_HEADER, ContextMenuPosition.COL_HEADER])
+      for (const position of [
+        ContextMenuPosition.MAIN_AREA,
+        ContextMenuPosition.ROW_HEADER,
+        ContextMenuPosition.COL_HEADER,
+      ])
         walk(injector.get(IMenuManagerService).getMenuByPositionKey(position))
       return out
     },

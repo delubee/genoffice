@@ -356,12 +356,13 @@ const localeKey = (key: StringKey): string => `${LOCALE_NAMESPACE}.${key}`
  * entries: the strings live under our own namespace of whichever Univer
  * locale is active and are reloaded on every switch.
  */
-function loadMenuLocale(localeService: LocaleService, lang: Lang): void {
+function loadMenuLocale(localeService: LocaleService, lang: Lang, extras?: CellMenuExtras): void {
   const strings: Record<string, string> = {}
   for (const node of [...cellContextMenuLayout(), ...headerContextMenuLayout()]) {
     strings[node.titleKey] = tFor(lang, node.titleKey)
     for (const child of node.children ?? []) strings[child.titleKey] = tFor(lang, child.titleKey)
   }
+  if (extras?.askChat) strings[ASK_CHAT_TITLE_KEY] = extras.askChat.label(lang)
   localeService.load({
     [localeService.getCurrentLocale()]: { [LOCALE_NAMESPACE]: strings },
   } as unknown as ILocales)
@@ -402,7 +403,17 @@ function schemaFor(nodes: readonly ContextMenuNode[]): Record<string, MenuSchema
   return groups
 }
 
-export function installCellContextMenu(runtime: UniverRuntime): IDisposable {
+/** Entries only a host shell adds to the cell menu (the VS Code view offers its native chat). */
+export interface CellMenuExtras {
+  readonly askChat?: { label(lang: Lang): string; ask(): void }
+}
+const ASK_CHAT_COMMAND_ID = 'genoffice.ctx.ask-chat'
+const ASK_CHAT_TITLE_KEY = 'askChatSelection' as StringKey
+
+export function installCellContextMenu(
+  runtime: UniverRuntime,
+  extras?: CellMenuExtras,
+): IDisposable {
   const injector = runtime.univer.__getInjector()
   const commandService = injector.get(ICommandService)
   const commands: ICommand[] = [
@@ -427,6 +438,15 @@ export function installCellContextMenu(runtime: UniverRuntime): IDisposable {
         return true
       },
     },
+    ...(extras?.askChat
+      ? [
+          {
+            id: ASK_CHAT_COMMAND_ID,
+            type: CommandType.COMMAND,
+            handler: () => (extras.askChat!.ask(), true),
+          } satisfies ICommand,
+        ]
+      : []),
     {
       id: FILTER_BY_COMMAND_ID,
       type: CommandType.COMMAND,
@@ -441,19 +461,33 @@ export function installCellContextMenu(runtime: UniverRuntime): IDisposable {
   ]
   const disposables = commands.map((command) => commandService.registerCommand(command))
   const localeService = injector.get(LocaleService)
-  loadMenuLocale(localeService, getLang())
+  loadMenuLocale(localeService, getLang(), extras)
   // applyUniverLocale switches Univer's locale type after boot; reload under the new one too
   const localeSubscription = localeService.currentLocale$.subscribe(() =>
-    loadMenuLocale(localeService, getLang()),
+    loadMenuLocale(localeService, getLang(), extras),
   )
   disposables.push(
     { dispose: () => localeSubscription.unsubscribe() },
     // The VS Code view has no desktop bridge; its locale is fixed per view.
-    { dispose: onDesktopLanguageChanged((lang) => loadMenuLocale(localeService, lang)) },
+    { dispose: onDesktopLanguageChanged((lang) => loadMenuLocale(localeService, lang, extras)) },
   )
   const header = schemaFor(headerContextMenuLayout())
   injector.get(IMenuManagerService).mergeMenu({
-    [ContextMenuPosition.MAIN_AREA]: schemaFor(cellContextMenuLayout()),
+    [ContextMenuPosition.MAIN_AREA]: schemaFor([
+      ...cellContextMenuLayout(),
+      ...(extras?.askChat
+        ? [
+            {
+              id: ASK_CHAT_COMMAND_ID,
+              title: '',
+              titleKey: ASK_CHAT_TITLE_KEY,
+              group: ContextMenuGroup.OTHERS,
+              order: 7,
+              commandId: ASK_CHAT_COMMAND_ID,
+            } satisfies ContextMenuNode,
+          ]
+        : []),
+    ]),
     [ContextMenuPosition.ROW_HEADER]: header,
     [ContextMenuPosition.COL_HEADER]: header,
   })

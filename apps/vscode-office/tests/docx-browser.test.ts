@@ -179,6 +179,12 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     expect(chats[1]).toMatchObject({ partial: true, scope: 'selection' })
     expect(bindings.resolve(chats[1]!.bindingId).selection?.blocks.length).toBeGreaterThan(0)
     expect(chats[1]!.query).not.toContain('Hello world')
+    // The right-click menu offers the same question for the selection.
+    await editor.click({ button: 'right', position: { x: 12, y: 8 } })
+    await page.locator('.ctx-item', { hasText: 'Ask about selection' }).click()
+    await expect.poll(() => chats.length).toBe(3)
+    expect(chats[2]).toMatchObject({ partial: true, scope: 'selection' })
+    expect(bindings.resolve(chats[2]!.bindingId).selection?.blocks.length).toBeGreaterThan(0)
     await editor.evaluate((element) =>
       (
         element as unknown as { editor: { commands: { focus(at: string): void } } }
@@ -623,6 +629,21 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     expect(sectionXml.match(/<w:sectPr\b/g)).toHaveLength(2)
     expect(sectionXml).toMatch(/<w:type w:val="continuous"\/>/)
     await bridge.request('view.resync', projection())
+    // The ribbon's AI entry asks about the selection when there is one.
+    await page
+      .locator('.ribbon-tab', { hasText: /^Home$/ })
+      .first()
+      .click()
+    await editor.evaluate((element) =>
+      (
+        element as unknown as {
+          editor: { commands: { setTextSelection(range: { from: number; to: number }): void } }
+        }
+      ).editor.commands.setTextSelection({ from: 2, to: 5 }),
+    )
+    await page.locator('.rb-big.ai-entry').first().click()
+    await expect.poll(() => chats.length).toBe(4)
+    expect(chats[3]).toMatchObject({ partial: true, scope: 'selection' })
     for (let step = 0; step < 500; step++) {
       try {
         session.history('undo')

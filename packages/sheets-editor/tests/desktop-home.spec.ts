@@ -1303,3 +1303,24 @@ test('Filter by Selected Cell color from the context menu records a color filter
   expect(JSON.stringify(filter.filter.columns[0]).toLowerCase()).toContain('ffff00')
   expect(errors).toEqual([])
 })
+
+test('the cell context menu asks VS Code Chat about the selected range', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(String(error)))
+  await page.goto(base)
+  await page.evaluate(async () => {
+    const { mountManualToolbar } = await import(
+      /* @vite-ignore */ String('/packages/sheets-editor/tests/fixtures/manual-toolbar.tsx')
+    )
+    ;(window as any).toolbar = await mountManualToolbar(true)
+    ;(window as any).toolbar.select('A2:B3')
+  })
+  await page.waitForTimeout(1500)
+  const canvas = page.locator('canvas[id^="univer-sheet-main-canvas"]')
+  await canvas.click({ position: { x: 120, y: 50 }, button: 'right' })
+  await page.locator('section.univer-popup button', { hasText: 'Ask about selection' }).click()
+  await expect
+    .poll(() => page.evaluate(() => (window as any).toolbar.actions()))
+    .toEqual([{ action: 'chat', instruction: '', scope: 'selection' }])
+  expect(errors).toEqual([])
+})

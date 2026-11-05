@@ -870,6 +870,13 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
             onNewComment={() => startNewComment(review())}
             onViewImage={unavailable('Picture viewer')}
             onSaveImageAs={unavailable('Save picture')}
+            askChat={{
+              label: OFFICE_ACTION_LABELS[getLang()].chatSelection,
+              onAsk: () =>
+                void runtime
+                  .officeAction({ action: 'chat', scope: 'selection', instruction: '' })
+                  .catch((error) => runtime.reportError(error)),
+            }}
             onAiPreset={(instruction) =>
               void runtime
                 .officeAction({ action: 'chat', scope: 'selection', instruction })
