@@ -297,6 +297,22 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
     return found < 0 ? sectionList.length - 1 : found
   })()
   const activeEntry = sectionList[activeSectionIndex]
+  // A break inserted in this session has no place in the file yet: the section above it cannot be
+  // addressed by the session's section list, so its settings wait for a save.
+  const unsavedBreakAhead = (() => {
+    const { doc, selection } = editor.state
+    for (let i = Math.min(selection.$head.index(0), doc.childCount - 1); i < doc.childCount; i++) {
+      const attrs = doc.child(i).attrs
+      if (!JSON.stringify(attrs).includes('<w:sectPr')) continue
+      return attrs.docxIndex == null
+    }
+    return false
+  })()
+  const unsavedSection = () => {
+    if (!unsavedBreakAhead) return false
+    runtime.reportError('Save the document before editing a section created by a new break.')
+    return true
+  }
   const activeIsFinal = !activeEntry || activeEntry.final
   // Strips of the section under the cursor: per-section state in a multi-section file, else the single parts.
   const multiSection = sectionList.length > 1
@@ -316,6 +332,7 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
   const stripValue = (key: HfKeyName) =>
     multiSection ? (stripOf(key)?.value ?? { text: '' }) : (runtime.settings[key] ?? { text: '' })
   const writeStrip = (key: HfKeyName, hf: NonNullable<DocumentRuntime['settings']['header']>) => {
+    if (multiSection && unsavedSection()) return
     if (multiSection)
       void runtime.applySettings({
         sectionHfEdit: {
@@ -328,7 +345,8 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
     else void runtime.applySettings({ [key]: hf })
   }
   /** Apply a section edit to the section under the cursor (the final section keeps its top-level settings). */
-  const editSection = (edit: SectionEdit) => {
+  const editSection = (edit: SectionEdit, afterBreak = false) => {
+    if (!afterBreak && unsavedSection()) return
     if (activeIsFinal) {
       void runtime.applySettings({
         ...(edit.section ? { section: edit.section } : {}),
@@ -488,7 +506,7 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
       })
       .run()
     // The section after the break starts as chosen: that is the type of the sectPr closing it.
-    editSection({ startType: type })
+    editSection({ startType: type }, true)
   }
   const strip = (key: HfKey) => {
     const kind = baseKind(key)

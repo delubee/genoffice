@@ -157,6 +157,13 @@ it('edits the page setup and page numbering of the section under the cursor', as
       .poll(() => session.presentation().settings!.sections![0]!.startType)
       .toBe('continuous')
     expect(session.presentation().settings!.sectionStart).toBeUndefined()
+    // The section above the new, unsaved break cannot be addressed yet: the edit is refused and reported.
+    await page.getByText('First section', { exact: true }).click()
+    await page.locator('[data-tip="Margins"]').first().click()
+    await page.locator('[data-rb-panel] button', { hasText: 'Wide' }).first().click()
+    await page.locator('.office-docx-error', { hasText: 'Save the document' }).waitFor()
+    expect(await bridge.request('view.flush', {})).toEqual({ ready: true })
+    expect(session.presentation().settings!.sections![0]!.section.marginLeft).toBe(720)
     expect(errors).toEqual([])
   } finally {
     await browser.close()

@@ -759,3 +759,5 @@ Desktop menu parity that the VS Code extension cannot or does not yet provide:
 - Full `minimum` native run: 72 passing, 2 pending, 1 failing before the fix below. `Desktop Insert Symbol UI` asserted that a tool read of a cache-less formula is `pending`; tool reads now calculate it on demand, so the test expects `ready` there while the view's pending guard (still covered later in the same test) is unchanged. The test passes alone.
 
 - [x] Host calculations (save and tool reads) run on a worker thread (`dist/calc-worker.cjs`, bundled and packaged; aborts terminate the worker and a fresh one serves the next job, with an in-process fallback when the bundle is absent); unit test with the real bundles covers results, abort and fallback.
+
+- [x] A section above a break inserted in the current session cannot be addressed by the file's section list: Layout and header/footer edits there are refused with "Save the document before editing a section created by a new break" instead of landing on the wrong section (browser test). Editing such sections right away would need the session to model unsaved breaks.
