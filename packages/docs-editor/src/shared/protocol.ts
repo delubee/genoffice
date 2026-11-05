@@ -20,7 +20,7 @@ export interface InkSetting {
   id: string
   anchorIndex: number
   stroke?: {
-    tool: 'pen' | 'highlighter'
+    tool: 'pen' | 'highlighter' | 'pencil'
     color: string
     width: number
     points: { x: number; y: number }[]

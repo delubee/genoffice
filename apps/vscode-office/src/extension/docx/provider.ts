@@ -14,6 +14,7 @@ import { writeBackup, restoreBackup } from '@genoffice/docx-session/backup'
 import { DocumentBindings } from '@genoffice/docx-session/bindings'
 import { docxToolSchemas, type DocxToolKind } from '../docx-schemas'
 import { operationsSchema, type DocxOperation } from '@genoffice/docs-editor/shared/operations'
+import type { StepRequest } from '@genoffice/docs-editor/shared/protocol'
 import { DocumentExchange } from '@genoffice/docx-session/exchange'
 
 const requestSchema = z
@@ -140,7 +141,7 @@ export class DocxEditorProvider
     bridge.handle('view.intent', (raw) =>
       document.exclusive(async () => {
         const revision = document.session.descriptor().revision
-        const commit = document.session.submit(requestSchema.parse(raw))
+        const commit = document.session.submit(requestSchema.parse(raw) as StepRequest)
         if (commit.presentation) {
           await document.session.stylesReady()
           commit.presentation = document.session.presentation()

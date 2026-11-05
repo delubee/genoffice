@@ -1,5 +1,15 @@
+import type { RevisionScope } from '../../../apps/docs/src/renderer/editor/revision-filters'
 import { useState, type ComponentProps, type ReactNode } from 'react'
 import type { DocDefaults, StyleInfo } from '@genoffice/docx-engine'
+import type { CommentsMode } from '../../../apps/docs/src/renderer/components/comments-mode'
+import {
+  DEFAULT_BALLOON_MODE,
+  type BalloonMode,
+} from '../../../apps/docs/src/renderer/editor/revision-view'
+import {
+  DEFAULT_REVISION_FILTER,
+  type RevisionFilter,
+} from '../../../apps/docs/src/renderer/editor/revision-filters'
 import { Ribbon } from '../../../apps/docs/src/renderer/components/Ribbon'
 import { computeFormatState } from '../../../apps/docs/src/renderer/components/ribbon-format-state'
 import { useShallowStable } from '../../../apps/docs/src/renderer/use-stable'
@@ -58,8 +68,8 @@ export function DocsRibbon({
     display: RibbonProps['revisionDisplay']
     onTrack(on: boolean): void
     onDisplay(mode: RibbonProps['revisionDisplay']): void
-    onAccept(all: boolean): void
-    onReject(all: boolean): void
+    onAccept(scope: RevisionScope): void
+    onReject(scope: RevisionScope): void
     onGoto(direction: 1 | -1): void
   }
   view: {
@@ -73,10 +83,10 @@ export function DocsRibbon({
   draw: {
     tool: RibbonProps['inkTool']
     onTool: RibbonProps['onInkTool']
-    pen: RibbonProps['inkPen']
-    onPen: RibbonProps['onInkPen']
-    highlighter: RibbonProps['inkHighlighter']
-    onHighlighter: RibbonProps['onInkHighlighter']
+    presets: RibbonProps['inkPresets']
+    activeId: RibbonProps['inkActiveId']
+    onPresets: RibbonProps['onInkPresets']
+    onActivate: RibbonProps['onInkActivate']
     count: number
     onClearAll(): void
   }
@@ -103,6 +113,8 @@ export function DocsRibbon({
     canComment: boolean
     onNew(): void
     onShow(): void
+    visible: boolean
+    onToggle(): void
     onDelete(): void
     onDeleteAll(resolvedOnly: boolean): void
     onGoto(direction: 1 | -1): void
@@ -120,6 +132,10 @@ export function DocsRibbon({
     computeFormatState(editor, storage?.styles, storage?.docDefaults),
   )
   const [showMarks, setShowMarks] = useState(false)
+  // review display preferences: the VS Code view keeps them local, they do not reach the file
+  const [commentsMode, setCommentsMode] = useState<CommentsMode>('contextual')
+  const [balloonMode, setBalloonMode] = useState<BalloonMode>(DEFAULT_BALLOON_MODE)
+  const [revisionFilter, setRevisionFilter] = useState<RevisionFilter>(DEFAULT_REVISION_FILTER)
   const [showRuler, setShowRuler] = useState(false)
   const [darkPage, setDarkPage] = useState(false)
   const [viewMode, setViewMode] = useState<RibbonProps['viewMode']>('print')
@@ -197,17 +213,21 @@ export function DocsRibbon({
     pageColor: runtime.settings.pageColor ?? null,
     onPageColor: (pageColor) => void runtime.applySettings({ pageColor }),
     watermark: runtime.settings.watermark ?? null,
-    onWatermark: (watermark) => void runtime.applySettings({ watermark }),
+    // the VS Code document model keeps the watermark text only; styled and picture marks reduce to their text
+    onWatermark: (spec) =>
+      void runtime.applySettings({
+        watermark: typeof spec === 'string' ? spec : spec && 'text' in spec ? spec.text : null,
+      }),
     themeFonts: runtime.settings.themeFonts ?? null,
     onThemeFonts: (themeFonts) => void runtime.applySettings({ themeFonts }),
     themeColors: runtime.settings.themeColors ?? null,
     onThemeColors: (themeColors) => void runtime.applySettings({ themeColors }),
     inkTool: draw.tool,
     onInkTool: draw.onTool,
-    inkPen: draw.pen,
-    onInkPen: draw.onPen,
-    inkHighlighter: draw.highlighter,
-    onInkHighlighter: draw.onHighlighter,
+    inkPresets: draw.presets,
+    inkActiveId: draw.activeId,
+    onInkPresets: draw.onPresets,
+    onInkActivate: draw.onActivate,
     inkCount: draw.count,
     onInkClearAll: draw.onClearAll,
     onInsertNote,
@@ -256,6 +276,23 @@ export function DocsRibbon({
     openCommentCount: comments.open,
     resolvedCommentCount: comments.resolved,
     onShowComments: comments.onShow,
+    showComments: comments.visible,
+    onToggleComments: comments.onToggle,
+    commentsMode,
+    onCommentsMode: setCommentsMode,
+    balloonMode,
+    onBalloonMode: setBalloonMode,
+    onTrackChangesOptions: () => {},
+    revisionFilter,
+    onRevisionFilter: setRevisionFilter,
+    revisionAuthors: [],
+    showReviewPane: false,
+    onToggleReviewPane: () => {},
+    watermarkStyle: null,
+    watermarkPicture: null,
+    watermarkDocImage: null,
+    onPageBorderAll: () => {},
+    onNameWithAi: () => {},
     canComment: comments.canComment,
     onNewComment: comments.onNew,
     commentAtCaret: comments.atCaret,

@@ -470,6 +470,11 @@ export class WorkbookRuntime implements EditorProjection {
       false
     )
   }
+  /** The active sheet shows formulas instead of values (the Formula Auditing button reads as pressed). */
+  get showFormulasActive(): boolean {
+    const id = this.runtime.univerAPI.getActiveWorkbook()?.getActiveSheet()?.getSheetId()
+    return id ? this.showFormulasFor(id) : false
+  }
   private syncFormulaView() {
     const id = this.runtime.univerAPI.getActiveWorkbook()?.getActiveSheet()?.getSheetId()
     setShowFormulasView(this.runtime, id ? this.showFormulasFor(id) : false)
@@ -1000,6 +1005,7 @@ export class WorkbookRuntime implements EditorProjection {
     const native = createFunctionArgumentsHost(
       () => (this.closed ? null : this.runtime),
       () => t('appActiveSheetUnavailable'),
+      undefined,
       this.container,
     )
     if (!this.state || this.closed) throw new Error(t('appActiveSheetUnavailable'))

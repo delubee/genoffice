@@ -1749,6 +1749,9 @@ async function executeOp(op: PlannedOp, run: OpRun): Promise<void> {
       op.ranges.map((range) => ({ name: range.name, sqref: range.sqref, hasPassword: false })),
     )
     recordProtectedRangesChange(state.editJournal, op.sheetId)
+  } else if (op.op === 'set_calculation_mode') {
+    // The saved calculation mode belongs to the VS Code editor; the desktop keeps it as a window setting.
+    throw new Error('Calculation mode edits are only supported in the VS Code editor.')
   } else {
     ctx.chartEditRef.current(
       op.chartPath,

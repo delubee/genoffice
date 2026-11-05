@@ -12,9 +12,15 @@ import type { StyleInfo } from '@genoffice/docx-engine'
 import { DocsRibbon, numberingContext } from './DocsRibbon'
 import { PageNumberDialog } from './PageNumberDialog'
 import { ZoomDialog } from '../../../apps/docs/src/renderer/components/ZoomDialog'
+import type { RevisionScope } from '../../../apps/docs/src/renderer/editor/revision-filters'
+import { DEFAULT_REVISION_FILTER } from '../../../apps/docs/src/renderer/editor/revision-filters'
 import { InkOverlay } from '../../../apps/docs/src/renderer/components/InkOverlay'
 import { rasterizeStroke, type InkTool } from '../../../apps/docs/src/renderer/editor/ink'
-import type { InkPenSettings } from '../../../apps/docs/src/renderer/components/ribbon-tabs'
+import {
+  loadInkPresets,
+  saveInkPresets,
+  type InkPreset,
+} from '../../../apps/docs/src/renderer/editor/ink-presets'
 import { ProtectDialog } from '../../../apps/docs/src/renderer/components/ProtectDialog'
 import { ComparePanel } from '../../../apps/docs/src/renderer/components/ComparePanel'
 import {
@@ -120,19 +126,21 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
   const [showNav, setShowNav] = useState(false)
   const [zoom, setZoom] = useState(100)
   const [inkTool, setInkTool] = useState<InkTool>('select')
-  const [inkPen, setInkPen] = useState<InkPenSettings>({ color: 'C00000', width: 2 })
-  const [inkHighlighter, setInkHighlighter] = useState<InkPenSettings>({
-    color: 'FFFF00',
-    width: 10,
-  })
+  const [inkPresets, setInkPresetsState] = useState<InkPreset[]>(loadInkPresets)
+  const [inkActiveId, setInkActiveId] = useState(() => inkPresets[0].id)
+  const setInkPresets = (next: InkPreset[]): void => {
+    setInkPresetsState(next)
+    saveInkPresets(next)
+  }
+  const inkActive = inkPresets.find((p) => p.id === inkActiveId) ?? inkPresets[0]
   const inks = runtime.settings.inks ?? []
   const draw = {
     tool: inkTool,
     onTool: setInkTool,
-    pen: inkPen,
-    onPen: setInkPen,
-    highlighter: inkHighlighter,
-    onHighlighter: setInkHighlighter,
+    presets: inkPresets,
+    activeId: inkActiveId,
+    onPresets: setInkPresets,
+    onActivate: setInkActiveId,
     count: inks.length,
     onClearAll: () => void runtime.applySettings({ inks: [] }),
   }
@@ -196,8 +204,8 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
       editor.view.dispatch(editor.state.tr.setMeta('trackChangesToggled', on))
     },
     onDisplay: setRevisionDisplay,
-    onAccept: (all: boolean) => handleRevision(review(), 'accept', all),
-    onReject: (all: boolean) => handleRevision(review(), 'reject', all),
+    onAccept: (scope: RevisionScope) => handleRevision(review(), 'accept', scope),
+    onReject: (scope: RevisionScope) => handleRevision(review(), 'reject', scope),
     onGoto: (direction: 1 | -1) => {
       const target = nextRevision(editor, direction)
       if (target)
@@ -267,6 +275,12 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
     setInkAnnotations: () => {},
     setInksDirty: () => {},
     setCompareResult: () => {},
+    // VS Code edits the body only: notes, headers and textboxes carry no pending changes here
+    revisionFilter: DEFAULT_REVISION_FILTER,
+    showRevision: () => {},
+    storyRevisions: () => [],
+    currentStoryRevision: () => null,
+    applyStoryRevisions: () => 0,
   })
   const reviewComments = {
     count: comments.length,
@@ -276,6 +290,8 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
     canComment: !editor.state.selection.empty || wordRangeAtCaret(editor) !== null,
     onNew: () => startNewComment(review()),
     onShow: () => setShowComments(true),
+    visible: showComments,
+    onToggle: () => setShowComments((on) => !on),
     onDelete: () => deleteCommentAtCaret(review()),
     onDeleteAll: (resolvedOnly: boolean) => deleteAllComments(review(), resolvedOnly),
     onGoto: (direction: 1 | -1) => void gotoComment(review(), direction),
@@ -949,8 +965,8 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
             {inkTool !== 'select' || inks.length ? (
               <InkOverlay
                 tool={editor.isEditable ? inkTool : 'select'}
-                color={inkTool === 'highlighter' ? inkHighlighter.color : inkPen.color}
-                width={inkTool === 'highlighter' ? inkHighlighter.width : inkPen.width}
+                color={inkActive.color}
+                width={inkActive.width}
                 zoom={zoom}
                 annotations={inks}
                 onAdd={(annotation) =>

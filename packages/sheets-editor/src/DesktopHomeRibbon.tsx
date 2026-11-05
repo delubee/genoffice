@@ -552,6 +552,7 @@ export function DesktopHomeRibbon({
           onCommand={command}
           definedNames={runtime?.goToNames.map((name) => name.name) ?? []}
           calcManual={runtime?.calculationManual ?? false}
+          showFormulas={runtime?.showFormulasActive ?? false}
         />
       ) : (
         <SheetsRibbon
@@ -561,6 +562,10 @@ export function DesktopHomeRibbon({
           sheetHasContent={runtime?.ribbonEcho.hasContent ?? false}
           sheetProtected={runtime?.ribbonEcho.protected ?? null}
           workbookProtected={runtime?.workbookProtected ?? null}
+          passwordProtected={false}
+          spellcheckOn={false}
+          showFormulas={runtime?.showFormulasActive ?? false}
+          queryConnections={[]}
           formulaBarVisible={runtime?.formulaBarVisible ?? true}
           crossHighlightVisible={runtime?.crossHighlightVisible ?? false}
           themeEditingAvailable={false}

@@ -100,10 +100,25 @@ export function pivotConfigToOpParts(
       }
       const label = fields[v.fieldIndex]?.label
       if (!label) throw new Error(t('appInvalidValueFieldIndex', { index: v.fieldIndex }))
+      // "Show values as" base fields travel as header names; the base field
+      // must sit on rows or columns for the engine to resolve it.
+      let baseField: string | undefined
+      let baseItem: string | undefined
+      if (v.baseFieldIndex !== undefined) {
+        baseField = fields[v.baseFieldIndex]?.label
+        if (!baseField) throw new Error(t('appInvalidPivotBaseField'))
+        if (!rowFieldLabels.includes(baseField) && !columnFieldLabels.includes(baseField)) {
+          throw new Error(t('appInvalidPivotBaseField'))
+        }
+      }
+      if (baseField === undefined) baseItem = undefined
+      else if (v.baseItem !== undefined) baseItem = v.baseItem
       return {
         field: label,
         agg: v.agg,
         ...(v.showDataAs !== undefined ? { showDataAs: v.showDataAs } : {}),
+        ...(baseField !== undefined ? { baseField } : {}),
+        ...(baseItem !== undefined ? { baseItem } : {}),
         ...(v.name?.trim() ? { name: v.name.trim() } : {}),
       }
     })
@@ -136,6 +151,9 @@ export const LAYOUT_ERROR_KEYS = {
   tooManyRowLines: 'appPivotTooManyRowLines',
   needsValues: 'appPivotNeedsValues',
   pageItemMissing: 'appPivotPageItemMissing',
+  baseFieldMissing: 'appPivotBaseFieldMissing',
+  baseFieldNotAxis: 'appPivotBaseFieldNotAxis',
+  baseItemMissing: 'appPivotBaseItemMissing',
 } satisfies Record<PivotLayoutErrorCode, Parameters<typeof t>[0]>
 
 const SESSION_ERROR_KEYS = {
@@ -176,12 +194,27 @@ export function pivotErrorMessage(error: unknown): string {
 export function modelOfPivotAdd(add: WorkbookPivotAdd): PivotLayoutModel {
   const columns =
     add.columnFieldIndices ?? (add.columnFieldIndex === undefined ? [] : [add.columnFieldIndex])
+  const columnFieldIndices = add.columnFieldIndices ?? columns
+  // "Show values as" base item: index into the base field's member list.
+  const baseItemLabelOf = (value: WorkbookPivotAdd['values'][number]): string | undefined => {
+    if (value.baseFieldIndex === undefined || value.baseItemIndex === undefined) return undefined
+    const rowLevel = add.rowFieldIndices.indexOf(value.baseFieldIndex)
+    const items =
+      rowLevel >= 0
+        ? (add.rowLevelItems?.[rowLevel] ?? add.rowItems)
+        : (add.colLevelItems?.[columnFieldIndices.indexOf(value.baseFieldIndex)] ??
+          add.columnItems ??
+          [])
+    return items[value.baseItemIndex]
+  }
   const values: PivotValueSpec[] = add.values.map((value, index) => {
     const filter = add.filters?.find((entry) => entry.kind === 'value' && entry.dataField === index)
     return {
       fieldIndex: value.fieldIndex,
       agg: value.agg,
       ...(value.showDataAs !== undefined ? { showDataAs: value.showDataAs } : {}),
+      ...(value.baseFieldIndex !== undefined ? { baseFieldIndex: value.baseFieldIndex } : {}),
+      ...(value.baseItemIndex !== undefined ? { baseItem: baseItemLabelOf(value) ?? '' } : {}),
       ...(value.name !== undefined ? { name: value.name } : {}),
       ...(value.formula !== undefined ? { formula: value.formula, calcName: value.calcName } : {}),
       ...(filter !== undefined && filter.kind === 'value'
@@ -251,10 +284,23 @@ export function modelOfDefinition(
     const filter = definition.filters.find(
       (entry) => entry.kind === 'value' && entry.dataField === index,
     )
+    // "Show values as" base item: a fieldItems index of the base field; the
+    // model stores its label for the picker.
+    const baseItemLabel = (() => {
+      if (dataField.baseField === undefined || dataField.baseItem === undefined) return undefined
+      const sharedIndex = definition.fieldItems[dataField.baseField]?.[dataField.baseItem]?.x
+      const shared =
+        sharedIndex === null || sharedIndex === undefined
+          ? undefined
+          : definition.fields[dataField.baseField]?.sharedItems[sharedIndex]
+      return shared === undefined || shared === null ? '' : String(shared)
+    })()
     return {
       fieldIndex: isCalc ? -1 : dataField.field,
       agg,
       ...(dataField.showDataAs !== undefined ? { showDataAs: dataField.showDataAs } : {}),
+      ...(dataField.baseField !== undefined ? { baseFieldIndex: dataField.baseField } : {}),
+      ...(baseItemLabel !== undefined ? { baseItem: baseItemLabel } : {}),
       ...(dataField.name !== defaultName && !isCalc ? { name: dataField.name } : {}),
       ...(isCalc ? { formula: source.formula, calcName: source.name } : {}),
       ...(filter !== undefined && filter.kind === 'value'

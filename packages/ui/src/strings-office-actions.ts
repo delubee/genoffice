@@ -156,4 +156,11 @@ export const OFFICE_ACTION_LABELS: Record<Lang, OfficeActionLabels> = {
     chat: 'Trò chuyện VS Code',
     chatSelection: 'Hỏi về vùng chọn',
   },
+  tr: {
+    open: 'Aç…',
+    save: 'Kaydet',
+    saveAs: 'Farklı Kaydet…',
+    chat: 'VS Code Sohbet',
+    chatSelection: 'Seçim hakkında sor',
+  },
 }

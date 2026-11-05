@@ -34,6 +34,7 @@ export {
   type RibbonDensity,
 } from './ribbon-collapse'
 export { isSymbolFontFamily } from './symbol-fonts'
+export { useScrollWindow } from './scroll-window'
 export {
   BUILTIN_FONT_FAMILIES,
   fontFamiliesFor,

@@ -283,6 +283,8 @@ export function SheetsRibbon({
   sheetHasContent,
   sheetProtected,
   workbookProtected,
+  passwordProtected,
+  spellcheckOn,
   formulaBarVisible,
   crossHighlightVisible,
   pageLayout,
@@ -296,6 +298,8 @@ export function SheetsRibbon({
   onAiToggle,
   onListNames,
   calcManual,
+  queryConnections,
+  showFormulas,
   onRefreshPivot,
   onIsSelectionInPivot,
 }: {
@@ -306,6 +310,9 @@ export function SheetsRibbon({
   readonly sheetHasContent: boolean
   readonly sheetProtected: boolean | null
   readonly workbookProtected: boolean | null
+  readonly passwordProtected: boolean
+  /// Spelling preference echo for the Review ▸ Proofing toggle.
+  readonly spellcheckOn: boolean
   /// View > Show echo for the formula bar toggle (app-level, not per sheet).
   readonly formulaBarVisible: boolean
   readonly crossHighlightVisible: boolean
@@ -315,10 +322,14 @@ export function SheetsRibbon({
   readonly selectedTable: SelectedTableRibbon | null
   readonly outlineSummary: { below: boolean; right: boolean }
   readonly onCommand: (command: string) => void
+  /// Formula view of the active sheet; the button reads as pressed.
+  readonly showFormulas: boolean
   /** Defined names for the Use in Formula menu. */
   readonly onListNames: () => readonly string[]
   /** Manual-recalc mode echo for the Calculation Options menu. */
   readonly calcManual: boolean
+  /** The workbook's refreshable web queries, listed under Data ▸ Get data. */
+  readonly queryConnections: readonly QueryConnection[]
   /** Open the AI panel and immediately send the given prompt */
   readonly onAiRun: (prompt: string) => void
   /** AI side panel visibility (docs/slides parity: the entry button toggles it) */
@@ -1201,7 +1212,7 @@ export function SheetsRibbon({
       <div className="ribbon" data-ribbon-body="">
         <FunctionLibraryGroup onCommand={onCommand} />
         <DefinedNamesGroup onCommand={onCommand} definedNames={definedNames} />
-        <FormulaAuditingGroup onCommand={onCommand} />
+        <FormulaAuditingGroup onCommand={onCommand} showFormulas={showFormulas} />
         <CalculationGroup onCommand={onCommand} calcManual={calcManual} />
       </div>
     )
@@ -1215,7 +1226,7 @@ export function SheetsRibbon({
           onRefreshPivot={onRefreshPivot}
           onIsSelectionInPivot={onIsSelectionInPivot}
         />
-        <GetDataRibbonGroup onCommand={onCommand} />
+        <GetDataRibbonGroup onCommand={onCommand} queryConnections={queryConnections} />
         <SortFilterRibbonGroup onCommand={onCommand} />
         <DataToolsRibbonGroup onCommand={onCommand} />
         <ForecastRibbonGroup onCommand={onCommand} />
@@ -1335,11 +1346,29 @@ export function SheetsRibbon({
         <RibbonGroup label={t('appGroupProofing')}>
           <RibbonButton
             large
+            label={t('appSpellTitle')}
+            detail={t('appSpellBtnDetail')}
+            symbol="✓"
+            onClick={() => onCommand('spell-check')}
+          />
+          <RibbonButton
+            large
             label={t('appWorkbookStatsLabel')}
             detail={t('appSheetsCellsFormulas')}
             symbol="🧮"
             onClick={() => onCommand('workbook-statistics')}
           />
+          <div className="row-stack">
+            <button
+              className="styles-row as-button"
+              aria-pressed={spellcheckOn}
+              data-tip={t('appSpellToggleTip')}
+              onClick={() => onCommand('spellcheck-toggle')}
+            >
+              <ToolSymbol symbol={spellcheckOn ? '✓' : '○'} />
+              {t('appSpellToggle')}
+            </button>
+          </div>
         </RibbonGroup>
         <RibbonGroup label={t('appGroupLanguage')}>
           <div className="ribbon-tool large" data-tip={t('appTranslateTitle')}>
@@ -1406,6 +1435,7 @@ export function SheetsRibbon({
         <RibbonGroup label={t('appGroupNotes')}>
           {largeMenu(t('appGroupNotes'), '🗒', t('appNotesDetail'), [
             { value: 'note-open', label: t('appNewNote') },
+            { value: 'note-insert-picture', label: t('appNoteInsertPicture') },
             { value: 'note-show-toggle', label: t('appShowHideNote') },
             { value: 'note-show-all', label: t('appShowAllNotes') },
             { value: 'notes-convert', label: t('appConvertToNotes') },
@@ -1427,6 +1457,15 @@ export function SheetsRibbon({
             symbol={workbookProtected ? '🔓' : '🔐'}
             onClick={() => onCommand('workbook-protect')}
           />
+          {passwordProtected && (
+            <RibbonButton
+              large
+              label={t('appChangePassword')}
+              detail={t('appChangePassword')}
+              symbol="🔑"
+              onClick={() => onCommand('workbook-change-password')}
+            />
+          )}
           <RibbonButton
             large
             label={t('appAllowEditRanges')}
@@ -2521,11 +2560,21 @@ export function PivotTableRibbonGroup({
   )
 }
 
+/// The part of a workbook web query the ribbon lists (the full record lives in the desktop API).
+export interface QueryConnection {
+  readonly id: string
+  readonly name: string
+  readonly source: string
+}
+
 /** Shared desktop Get Data entries (From Text/CSV, Merge Workbooks, Refresh All). */
 export function GetDataRibbonGroup({
   onCommand,
+  queryConnections = [],
 }: {
   readonly onCommand: (command: string) => void
+  /** The workbook's refreshable web queries, listed under Get Data. */
+  readonly queryConnections?: readonly QueryConnection[]
 }): React.JSX.Element {
   const { t } = useI18n()
   return (
@@ -2555,6 +2604,30 @@ export function GetDataRibbonGroup({
           <ToolSymbol symbol="⟳" />
           {t('appRefreshAll')}
         </button>
+        {queryConnections.length > 0 ? (
+          <span className="styles-row" data-tip={t('appQueryConnectionsTitle')}>
+            <ToolSymbol symbol="⟳" />
+            {t('appRefreshQuery')}
+            <CaretIcon />
+            <MenuSelect
+              cover
+              label={t('appRefreshQuery')}
+              options={queryConnections.map((c) => ({
+                value: `query-refresh:${c.id}`,
+                label: `${c.name} — ${queryConnectionHost(c.source)}`,
+              }))}
+              onPick={onCommand}
+            />
+          </span>
+        ) : null}
+        <button
+          className="styles-row as-button"
+          data-tip={t('appQueriesConnectionsTitle')}
+          onClick={() => onCommand('queries-open')}
+        >
+          <ToolSymbol symbol="⇄" />
+          {t('appQueriesConnections')}
+        </button>
       </div>
     </RibbonGroup>
   )
@@ -2574,7 +2647,10 @@ export function ForecastRibbonGroup({
         symbol="❔"
         title={t('appWhatIfTitle')}
         onCommand={onCommand}
-        options={[{ value: 'goal-seek-open', label: t('appGoalSeek') }]}
+        options={[
+          { value: 'goal-seek-open', label: t('appGoalSeek') },
+          { value: 'data-table-open', label: t('appDataTable') },
+        ]}
       />
     </RibbonGroup>
   )
@@ -2822,17 +2898,19 @@ export function FunctionLibraryRibbon({
   definedNames,
   auditing = false,
   calcManual = false,
+  showFormulas = false,
 }: {
   onCommand(command: string): void
   auditing?: boolean
   definedNames?: readonly string[]
   calcManual?: boolean
+  showFormulas?: boolean
 }) {
   return (
     <div className="ribbon" data-ribbon-body="">
       <FunctionLibraryGroup onCommand={onCommand} />
       {definedNames && <DefinedNamesGroup onCommand={onCommand} definedNames={definedNames} />}
-      {auditing && <FormulaAuditingGroup onCommand={onCommand} />}
+      {auditing && <FormulaAuditingGroup onCommand={onCommand} showFormulas={showFormulas} />}
       <CalculationGroup onCommand={onCommand} calcManual={calcManual} />
     </div>
   )
@@ -3000,7 +3078,14 @@ function DefinedNamesGroup({
   )
 }
 
-export function FormulaAuditingGroup({ onCommand }: { onCommand(command: string): void }) {
+export function FormulaAuditingGroup({
+  onCommand,
+  showFormulas = false,
+}: {
+  onCommand(command: string): void
+  /// Formula view of the active sheet; the button reads as pressed.
+  showFormulas?: boolean
+}) {
   const { t } = useI18n()
   return (
     <RibbonGroup label={t('appGroupFormulaAuditing')}>
@@ -3032,6 +3117,7 @@ export function FormulaAuditingGroup({ onCommand }: { onCommand(command: string)
       </div>
       <RibbonButton
         large
+        active={showFormulas}
         label={t('appShowFormulas')}
         detail={t('appShowFormulasDetail')}
         symbol="ƒ"
@@ -3051,6 +3137,23 @@ export function FormulaAuditingGroup({ onCommand }: { onCommand(command: string)
         symbol="👓"
         onClick={() => onCommand('watch-window')}
       />
+      <RibbonButton
+        large
+        label={t('appLinksPanel')}
+        detail={t('appLinksPanelDetail')}
+        symbol="🔗"
+        onClick={() => onCommand('external-links-panel')}
+      />
     </RibbonGroup>
   )
+}
+
+/// The host a query reads from, shown next to its name so the reader can see
+/// where a refresh would go before they ask for one.
+function queryConnectionHost(source: string): string {
+  try {
+    return new URL(source).host
+  } catch {
+    return source
+  }
 }

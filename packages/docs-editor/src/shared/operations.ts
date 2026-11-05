@@ -462,7 +462,7 @@ export const documentSettingsSchema = z
             anchorIndex: z.number().int().min(0).max(10_000_000),
             stroke: z
               .object({
-                tool: z.enum(['pen', 'highlighter']),
+                tool: z.enum(['pen', 'highlighter', 'pencil']),
                 color: z.string().regex(/^[0-9A-Fa-f]{6}$/),
                 width: z.number().min(0.1).max(200),
                 points: z
