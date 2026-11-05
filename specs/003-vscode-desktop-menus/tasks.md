@@ -771,3 +771,13 @@ Desktop menu parity that the VS Code extension cannot or does not yet provide:
 - [x] Sheets: the cell context menu offers "Ask about selection" (the existing localized label) and binds the selected range for native chat; the desktop app's menu is unchanged (`installCellContextMenu` takes host extras). Browser test records the `chat`/`selection` action.
 - [x] Docs: the text context menu offers the same entry for a non-empty selection, and the Home ribbon's AI entry asks about the selection when there is one (document otherwise). Browser test through the real webview.
 - [x] Ctrl/Cmd+Alt+A asks native chat about the selection in both editors (handled inside the webviews, outside cell editing and dialogs; browser tests for Sheets and Docs). It is not a VS Code keybinding, so it cannot be remapped in the Keyboard Shortcuts editor.
+
+## Upstream sync (dev/genoffice merge, 2026-11)
+
+- [x] `dev/genoffice` (upstream `main` as of the sync) merged into this branch. Where upstream extracted code this branch had already moved (desktop-api to the shared workbook protocol, the sidecar client into `workbook-session`, the Ribbon into `SheetsRibbon`), the branch structure was kept and the upstream change ported into the new home.
+- [x] Docs ribbon in VS Code follows upstream's ink presets (pencil included), `RevisionScope` accept/reject menu and the extended review context. Revisions outside the body (notes, headers, textboxes) are not offered in VS Code; styled and picture watermarks reduce to their text.
+- [x] Sheets: external links, queries, data table and password props accepted by `SheetsRibbon`; VS Code passes inert values for the ones it has no port for.
+- [x] Webview boundary allows the renderer-safe `@genoffice/ai-provider/browser` entry (the Docs AI panel imports it).
+- [x] Gates after the merge: native `minimum` 73 passing, 2 pending, 0 failing (needs `GENOFFICE_TEST_CDP_PORT`, otherwise most UI cases skip); `vscode:test`; xlsx-gateway 473; `cargo test` 331; DOCX browser tests 2; `vscode:build`.
+- [ ] Known: `promote-file-atomically` has 3 failures under root (chmod); the main `tsc` of `apps/vscode-office` reports ~1,886 "possibly undefined" errors in upstream Docs/docx-engine code, same count before the merge.
+- [ ] Sheets `desktop-home` browser test not re-run after the merge.
