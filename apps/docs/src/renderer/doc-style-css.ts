@@ -1,7 +1,7 @@
 /** Escape a value inside a quoted CSS attribute selector in browsers and Node. */
 function cssQuotedValue(value: string): string {
   return (
-    value
+    String(value)
       .replace(/\0/g, '\uFFFD')
       // eslint-disable-next-line no-control-regex -- CSS strings must escape C0 control characters.
       .replace(/["\\\x01-\x1f\x7f]/g, (character) => `\\${character.charCodeAt(0).toString(16)} `)
