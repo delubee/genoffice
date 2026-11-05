@@ -440,35 +440,19 @@
                         "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,6}$"
                       },
                       "value": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "number"
-                          },
-                          {
-                            "type": "boolean"
-                          },
-                          {
-                            "type": "null"
-                          }
+                        "type": [
+                          "string",
+                          "number",
+                          "boolean",
+                          "null"
                         ]
                       },
                       "expectedValue": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "number"
-                          },
-                          {
-                            "type": "boolean"
-                          },
-                          {
-                            "type": "null"
-                          }
+                        "type": [
+                          "string",
+                          "number",
+                          "boolean",
+                          "null"
                         ]
                       }
                     },
@@ -518,23 +502,16 @@
                                 ]
                               },
                               "rawValue": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "boolean"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "null"
                                 ]
                               },
                               "formula": {
                                 "type": "string",
+                                "format": "starts_with",
                                 "pattern": "^=.*"
                               },
                               "calculationState": {
@@ -546,19 +523,11 @@
                                 ]
                               },
                               "cachedValue": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "boolean"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "null"
                                 ]
                               },
                               "numberFormat": {
@@ -1277,6 +1246,7 @@
                       "formula": {
                         "type": "string",
                         "maxLength": 8192,
+                        "format": "starts_with",
                         "pattern": "^=.*"
                       },
                       "expectedFormula": {
@@ -1342,19 +1312,11 @@
                           "maxItems": 100,
                           "type": "array",
                           "items": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "boolean"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "number",
+                              "boolean",
+                              "null"
                             ]
                           }
                         }
@@ -1490,33 +1452,21 @@
                         "type": "object",
                         "properties": {
                           "bold": {
-                            "anyOf": [
-                              {
-                                "type": "boolean"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "boolean",
+                              "null"
                             ]
                           },
                           "italic": {
-                            "anyOf": [
-                              {
-                                "type": "boolean"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "boolean",
+                              "null"
                             ]
                           },
                           "underline": {
-                            "anyOf": [
-                              {
-                                "type": "boolean"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "boolean",
+                              "null"
                             ]
                           },
                           "underlineStyle": {
@@ -1547,13 +1497,9 @@
                             "type": "boolean"
                           },
                           "strikethrough": {
-                            "anyOf": [
-                              {
-                                "type": "boolean"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "boolean",
+                              "null"
                             ]
                           },
                           "fontFamily": {
@@ -2019,13 +1965,9 @@
                             ]
                           },
                           "wrapText": {
-                            "anyOf": [
-                              {
-                                "type": "boolean"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "boolean",
+                              "null"
                             ]
                           },
                           "textRotation": {
@@ -2667,23 +2609,15 @@
                         "type": "object",
                         "properties": {
                           "min": {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "number",
+                              "null"
                             ]
                           },
                           "max": {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "number",
+                              "null"
                             ]
                           }
                         },
@@ -3410,7 +3344,11 @@
                                 "max",
                                 "min",
                                 "product",
-                                "countNums"
+                                "countNums",
+                                "stdDev",
+                                "stdDevp",
+                                "var",
+                                "varp"
                               ]
                             },
                             "numFmt": {
@@ -3426,8 +3364,25 @@
                                 "percentOfCol",
                                 "percentOfParentRow",
                                 "percentOfParentCol",
-                                "index"
+                                "index",
+                                "percentOf",
+                                "percentOfParent",
+                                "difference",
+                                "percentDiff",
+                                "runTotal",
+                                "percentOfRunningTotal",
+                                "rankAscending",
+                                "rankDescending"
                               ]
+                            },
+                            "baseField": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 255
+                            },
+                            "baseItem": {
+                              "type": "string",
+                              "maxLength": 255
                             },
                             "name": {
                               "type": "string",
@@ -4404,6 +4359,7 @@
                                   "formula": {
                                     "type": "string",
                                     "maxLength": 8192,
+                                    "format": "starts_with",
                                     "pattern": "^=.*"
                                   },
                                   "options": {
@@ -5057,7 +5013,11 @@
                                 "max",
                                 "min",
                                 "product",
-                                "countNums"
+                                "countNums",
+                                "stdDev",
+                                "stdDevp",
+                                "var",
+                                "varp"
                               ]
                             },
                             "numFmt": {
@@ -5073,8 +5033,25 @@
                                 "percentOfCol",
                                 "percentOfParentRow",
                                 "percentOfParentCol",
-                                "index"
+                                "index",
+                                "percentOf",
+                                "percentOfParent",
+                                "difference",
+                                "percentDiff",
+                                "runTotal",
+                                "percentOfRunningTotal",
+                                "rankAscending",
+                                "rankDescending"
                               ]
+                            },
+                            "baseField": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 255
+                            },
+                            "baseItem": {
+                              "type": "string",
+                              "maxLength": 255
                             },
                             "name": {
                               "type": "string",

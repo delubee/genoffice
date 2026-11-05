@@ -10,8 +10,14 @@ export function browserBoundary() {
     resolveId(source) {
       // Pure constants/range redaction helpers shared by DOCX parsing; this
       // explicit subpath imports no agent runtime, provider, process or network.
+      // The ai-provider `browser` entry is its renderer-safe settings surface (types and
+      // pure helpers; its own header keeps Node-backed transports out).
       if (
-        ['@genoffice/agent-core/redact-range', '@genoffice/agent-core/redact-core'].includes(source)
+        [
+          '@genoffice/agent-core/redact-range',
+          '@genoffice/agent-core/redact-core',
+          '@genoffice/ai-provider/browser',
+        ].includes(source)
       )
         return null
       if (
