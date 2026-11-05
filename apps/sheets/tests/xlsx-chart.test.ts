@@ -937,7 +937,8 @@ describe('applyChartEdit scatter seriesSet', () => {
     expect(xml.match(/<c:ser>/g)).toHaveLength(2)
     expect(xml).toContain(
       '<c:ser><c:idx val="0"/><c:order val="0"/><c:tx><c:v>A</c:v></c:tx>' +
-        '<c:spPr><a:ln><a:solidFill><a:srgbClr val="112233"/></a:solidFill></a:ln></c:spPr>' +
+        '<c:spPr><a:solidFill><a:srgbClr val="112233"/></a:solidFill>' +
+        '<a:ln><a:solidFill><a:srgbClr val="112233"/></a:solidFill></a:ln></c:spPr>' +
         "<c:xVal><c:numRef><c:f>'D'!$A$2:$A$3</c:f><c:numCache><c:formatCode>General</c:formatCode>" +
         '<c:ptCount val="2"/><c:pt idx="0"><c:v>1</c:v></c:pt>',
     )

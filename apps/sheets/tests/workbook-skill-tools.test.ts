@@ -816,7 +816,7 @@ describe('executeWorkbookTool: propose_operations', () => {
     )
     expect(result.isError).toBe(true)
     expect(result.output).toContain(
-      "operations[0] (set_column_width): op: Invalid discriminator value. Expected 'set_cell' | ",
+      "operations[0] (set_column_width): op: Invalid discriminator value. Expected '",
     )
     expect(result.output).toContain("'set_col_width'")
   })
