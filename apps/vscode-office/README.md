@@ -37,6 +37,8 @@ The editor supports values, formulas, basic formats, typed copy/fill, worksheet/
 3. Read current context/capabilities before editing. After a structure change, rebind the selection. A stale revision requires a fresh read and reconsideration.
 4. Use **GenOffice: Workbook Skill Status** to inspect local registration; it cannot verify tool enablement for a particular conversation.
 
+**Ask about the selection:** in a workbook or a Word document, select a range or some text and use the right-click entry **Ask about selection**, the toolbar button of the same name, or **Ctrl+Alt+A** (**Cmd+Alt+A** on macOS). The editor binds the selection (without copying its contents into the prompt) and opens native Chat in agent mode with the binding filled in; with no selection in a Word document the whole document is bound.
+
 Eight tools: `genoffice_workbook_context`, `_read`, `_aggregate`, `_apply`, `_operationStatus`, `_export`, `_prepareImport`, `_applyImport` (each suffix uses the `genoffice_workbook` prefix). Explicit URI or binding determines the target; changing editor focus never retargets a running task.
 
 ### Existing merged cells

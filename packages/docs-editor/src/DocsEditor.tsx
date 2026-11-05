@@ -618,6 +618,17 @@ export function DocsEditor({ runtime, onReady }: { runtime: DocumentRuntime; onR
       } else if (event.altKey && event.code === 'KeyM') {
         event.preventDefault()
         setParagraphDialog(true)
+      } else if (event.altKey && event.code === 'KeyA') {
+        // Ask VS Code Chat about the selection (the whole document without one).
+        event.preventDefault()
+        event.stopPropagation()
+        void runtime
+          .officeAction({
+            action: 'chat',
+            scope: editor.state.selection.empty ? 'document' : 'selection',
+            instruction: '',
+          })
+          .catch((error) => runtime.reportError(error))
       }
     }
     window.addEventListener('keydown', onKeyDown, true)

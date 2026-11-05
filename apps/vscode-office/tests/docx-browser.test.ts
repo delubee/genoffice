@@ -644,6 +644,18 @@ it('opens the built DOCX page, acknowledges typing/splits and preserves shared h
     await page.locator('.rb-big.ai-entry').first().click()
     await expect.poll(() => chats.length).toBe(4)
     expect(chats[3]).toMatchObject({ partial: true, scope: 'selection' })
+    // Ctrl+Alt+A does the same from the keyboard.
+    await editor.click()
+    await editor.evaluate((element) =>
+      (
+        element as unknown as {
+          editor: { commands: { setTextSelection(range: { from: number; to: number }): void } }
+        }
+      ).editor.commands.setTextSelection({ from: 2, to: 5 }),
+    )
+    await page.keyboard.press('Control+Alt+KeyA')
+    await expect.poll(() => chats.length).toBe(5)
+    expect(chats[4]).toMatchObject({ partial: true, scope: 'selection' })
     for (let step = 0; step < 500; step++) {
       try {
         session.history('undo')

@@ -770,4 +770,4 @@ Desktop menu parity that the VS Code extension cannot or does not yet provide:
 
 - [x] Sheets: the cell context menu offers "Ask about selection" (the existing localized label) and binds the selected range for native chat; the desktop app's menu is unchanged (`installCellContextMenu` takes host extras). Browser test records the `chat`/`selection` action.
 - [x] Docs: the text context menu offers the same entry for a non-empty selection, and the Home ribbon's AI entry asks about the selection when there is one (document otherwise). Browser test through the real webview.
-- [ ] Not done: a keyboard shortcut for the chat action.
+- [x] Ctrl/Cmd+Alt+A asks native chat about the selection in both editors (handled inside the webviews, outside cell editing and dialogs; browser tests for Sheets and Docs). It is not a VS Code keybinding, so it cannot be remapped in the Keyboard Shortcuts editor.

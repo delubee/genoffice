@@ -506,6 +506,21 @@ export function DesktopHomeRibbon({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return
       const guards = runtime.shortcutGuards(event)
+      // Ctrl/Cmd+Alt+A asks VS Code Chat about the selected range, outside cell editing and dialogs.
+      if (
+        guards &&
+        !guards.cellEditing &&
+        !guards.modalOpen &&
+        (event.ctrlKey || event.metaKey) &&
+        event.altKey &&
+        !event.shiftKey &&
+        event.code === 'KeyA'
+      ) {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        void run(() => runtime.askChatAboutSelection())
+        return
+      }
       const action = guards && resolveGlobalShortcut(event, guards)
       if (!action) return
       event.preventDefault()

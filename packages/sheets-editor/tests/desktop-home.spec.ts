@@ -1322,5 +1322,12 @@ test('the cell context menu asks VS Code Chat about the selected range', async (
   await expect
     .poll(() => page.evaluate(() => (window as any).toolbar.actions()))
     .toEqual([{ action: 'chat', instruction: '', scope: 'selection' }])
+  // Ctrl+Alt+A asks the same question from the keyboard.
+  await page.evaluate(() => (window as any).toolbar.select('B2'))
+  await canvas.click({ position: { x: 200, y: 60 } })
+  await page.keyboard.press('Control+Alt+KeyA')
+  await expect
+    .poll(async () => (await page.evaluate(() => (window as any).toolbar.actions())).length)
+    .toBe(2)
   expect(errors).toEqual([])
 })
