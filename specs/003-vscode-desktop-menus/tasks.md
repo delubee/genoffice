@@ -752,8 +752,10 @@ Desktop menu parity that the VS Code extension cannot or does not yet provide:
 
 - [x] Save calculates the frozen root with the host's normalized Univer adapter (`calculateSaveValues`) and writes fresh cached `<v>` values for every scalar formula, including untouched dependents on other sheets; previously every formula cache was emptied once the workbook changed. Unsupported roots (external references, 1904 dates, budget, 20 s timeout) fall back to the old empty-cache behavior, `#NAME?` results (unknown functions) are never cached, and `fullCalcOnLoad` stays set so Excel still recalculates. Native test: edit a precedent, save, read the dependents' cached values on two sheets.
 - [x] Tool and search reads (`document.snapshot().read`) request the host's results on demand when a range holds a pending formula cell: computed once per immutable root, 8 s limit, then `cachedValue`/`rawValue`/`ready` (or `error`); the editor view's own reads are unchanged (native test).
-- [ ] Still open: the results are not published as a document-wide cache for Find/aggregate/charts, array/spill results are not cached, the calculation runs on the extension-host thread (no worker), and Calculate Now/F9 in the view are not wired to the host.
+- [ ] Still open: the results are not published as a document-wide cache for Find/aggregate/charts, array/spill results are not cached, Calculate Now/F9 in the view are not wired to the host.
 
 ## Native suite checkpoint (calculation results)
 
 - Full `minimum` native run: 72 passing, 2 pending, 1 failing before the fix below. `Desktop Insert Symbol UI` asserted that a tool read of a cache-less formula is `pending`; tool reads now calculate it on demand, so the test expects `ready` there while the view's pending guard (still covered later in the same test) is unchanged. The test passes alone.
+
+- [x] Host calculations (save and tool reads) run on a worker thread (`dist/calc-worker.cjs`, bundled and packaged; aborts terminate the worker and a fresh one serves the next job, with an in-process fallback when the bundle is absent); unit test with the real bundles covers results, abort and fallback.

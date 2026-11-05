@@ -4,7 +4,11 @@ import { registerWorkbookTools } from './tools/register'
 import { registerBindSelection } from './commands/bind-selection'
 import { registerWorkbookSkillCommands } from './commands/install-skill'
 import { LazyDocxProvider } from './docx-proxy'
+import { join } from 'node:path'
+import { setCalculationWorkerPath } from '@genoffice/workbook-session/calculation/worker-client'
 export function activate(context: vscode.ExtensionContext) {
+  // Formula calculations for saving and tool reads run on a worker thread when the bundle is present.
+  setCalculationWorkerPath(join(context.extensionPath, 'dist', 'calc-worker.cjs'))
   const output = vscode.window.createOutputChannel('GenOffice Workbook')
   const provider = new WorkbookEditorProvider(context, output)
   const docx = new LazyDocxProvider(context)

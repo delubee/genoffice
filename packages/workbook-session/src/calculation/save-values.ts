@@ -2,7 +2,7 @@ import { formatAddress } from '@genoffice/xlsx-gateway/domain/cell-address'
 import type { WorkbookState } from '../domain'
 import type { WorkbookSource } from '../ports'
 import { loadCalculationSource } from './source'
-import { calculateSourceWorkbook } from './evaluate-source'
+import { calculateOffThread } from './worker-client'
 
 /** One freshly calculated formula result, at the cell's final logical position. */
 export interface SaveCalculationValue {
@@ -35,7 +35,7 @@ export async function calculateSaveValues(input: {
     })
     if (!loaded.sheets.some((sheet) => Object.values(sheet.cells).some((cell) => cell.formula)))
       return []
-    const calculated = await calculateSourceWorkbook(loaded, signal ? { signal } : {})
+    const calculated = await calculateOffThread(loaded, signal ? { signal } : {})
     const values: SaveCalculationValue[] = []
     for (const formula of calculated.formulas) {
       // Arrays write their spill through ordinary cells; only scalar formulas refresh a cached value.

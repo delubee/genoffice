@@ -13,6 +13,14 @@ await build({
   define: { 'import.meta.env': '{"DEV":false}' },
 })
 await build({
+  entryPoints: ['../../packages/workbook-session/src/calculation/worker-entry.ts'],
+  outfile: 'dist/calc-worker.cjs',
+  bundle: true,
+  platform: 'node',
+  target: 'node22',
+  format: 'cjs',
+})
+await build({
   entryPoints: ['src/extension/tools/manifest.ts'],
   outfile: 'dist/tool-schema.cjs',
   bundle: true,

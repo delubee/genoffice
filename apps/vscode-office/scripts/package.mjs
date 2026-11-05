@@ -50,6 +50,7 @@ for (const required of [
   'package.json',
   'dist/extension.cjs',
   'dist/docx-host.cjs',
+  'dist/calc-worker.cjs',
   'dist/webview/index.html',
   'dist/webview/docx.html',
   'skills/genoffice-workbook/SKILL.md',
