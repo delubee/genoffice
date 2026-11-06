@@ -780,4 +780,4 @@ Desktop menu parity that the VS Code extension cannot or does not yet provide:
 - [x] Webview boundary allows the renderer-safe `@genoffice/ai-provider/browser` entry (the Docs AI panel imports it).
 - [x] Gates after the merge: native `minimum` 73 passing, 2 pending, 0 failing (needs `GENOFFICE_TEST_CDP_PORT`, otherwise most UI cases skip); `vscode:test`; xlsx-gateway 473; `cargo test` 331; DOCX browser tests 2; `vscode:build`.
 - [ ] Known: `promote-file-atomically` has 3 failures under root (chmod); the main `tsc` of `apps/vscode-office` reports ~1,886 "possibly undefined" errors in upstream Docs/docx-engine code, same count before the merge.
-- [ ] Sheets `desktop-home` browser test not re-run after the merge.
+- [x] Sheets `desktop-home` browser test re-run after the merge: 25 passing.
