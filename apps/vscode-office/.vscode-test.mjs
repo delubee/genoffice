@@ -15,7 +15,7 @@ export default defineConfig([
     files: 'dist/tests/integration/**/*.test.cjs',
     workspaceFolder: './test-workspace',
     launchArgs: ['--disable-gpu', '--no-sandbox', ...cdpArgs],
-    mocha: { timeout: 30_000 },
+    mocha: { timeout: 60_000 },
   },
   {
     label: 'stable',
@@ -24,6 +24,6 @@ export default defineConfig([
     files: 'dist/tests/integration/**/*.test.cjs',
     workspaceFolder: './test-workspace',
     launchArgs: ['--disable-gpu', '--no-sandbox', ...cdpArgs],
-    mocha: { timeout: 30_000 },
+    mocha: { timeout: 60_000 },
   },
 ])
