@@ -9,6 +9,7 @@
     "src/extension/docx",
     "src/webview/docx.tsx",
     "../docs/src/renderer/env.d.ts",
-    "tests/docx-browser.test.ts"
+    "tests/docx-browser.test.ts",
+    "tests/docx-sections-browser.test.ts"
   ]
 }

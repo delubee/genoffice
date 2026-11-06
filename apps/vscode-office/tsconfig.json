@@ -7,5 +7,10 @@
     "noUncheckedIndexedAccess": true
   },
   "include": ["src", "tests", "*.config.ts"],
-  "exclude": ["src/extension/docx", "src/webview/docx.tsx", "tests/docx-browser.test.ts"]
+  "exclude": [
+    "src/extension/docx",
+    "src/webview/docx.tsx",
+    "tests/docx-browser.test.ts",
+    "tests/docx-sections-browser.test.ts"
+  ]
 }
