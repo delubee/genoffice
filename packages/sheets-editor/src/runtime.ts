@@ -5722,9 +5722,7 @@ export class WorkbookRuntime implements EditorProjection {
       } finally {
         this.internal--
       }
-      await new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-      )
+      await settleFrame(2)
       if (this.closed || this.state?.stateId !== stateId) return
       this.projectionDisposables.push(
         installFxButtonHook(this.runtime, () => {
@@ -5804,7 +5802,7 @@ export class WorkbookRuntime implements EditorProjection {
         await this.loadPage(page.row, page.column)
       }
       // Loading original row heights / hidden rows can change the viewport.
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      await settleFrame(1)
     }
     throw new Error('viewport_limit: increase zoom or row/column sizes')
   }
@@ -8573,6 +8571,24 @@ export class WorkbookRuntime implements EditorProjection {
     // Univer owns a nested React root; release it after a parent React cleanup.
     queueMicrotask(() => this.runtime.univer.dispose())
   }
+}
+
+/// Waits `frames` animation frames, but at most FRAME_WAIT_MS: a webview that is not the
+/// visible editor (a background tab) is not given frames, and projection must still finish.
+const FRAME_WAIT_MS = 150
+function settleFrame(frames: number): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, FRAME_WAIT_MS * frames)
+    const step = (left: number): void => {
+      if (left === 0) {
+        clearTimeout(timer)
+        resolve()
+        return
+      }
+      requestAnimationFrame(() => step(left - 1))
+    }
+    step(frames)
+  })
 }
 
 function tableErrorMessage(error: unknown): string {
