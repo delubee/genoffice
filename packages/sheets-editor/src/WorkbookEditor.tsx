@@ -1,13 +1,17 @@
+import { DesktopChartPanels } from './DesktopChartPanels'
+import { CHART_KIND_LABEL } from '../../../apps/sheets/src/renderer/RecommendedChartsDialog'
+import { t } from '../../../apps/sheets/src/renderer/i18n/locale'
+import type { BuildChartVisualInput } from '@genoffice/xlsx-gateway/domain/chart-visual'
 import { useEffect, useRef, useState } from 'react'
+import { OfficeFileActions, OFFICE_ACTION_LABELS } from '@genoffice/ui/chrome'
+import { normalizeLang } from '@genoffice/i18n'
 import type { EditorHost } from './ports'
 import { WorkbookRuntime } from './runtime'
 import { editorText } from './i18n'
 import { editorError } from './editor-error'
 import type { WorkbookOperation } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
 import { columnLabel } from '@genoffice/xlsx-gateway/domain/cell-address'
-import { BasicChart } from './BasicChart'
 import { WorkbookRibbon, RibbonGroup } from './WorkbookRibbon'
-import type { SheetVisual } from '@genoffice/xlsx-gateway/domain/chart-visual'
 import type { WorkbookAppearance } from './appearance'
 
 export function WorkbookEditor({
@@ -40,8 +44,7 @@ export function WorkbookEditor({
       | 'border'
     >('fontFamily'),
     [styleValue, setStyleValue] = useState('Calibri')
-  const [charts, setCharts] = useState<readonly SheetVisual[]>([]),
-    [chartType, setChartType] = useState<'column' | 'bar' | 'line' | 'pie'>('column')
+  const [chartType, setChartType] = useState<BuildChartVisualInput['chartType']>('column')
   const [, setSelectionVersion] = useState(0)
   const [rowHeight, setRowHeight] = useState(15),
     [columnWidth, setColumnWidth] = useState(96)
@@ -53,11 +56,11 @@ export function WorkbookEditor({
       host,
       (failure) => setError(editorError(failure, editorText(locale))),
       () => {
-        setCharts(runtime.current?.charts ?? [])
         setSelectionVersion((version) => version + 1)
       },
       locale,
       initialAppearance.current,
+      () => setError(''),
     )
     runtime.current = projection
     onReady(projection)
@@ -108,6 +111,16 @@ export function WorkbookEditor({
               <option value="vscode">{text.vscodeAppearance}</option>
             </select>
           </label>
+        )}
+        {host.action && (
+          <OfficeFileActions
+            labels={OFFICE_ACTION_LABELS[normalizeLang(locale ?? navigator.language)]}
+            onOpen={() => host.action!({ action: 'open' })}
+            onSave={() => host.action!({ action: 'save' })}
+            onSaveAs={() => host.action!({ action: 'saveAs' })}
+            onChat={(scope) => host.action!({ action: 'chat', scope, instruction: '' })}
+            onError={(error) => setError(editorError(error, text))}
+          />
         )}
         <button
           onClick={() => {
@@ -468,9 +481,21 @@ export function WorkbookEditor({
               value={chartType}
               onChange={(event) => setChartType(event.target.value as typeof chartType)}
             >
-              {(['column', 'bar', 'line', 'pie'] as const).map((type) => (
+              {(
+                [
+                  'column',
+                  'bar',
+                  'line',
+                  'area',
+                  'pie',
+                  'scatter',
+                  'radar',
+                  'doughnut',
+                  'combo',
+                ] as const
+              ).map((type) => (
                 <option key={type} value={type}>
-                  {text[type]}
+                  {t(CHART_KIND_LABEL[type])}
                 </option>
               ))}
             </select>
@@ -494,63 +519,9 @@ export function WorkbookEditor({
           {error}
         </div>
       )}
+      <DesktopChartPanels runtime={runtime.current} locale={locale} />
       <div className="workbook-content">
         <div ref={container} className="workbook-grid" aria-label={text.title} />
-        {charts.length > 0 && (
-          <aside className="workbook-charts" aria-label={text.chart}>
-            {charts.map((visual) => (
-              <section key={visual.id}>
-                <BasicChart chart={visual.chart} />
-                <form
-                  key={`${visual.id}:${visual.chart.title}`}
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    const fields = new FormData(event.currentTarget)
-                    submit(() => ({
-                      op: 'edit_chart',
-                      chartPath: visual.id,
-                      title: String(fields.get('title')),
-                      chartType: String(fields.get('type')) as typeof chartType,
-                    }))
-                  }}
-                >
-                  <input
-                    name="title"
-                    aria-label={text.chartTitle}
-                    defaultValue={visual.chart.title}
-                    maxLength={255}
-                  />
-                  <select
-                    name="type"
-                    aria-label={text.chart}
-                    defaultValue={
-                      visual.chart.chartTypes.includes('pieChart')
-                        ? 'pie'
-                        : visual.chart.chartTypes.includes('lineChart')
-                          ? 'line'
-                          : visual.chart.barDirection === 'bar'
-                            ? 'bar'
-                            : 'column'
-                    }
-                  >
-                    {(['column', 'bar', 'line', 'pie'] as const).map((type) => (
-                      <option key={type} value={type}>
-                        {text[type]}
-                      </option>
-                    ))}
-                  </select>
-                  <button type="submit">{text.apply}</button>
-                  <button
-                    type="button"
-                    onClick={() => submit(() => ({ op: 'delete_visual', visualId: visual.id }))}
-                  >
-                    {text.deleteChart}
-                  </button>
-                </form>
-              </section>
-            ))}
-          </aside>
-        )}
       </div>
     </section>
   )

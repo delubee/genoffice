@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Editor } from '@tiptap/core'
 import type { Selection, Transaction } from '@tiptap/pm/state'
-import { Dropdown, isSymbolFontFamily, type DropdownOption } from '@genoffice/ui'
+import { Dropdown, isSymbolFontFamily, type DropdownOption } from '@genoffice/ui/chrome'
 import { useI18n, type StringKey } from '../i18n/locale'
 import { fontFamiliesFor, systemFamiliesBesidesCandidates } from '../font-list'
 import { fontSizeLabel, fontSizeOptions, parseFontSize } from '../font-sizes'
@@ -489,7 +489,12 @@ export function FontDialog({ editor, onClose }: { editor: Editor; onClose: () =>
       onKeyDown={modalKeys.onKeyDown}
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="modal font-dialog">
+      <div
+        className="modal font-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('appFontDialogTitle')}
+      >
         <h2>{t('appFontDialogTitle')}</h2>
         <div className="dlg-tabs" role="tablist">
           {(['font', 'advanced'] as Tab[]).map((k) => (
@@ -509,6 +514,8 @@ export function FontDialog({ editor, onClose }: { editor: Editor; onClose: () =>
         <div
           className="font-preview"
           style={{
+            // This is document paper: keep authored ink readable without remapping it with chrome.
+            backgroundColor: '#FFFFFF',
             fontFamily:
               [fontLatin, fontEastAsia]
                 .filter(Boolean)

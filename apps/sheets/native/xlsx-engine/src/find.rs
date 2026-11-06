@@ -29,6 +29,9 @@ pub enum FindLookIn {
     FormulasOnly,
     /// Value text or formula text.
     Both,
+    /// Internal complete-cell enumeration, including formatted blanks.
+    /// The query is ignored; normal user Find modes keep their text semantics.
+    StoredCells,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -75,6 +78,8 @@ pub struct FindCellsMatch {
     pub value_text: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub formula_text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub array_ref: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -181,6 +186,7 @@ impl FindMatcher {
             }
             FindLookIn::FormulasOnly => formula_hit(),
             FindLookIn::Both => value_hit() || formula_hit(),
+            FindLookIn::StoredCells => true,
         }
     }
 }
@@ -422,6 +428,11 @@ impl WorkbookSession {
                     value: cell.value,
                     value_text,
                     formula_text: cell.formula,
+                    array_ref: if matches!(look_in, FindLookIn::StoredCells) {
+                        cell.array_ref
+                    } else {
+                        None
+                    },
                 })
             })
             .collect())
@@ -439,15 +450,37 @@ impl WorkbookSession {
         deadline: Instant,
         cancelled: &AtomicBool,
     ) -> Result<ScanOutcome, SidecarError> {
-        let row_count = self.sheets[sheet_index].row_count;
-        if row_count == 0 {
+        // Internal enumeration follows completed index chunks rather than the
+        // producer's <dimension>, which can understate the stored cell extent.
+        let last_chunk = if matches!(look_in, FindLookIn::StoredCells) {
+            let (lock, _) = &*self.runtimes[sheet_index].state;
+            let index = lock
+                .lock()
+                .map_err(|_| SidecarError::Io("Worksheet index lock was poisoned.".into()))?;
+            if let Some(error) = &index.error {
+                return Err(SidecarError::Workbook(error.clone()));
+            }
+            if !index.complete {
+                return Ok(ScanOutcome {
+                    complete: false,
+                    next: start.or(Some((0, 0))),
+                    indexing_complete: false,
+                });
+            }
+            index.chunk_files.keys().copied().max()
+        } else {
+            self.sheets[sheet_index]
+                .row_count
+                .checked_sub(1)
+                .map(|row| row / CHUNK_ROW_COUNT)
+        };
+        let Some(last_chunk) = last_chunk else {
             return Ok(ScanOutcome {
                 complete: true,
                 next: None,
                 indexing_complete: true,
             });
-        }
-        let last_chunk = (row_count - 1) / CHUNK_ROW_COUNT;
+        };
         let accepts = |hit: &FindCellsMatch| {
             start.is_none_or(|(row, column)| (hit.row, hit.column) >= (row, column))
         };
@@ -697,6 +730,37 @@ mod tests {
             sessions.find_cells(&request(&session_id, "   "), &AtomicBool::new(false)),
             Err(SidecarError::InvalidRequest(_))
         ));
+    }
+
+    #[test]
+    fn stored_cells_include_empty_and_formatted_cells_with_pagination() {
+        let sheet = r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:C2"/><sheetData><row r="1"><c r="A1" s="1"/><c r="B1" t="inlineStr"><is><t></t></is></c><c r="C1"><v>0</v></c></row><row r="2"><c r="A2"><f t="array" ref="A2:B3">A1</f></c></row></sheetData></worksheet>"#;
+        let (_dir, path) = open_fixture(&[
+            ("xl/workbook.xml", WORKBOOK_XML),
+            ("xl/_rels/workbook.xml.rels", RELS_XML),
+            ("xl/worksheets/sheet1.xml", sheet),
+            ("xl/worksheets/sheet2.xml", SHEET2_XML),
+        ]);
+        let mut sessions = WorkbookSessions::new();
+        let metadata = sessions.open(&path).unwrap();
+        let mut query = request(&metadata.session_id, "internal-enumeration");
+        query.look_in = FindLookIn::StoredCells;
+        query.sheet_id = Some("sheet-1".into());
+        query.limit = 1;
+        let cells = run_to_completion(&mut sessions, query);
+        assert_eq!(
+            coords(&cells),
+            vec![
+                ("sheet-1", 0, 0),
+                ("sheet-1", 0, 1),
+                ("sheet-1", 0, 2),
+                ("sheet-1", 1, 0)
+            ]
+        );
+        assert!(cells[0].value.is_none());
+        assert!(cells[0].formula_text.is_none());
+        assert_eq!(cells[3].formula_text.as_deref(), Some("=A1"));
+        assert_eq!(cells[3].array_ref.as_deref(), Some("A2:B3"));
     }
 
     #[test]

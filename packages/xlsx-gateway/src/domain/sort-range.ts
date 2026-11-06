@@ -24,7 +24,9 @@ export interface SortSpec {
   readonly byColumn: string
   readonly ascending: boolean
   readonly hasHeader: boolean
+  readonly rowVisible?: (row: number) => boolean
   readonly locale?: string
+  readonly levels?: readonly { byColumn: string; order: 'asc' | 'desc' }[]
 }
 
 /// blanks always sort last; numbers before booleans before text (Excel order)
@@ -61,13 +63,21 @@ export function computeSortedRowOrder(
   keyOffset: number,
   ascending: boolean,
   locale?: string,
+  levels?: readonly { keyOffset: number; ascending: boolean }[],
 ): number[] {
+  const keys = levels?.length ? levels : [{ keyOffset, ascending }]
   return rows
-    .map((row, index) => ({ key: row[keyOffset] ?? null, index }))
+    .map((row, index) => ({ row, index }))
     .sort((a, b) => {
-      const cmp = compareScalars(a.key, b.key, locale)
-      const oriented = a.key === null || b.key === null || cmp === 0 ? cmp : ascending ? cmp : -cmp
-      return oriented !== 0 ? oriented : a.index - b.index
+      for (const key of keys) {
+        const left = a.row[key.keyOffset] ?? null
+        const right = b.row[key.keyOffset] ?? null
+        const cmp = compareScalars(left, right, locale)
+        const oriented =
+          left === null || right === null || cmp === 0 ? cmp : key.ascending ? cmp : -cmp
+        if (oriented !== 0) return oriented
+      }
+      return a.index - b.index
     })
     .map((entry) => entry.index)
 }
@@ -78,6 +88,16 @@ export function computeSortChanges(
 ): SortComputedChange[] {
   const bounds = parseRange(spec.range)
   const keyColumn = columnIndex(spec.byColumn)
+  const levels = spec.levels?.map((level) => ({
+    keyOffset: columnIndex(level.byColumn) - bounds.startColumn,
+    ascending: level.order === 'asc',
+  }))
+  if (
+    levels?.some(
+      (level) => level.keyOffset < 0 || level.keyOffset > bounds.endColumn - bounds.startColumn,
+    )
+  )
+    throw new Error('A sort level is outside the selected range.')
   if (keyColumn < bounds.startColumn || keyColumn > bounds.endColumn) {
     throw new Error(`Sort column ${spec.byColumn} is outside the range ${spec.range}.`)
   }
@@ -86,8 +106,9 @@ export function computeSortChanges(
     throw new Error('The sort range needs at least two data rows.')
   }
 
-  const rows: { key: CellScalar; cells: CellScalar[]; display: CellScalar[] }[] = []
+  const rows: { index: number; key: CellScalar; cells: CellScalar[]; display: CellScalar[] }[] = []
   for (let row = firstDataRow; row <= bounds.endRow; row += 1) {
+    if (spec.rowVisible && !spec.rowVisible(row)) continue
     const cells: CellScalar[] = []
     const display: CellScalar[] = []
     for (let column = bounds.startColumn; column <= bounds.endColumn; column += 1) {
@@ -103,7 +124,7 @@ export function computeSortChanges(
       cells.push(state.rawValue !== undefined ? state.rawValue : state.value)
       display.push(state.value)
     }
-    rows.push({ key: cells[keyColumn - bounds.startColumn] ?? null, cells, display })
+    rows.push({ index: row, key: cells[keyColumn - bounds.startColumn] ?? null, cells, display })
   }
 
   const order = computeSortedRowOrder(
@@ -111,11 +132,12 @@ export function computeSortChanges(
     keyColumn - bounds.startColumn,
     spec.ascending,
     spec.locale,
+    levels,
   )
 
   const changes: SortComputedChange[] = []
   order.forEach((sourceIndex, offset) => {
-    const targetRow = firstDataRow + offset
+    const targetRow = rows[offset]!.index
     rows[sourceIndex]?.cells.forEach((value, columnOffset) => {
       const address = formatAddress(targetRow, bounds.startColumn + columnOffset)
       const before = rows[offset]?.cells[columnOffset] ?? null

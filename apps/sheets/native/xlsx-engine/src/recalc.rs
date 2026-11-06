@@ -1065,7 +1065,7 @@ fn workbook_uses_1904_dates(path: &Path) -> Result<bool, SidecarError> {
             "The formula engine could not read the workbook archive: {error}"
         ))
     })?;
-    let (_, _, _, date_1904) = crate::workbook::read_sheet_declarations(&mut archive)?;
+    let (_, _, _, date_1904, _) = crate::workbook::read_sheet_declarations(&mut archive)?;
     Ok(date_1904)
 }
 

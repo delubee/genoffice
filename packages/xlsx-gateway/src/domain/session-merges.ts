@@ -13,7 +13,7 @@ export function sessionMerges(features?: Record<string, unknown>) {
 export function updateSessionMerges(
   features: Record<string, unknown>,
   op: Extract<WorkbookOperation, { op: 'merge_cells' | 'unmerge_cells' }>,
-  cells: Record<string, { rawValue: unknown; formula?: string }>,
+  cells: Record<string, { rawValue: unknown; formula?: string | undefined }>,
 ) {
   const range = parseRange(op.range),
     merges = sessionMerges(features)
@@ -70,6 +70,20 @@ export function assertMergeOperation(
   const merges = mergesFor(op.sheetId)
   let bounds: Area | undefined
   if ('address' in op) bounds = parseRange(op.address)
+  if (op.op === 'paste_cells') {
+    if (op.writeValues === false && op.merges === undefined) return
+    const start = parseRange(op.start)
+    bounds = {
+      ...start,
+      endRow: start.startRow + op.cells.length - 1,
+      endColumn: start.startColumn + op.cells[0]!.length - 1,
+    }
+    if (op.merges !== undefined) {
+      if (merges.some((m) => intersects(bounds!, m) && !contains(bounds!, m)))
+        throw new Error('merge_partial_overlap')
+      return
+    }
+  }
   if (op.op === 'set_range') {
     const start = parseRange(op.start ?? op.range ?? 'A1')
     bounds = {

@@ -1,0 +1,29 @@
+{
+  "name": "@genoffice/docx-session",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@genoffice/docs-editor": "*",
+    "@genoffice/docx-engine": "*",
+    "@genoffice/workbook-session": "*",
+    "@tiptap/pm": "3.31.0",
+    "jszip": "^3.10.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.12",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3"
+  }
+}

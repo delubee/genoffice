@@ -1,3 +1,4 @@
+import { findCurrentCells } from '../src/search'
 import { expect, it } from 'vitest'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -41,6 +42,37 @@ it('uses the real sidecar through the extracted client and shared schemas', asyn
       })
       expect(read.cells[0]!.rawValue).toBe(1)
       expect(read.cells[7]).toMatchObject({ rawValue: 3, formula: '=SUM(A1:A2)' })
+      const searched = await findCurrentCells({
+        state,
+        source,
+        sourceSessionId: opened.original.sidecarSessionId,
+        query: {
+          stateId: state.stateId,
+          query: 'SUM',
+          lookIn: 'formulas',
+          sheetIds: [state.sheets[0]!.id],
+        },
+      })
+      expect(searched.hits).toContainEqual(
+        expect.objectContaining({
+          sheetId: state.sheets[0]!.id,
+          address: 'D2',
+          formula: '=SUM(A1:A2)',
+        }),
+      )
+      await expect(
+        source.findBaseCells({
+          sessionId: opened.original.sidecarSessionId,
+          sheetId: 'foreign',
+          query: 'SUM',
+          lookIn: 'formulas',
+          matchCase: false,
+          matchEntireCell: false,
+          wildcards: false,
+          limit: 10,
+        }),
+      ).rejects.toMatchObject({ code: 'session_mismatch' })
+
       const material = await prepareCandidateMaterial({
         state,
         source,

@@ -1,3 +1,4 @@
+import type { NameReferencePlan } from '../domain/defined-name-references'
 import { randomUUID } from 'node:crypto'
 import { closeSync, openSync, readFileSync, writeFileSync, writeSync } from 'node:fs'
 import { copyFile, mkdir, mkdtemp, rename, rm, stat, unlink } from 'node:fs/promises'
@@ -83,6 +84,7 @@ export interface ArchiveClient {
 }
 
 export interface StreamingSaveRequest {
+  readonly nameReferencePlan?: NameReferencePlan | null | undefined
   /** Clear unverified formula caches, then apply explicitly supplied fresh results. */
   readonly invalidateFormulaCaches?: boolean
   readonly client: ArchiveClient
@@ -117,6 +119,7 @@ export interface StreamingSaveRequest {
   readonly externalLinkOps?: ExternalLinkOps | null | undefined
   readonly themeState?: WorkbookThemeState | null | undefined
   readonly workbookProtectionState?: { readonly lockStructure: boolean } | null | undefined
+  readonly calcModeState?: { readonly mode: 'auto' | 'manual' | 'autoNoTable' } | null | undefined
   readonly protectedRangeStates?: readonly SheetProtectedRangesState[] | undefined
   readonly tabColorStates?: readonly SheetTabColorState[] | undefined
   /** null/undefined = the caller does not know the marks; the part is left as it is */
@@ -223,6 +226,8 @@ export async function saveWorkbookViaSidecar(
       request.externalLinkOps ?? null,
       request.redactionStates ?? null,
       request.invalidateFormulaCaches ?? false,
+      request.nameReferencePlan ?? null,
+      request.calcModeState ?? null,
     )
 
     const replacements = await writePlanContents(workDir, 'replace', plan.replaced)

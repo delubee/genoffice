@@ -1623,4 +1623,17 @@ export const tr = {
   appVisualFlipV: 'Dikey Çevir',
   appVisualFlipH: 'Yatay Çevir',
   appCtxPasteVisual: 'Resim veya Şekil Yapıştır',
+  appChartAxisRangeInvalid: 'Maksimum, minimumdan büyük olmalıdır.',
+  appDefinedNameInvalid: 'Geçerli, ayrılmamış bir ad ve başvuru girin.',
+  appDefinedNameDuplicate: 'Bu ad bu kapsamda zaten kullanılıyor.',
+  appDefinedNameBindingConflict: 'Bu değişiklik gizli veya sayfa kapsamlı bir tanımla çakışıyor.',
+  appAuditPendingValues:
+    'Hata denetimi kaydedilmiş formül değerlerini kullanır; bazı sonuçlar yeniden hesaplamayı bekliyor.',
+  appDefinedNameLabelPending:
+    'Formül etiketleri doğrulanmadı. Ad oluşturmak için metin etiketleri kullanın.',
+  appDocumentChangedDuringAction: 'Bu eylem hazırlanırken belge değişti. Yeniden deneyin.',
+  appClipboardUnsupported: 'Bu pano içeriği henüz yapıştırılamıyor. Hiçbir hücre değiştirilmedi.',
+  appClipboardSelectionChanged: 'Yapıştırmadan önce seçim değişti. Yeniden deneyin.',
+  appClipboardBusy: 'Geçerli düzenlemenin bitmesini bekleyin.',
+  appClipboardReadUnavailable: 'Pano okunamıyor. Yapıştırmak için {shortcut} kullanın.',
 } satisfies Record<keyof typeof zh, string>

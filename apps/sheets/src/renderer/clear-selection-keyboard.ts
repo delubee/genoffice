@@ -77,13 +77,19 @@ export function shouldInterceptClearSelection(
  * sheet container and outside Univer's own chrome hosts. Shared by every
  * window-level shortcut that writes to or scrolls the sheet.
  */
-export function isGridKeyTarget(target: ClearSelectionKeyEvent['target']): boolean {
+export function isGridKeyTarget(
+  target: ClearSelectionKeyEvent['target'],
+  gridHost?: Element,
+): boolean {
   if (!hasClosest(target)) return true
   if (target.closest(SKIP_HOST_SELECTOR)) return false
   // Find/replace, data-validation, CF, and app chrome all use native fields.
   if (target.closest(NATIVE_FIELD_SELECTOR)) return false
   // App chrome (AI composer) is contenteditable outside the sheet container.
-  if (target.closest(CONTENT_EDITABLE_SELECTOR) && !target.closest(SHEET_CONTAINER_SELECTOR)) {
+  if (
+    target.closest(CONTENT_EDITABLE_SELECTOR) &&
+    !(gridHost ? gridHost.contains(target) : target.closest(SHEET_CONTAINER_SELECTOR))
+  ) {
     return false
   }
   return true

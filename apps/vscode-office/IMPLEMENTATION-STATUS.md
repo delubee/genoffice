@@ -1,4 +1,4 @@
-# Implementation status — 2026-10-23
+# Implementation status — 2026-10-24
 
 This is a **preview, not a release candidate**. All six stories have implemented code and local deterministic evidence. Real model/Chat acceptance, macOS 14/SSH environments, and the exact performance reference environment remain unverified. Windows 11 x64 build and installation are now locally verified; Windows current-stable/human/crash acceptance remains pending. `specs/001-vscode-office-editor/tasks.md` retains unchecked release gates.
 
@@ -60,7 +60,6 @@ feature parity. See README's ribbon matrix for the available controls and
 limits. Advanced dialogs, original objects, print preview, and transformations
 that cannot preserve reference-bearing features remain outside this increment.
 
-
 0.1.3 verification: Linux/Windows unit suites 59 session / 10 editor / 31
 extension; shared gateway 252; desktop compatibility 70 and desktop typecheck;
 Chromium 15 browser tests. Windows actual extension-host tests and final
@@ -77,3 +76,28 @@ Windows verification passed: 104 workspace unit tests, six real VS Code tests,
 and actual VSIX installation with editing, saving and native tool reads.
 See [merge editing evidence](test-results/merge-editing.md) and
 [0.1.4 installed proof](test-results/merge-installed-win32-x64-proof.json).
+
+## DOCX 0.2.0 verification
+
+The same plugin now includes a lazy DOCX host bundle and separate Word webview.
+Implemented: manual formatting, headings and genuine numbering definitions,
+rectangular tables, original-based saves, native tool editing, scoped selection
+bindings, hash/version-bound Python exchange, private recovery and shared native
+history. Unsupported/private blocks are protected and omitted from tool reads.
+
+Final verification: all five workspace type checks, 133 unit tests and 17 affected
+desktop style tests passed. Browser controls, actual VS Code native tools/Python,
+backup restoration and independent XLSX/DOCX sessions passed. The final Windows
+fixture (1,113,986 bytes, 200 paragraphs, 10 tables) opened in 1,977 ms; a
+100-character native tool edit projected in 132 ms.
+
+Both Linux and Windows 0.2.0 VSIX files passed actual isolated production
+installation tests, including real Word webview input, save/reopen, undo/redo,
+native reads and shipped skill installation. See
+[feature verification](../../specs/002-vscode-docx/verification.md) and
+`test-results/docx-*-proof.json` for exact hashes/evidence.
+
+Advanced/private content and complex tables remain protected. Native history
+survives saves; recovery starts a fresh session/history. Real-model chat/skill
+discovery, macOS, actual Remote SSH and forced-crash/human acceptance remain
+unverified. This remains a preview.

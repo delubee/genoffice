@@ -99,6 +99,7 @@ export const he = {
   appLabelNumberFormat: 'תבנית מספר של התווית',
   appLabelFormatPlaceholder: 'לדוגמה 0.0% / #,##0',
   appGridlines: 'קווי רשת',
+  appChartAxisRangeInvalid: 'הערך המרבי חייב להיות גדול מהערך המזערי.',
   appAxisMin: 'מינימום',
   appAxisMax: 'מקסימום',
   appBarSection: 'עמודות',
@@ -594,6 +595,13 @@ export const he = {
   appScopeWorkbook: 'חוברת עבודה',
   appNamesNeedFile: 'פתח תחילה קובץ XLSX — שמות מוגדרים נשמרים לקובץ.',
   appNameGone: 'שם זה אינו קיים עוד.',
+  appDefinedNameInvalid: 'יש להזין שם חוקי שאינו שמור והפניה תקינה.',
+  appDefinedNameDuplicate: 'השם כבר בשימוש בתחום זה.',
+  appDefinedNameBindingConflict: 'השינוי מתנגש בהגדרה מוסתרת או בהגדרה ברמת הגיליון.',
+  appAuditPendingValues:
+    'בדיקת השגיאות משתמשת בערכי נוסחאות שמורים; חלק מהתוצאות ממתינות לחישוב מחדש.',
+  appDefinedNameLabelPending:
+    'תוצאות הנוסחאות של התוויות לא אומתו. יש להשתמש בתוויות טקסט ליצירת שמות.',
   appNameApplyFailed: 'לא ניתן להחיל את השם.',
   appNamesUpdated: 'השמות המוגדרים עודכנו — שמור עם ⌘S.',
   appLinkInternal: 'הקישור מצביע לתוך חוברת העבודה: {location}',
@@ -1528,6 +1536,11 @@ export const he = {
   appVisualFlipV: 'הפוך אנכית',
   appVisualFlipH: 'הפוך אופקית',
   appCtxPasteVisual: 'הדבק תמונה או צורה',
+  appDocumentChangedDuringAction: 'המסמך השתנה במהלך הכנת הפעולה. יש לנסות שוב.',
+  appClipboardUnsupported: 'עדיין אי אפשר להדביק תוכן זה. לא שונו תאים.',
+  appClipboardSelectionChanged: 'הבחירה השתנתה לפני ההדבקה. נסו שוב.',
+  appClipboardBusy: 'המתינו לסיום העריכה הנוכחית.',
+  appClipboardReadUnavailable: 'לא ניתן לקרוא את הלוח. השתמשו ב־{shortcut} להדבקה.',
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'איות',

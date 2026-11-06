@@ -114,3 +114,51 @@ it('checks budgets/cancellation before acknowledgment and acknowledges a fully p
   })
   expect(restored.state).toEqual(input.state)
 })
+
+it('restores inline picture bytes across chunk boundaries without any transient image cache', async () => {
+  const { directory, input, state } = await context()
+  const bytes = Buffer.alloc(300 * 1024)
+  Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    'base64',
+  ).copy(bytes)
+  const dataUrl = `data:image/png;base64,${bytes.toString('base64')}`
+  state.sheets[0]!.features = {
+    visuals: [
+      {
+        id: 'added-image-backup',
+        sheetId: state.sheets[0]!.id,
+        kind: 'image',
+        name: 'backup.png',
+        mediaType: 'image/png',
+        mediaDataUrl: dataUrl,
+        rotation: 90,
+        flipH: true,
+        anchor: {
+          fromRow: 0,
+          fromColumn: 0,
+          fromRowOffset: 0,
+          fromColumnOffset: 0,
+          toRow: 2,
+          toColumn: 2,
+          toRowOffset: 0,
+          toColumnOffset: 0,
+        },
+      },
+    ],
+  }
+  const point = await createRecoveryPoint(input)
+  try {
+    const restored = await readRecoveryPoint({
+      manifestPath: point.manifestPath,
+      expectedManifestHash: point.manifestHash,
+      documentUri: input.documentUri,
+      allowedRoots: [directory],
+    })
+    expect(restored.state).toEqual(state)
+    const image = (restored.state.sheets[0]!.features!.visuals as any[])[0]
+    expect(Buffer.from(image.mediaDataUrl.split(',')[1], 'base64')).toEqual(bytes)
+  } finally {
+    await point.dispose()
+  }
+})

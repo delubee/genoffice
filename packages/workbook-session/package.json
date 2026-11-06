@@ -18,11 +18,16 @@
   "dependencies": {
     "@genoffice/xlsx-gateway": "*",
     "zod": "^4.3.6",
-    "numfmt": "^3.2.6"
+    "numfmt": "^3.2.6",
+    "@univerjs/core": "^0.25.1",
+    "@univerjs/sheets": "^0.25.1",
+    "@univerjs/engine-formula": "^0.25.1",
+    "@univerjs/sheets-formula": "^0.25.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "esbuild": "^0.25.0"
   }
 }

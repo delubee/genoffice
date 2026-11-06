@@ -1,7 +1,7 @@
 import type { IFunctionInfo } from '@univerjs/engine-formula'
 import { useMemo, useState } from 'react'
 
-import { Dropdown } from '@genoffice/ui'
+import { Dropdown } from '@genoffice/ui/chrome'
 
 import {
   buildFunctionCatalog,
@@ -328,6 +328,8 @@ export function useFunctionCatalog(functions: readonly IFunctionInfo[]): Functio
           return { ...spec, abstract: description, description }
         }),
       ),
+    // The translation callback is unstable; the locale is the memo invalidation key.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [functions, lang],
   )
 }

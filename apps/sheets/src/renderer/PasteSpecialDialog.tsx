@@ -10,7 +10,7 @@ import {
   type PasteSpecialOptions,
   type PasteSpecialSource,
   type PasteSpecialType,
-} from './paste-special'
+} from './paste-special-model'
 
 const TYPE_LABELS: Readonly<Record<PasteSpecialType, StringKey>> = {
   all: 'dlgPasteSpecialAll',

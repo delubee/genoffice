@@ -152,7 +152,12 @@ export function finishedFormula(
   const call = buildFunctionCall(name, args)
   if (target.formula === '') return `=${call}`
   if (span) return spliceFunctionCall(target.formula, span, call)
-  return target.formula.slice(0, target.caret) + call + target.formula.slice(target.caret)
+  // The native fx button can report a caret before the leading equals sign.
+  const caret = Math.max(
+    target.formula.startsWith('=') ? 1 : 0,
+    Math.min(target.formula.length, target.caret),
+  )
+  return target.formula.slice(0, caret) + call + target.formula.slice(caret)
 }
 
 /// Parameters from an Excel syntax line such as `SUM(number1, [number2], …)`;

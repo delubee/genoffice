@@ -17,6 +17,8 @@ pub struct WorkbookMetadata {
     pub dxf_styles: Vec<CellStyle>,
     pub visuals: Vec<VisualObject>,
     pub defined_names: Vec<DefinedName>,
+    pub reserved_defined_names: Vec<ReservedDefinedName>,
+    pub name_bindings_complete: bool,
     /// Theme palette as `#RRGGBB` in theme index order; None without a theme.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub theme_colors: Option<Vec<String>>,
@@ -32,6 +34,9 @@ pub struct WorkbookMetadata {
     /// workbookPr/@date1904: serial dates count from 1904-01-01.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub date1904: bool,
+    /// calcPr/@calcMode (`auto` when absent in the file).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub calc_mode: Option<String>,
     /// System short-date pattern applied to builtin numFmtIds 14/22, echoed
     /// so the renderer's own short-date affordances match.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -44,6 +49,16 @@ pub struct WorkbookProtectionInfo {
     pub lock_structure: bool,
     /// workbookPassword= (legacy) or workbookHashValue= (modern) present.
     pub has_password: bool,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReservedDefinedName {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sheet_index: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sheet_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -541,19 +556,29 @@ pub struct RangeResult {
 
 /// One `<filterColumn>` of a worksheet autoFilter: checked values
 /// (`<filters>`), the blank flag, or comparison criteria
-/// (`<customFilters>`). Color/icon/dynamic/top10 criteria have no renderer
-/// mapping and their column is omitted.
+/// (`<customFilters>`), or standard/extended color criteria.
+/// Icon/dynamic/top10 criteria have no renderer mapping and are omitted.
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FilterColumnCriteria {
     /// 0-based offset from the filter range's first column, per OOXML.
     pub col_id: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub colors: Option<ColorFilterCriteria>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub values: Option<Vec<String>>,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub blank: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub customs: Option<CustomFilterCriteria>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct ColorFilterCriteria {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fill: Option<Vec<Option<String>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub font: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Serialize)]

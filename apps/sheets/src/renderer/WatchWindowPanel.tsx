@@ -27,12 +27,14 @@ export function watchKey(cell: WatchCell): string {
 export function WatchWindowPanel({
   watches,
   onResolve,
+  onRefresh,
   onAddSelection,
   onRemove,
   onClose,
 }: {
   readonly watches: readonly WatchCell[]
   /// null = the sheet is gone; the row renders struck through.
+  readonly onRefresh?: () => Promise<void>
   readonly onResolve: (cell: WatchCell) => WatchRowValue | null
   readonly onAddSelection: () => void
   readonly onRemove: (key: string) => void
@@ -41,9 +43,17 @@ export function WatchWindowPanel({
   const { t } = useI18n()
   const [, setTick] = useState(0)
   useEffect(() => {
-    const timer = setInterval(() => setTick((value) => value + 1), 800)
+    const refresh = () => {
+      if (onRefresh)
+        void onRefresh()
+          .then(() => setTick((value) => value + 1))
+          .catch(() => {})
+      else setTick((value) => value + 1)
+    }
+    refresh()
+    const timer = setInterval(refresh, 800)
     return () => clearInterval(timer)
-  }, [])
+  }, [onRefresh])
   return (
     <section className="watch-window" role="dialog" aria-label={t('appWatchWindow')}>
       <header>

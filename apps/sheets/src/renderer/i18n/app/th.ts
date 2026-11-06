@@ -101,6 +101,7 @@ export const th = {
   appLabelNumberFormat: 'รูปแบบตัวเลขของป้ายชื่อ',
   appLabelFormatPlaceholder: 'เช่น 0.0% / #,##0',
   appGridlines: 'เส้นตาราง',
+  appChartAxisRangeInvalid: 'ค่าสูงสุดต้องมากกว่าค่าต่ำสุด',
   appAxisMin: 'ค่าต่ำสุด',
   appAxisMax: 'ค่าสูงสุด',
   appBarSection: 'คอลัมน์',
@@ -616,6 +617,13 @@ export const th = {
   appScopeWorkbook: 'เวิร์กบุ๊ก',
   appNamesNeedFile: 'เปิดไฟล์ XLSX ก่อน — ชื่อที่กำหนดจะถูกบันทึกลงไฟล์',
   appNameGone: 'ชื่อนั้นไม่มีอยู่แล้ว',
+  appDefinedNameInvalid: 'ป้อนชื่อที่ถูกต้องซึ่งไม่ใช่ชื่อสงวนและการอ้างอิงที่ถูกต้อง',
+  appDefinedNameDuplicate: 'มีการใช้ชื่อนี้ในขอบเขตนี้แล้ว',
+  appDefinedNameBindingConflict:
+    'การเปลี่ยนแปลงนี้ขัดแย้งกับคำนิยามที่ซ่อนอยู่หรือคำนิยามระดับแผ่นงาน',
+  appAuditPendingValues: 'การตรวจสอบข้อผิดพลาดใช้ค่าสูตรที่บันทึกไว้ บางผลลัพธ์ยังรอการคำนวณใหม่',
+  appDefinedNameLabelPending:
+    'ยังไม่ได้ตรวจสอบผลลัพธ์สูตรของป้ายชื่อ ให้ใช้ป้ายชื่อข้อความเพื่อสร้างชื่อ',
   appNameApplyFailed: 'นำชื่อไปใช้ไม่ได้',
   appNamesUpdated: 'อัปเดตชื่อที่กำหนดแล้ว — บันทึกด้วย ⌘S',
   appLinkInternal: 'ลิงก์ชี้ไปภายในเวิร์กบุ๊ก: {location}',
@@ -1551,6 +1559,11 @@ export const th = {
   appVisualFlipV: 'พลิกแนวตั้ง',
   appVisualFlipH: 'พลิกแนวนอน',
   appCtxPasteVisual: 'วางรูปภาพหรือรูปร่าง',
+  appDocumentChangedDuringAction: 'เอกสารเปลี่ยนแปลงระหว่างเตรียมการดำเนินการนี้ โปรดลองอีกครั้ง',
+  appClipboardUnsupported: 'ยังไม่สามารถวางเนื้อหานี้ได้ ไม่มีเซลล์ถูกเปลี่ยนแปลง',
+  appClipboardSelectionChanged: 'การเลือกเปลี่ยนไปก่อนวาง โปรดลองอีกครั้ง',
+  appClipboardBusy: 'โปรดรอให้การแก้ไขปัจจุบันเสร็จสิ้น',
+  appClipboardReadUnavailable: 'ไม่สามารถอ่านคลิปบอร์ดได้ ใช้ {shortcut} เพื่อวาง',
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'ตรวจการสะกดคำ',

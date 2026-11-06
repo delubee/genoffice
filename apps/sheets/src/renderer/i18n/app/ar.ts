@@ -100,6 +100,7 @@ export const ar = {
   appLabelNumberFormat: 'تنسيق أرقام التسمية',
   appLabelFormatPlaceholder: 'مثل 0.0% / #,##0',
   appGridlines: 'خطوط الشبكة',
+  appChartAxisRangeInvalid: 'يجب أن تكون القيمة القصوى أكبر من القيمة الدنيا.',
   appAxisMin: 'الحد الأدنى',
   appAxisMax: 'الحد الأقصى',
   appBarSection: 'الأعمدة',
@@ -615,6 +616,12 @@ export const ar = {
   appScopeWorkbook: 'المصنف',
   appNamesNeedFile: 'افتح ملف XLSX أولاً — تُحفظ الأسماء المعرفة في الملف.',
   appNameGone: 'هذا الاسم لم يعد موجودًا.',
+  appDefinedNameInvalid: 'أدخل اسمًا غير محجوز ومرجعًا صالحين.',
+  appDefinedNameDuplicate: 'هذا الاسم مستخدم بالفعل في هذا النطاق.',
+  appDefinedNameBindingConflict: 'يتعارض هذا التغيير مع تعريف مخفي أو تعريف على مستوى الورقة.',
+  appAuditPendingValues: 'يستخدم فحص الأخطاء قيم الصيغ المحفوظة؛ بعض النتائج تنتظر إعادة الحساب.',
+  appDefinedNameLabelPending:
+    'لم يتم التحقق من نتائج صيغ التسميات. استخدم تسميات نصية لإنشاء الأسماء.',
   appNameApplyFailed: 'تعذر تطبيق الاسم.',
   appNamesUpdated: 'حُدّثت الأسماء المعرفة — احفظ بـ ⌘S.',
   appLinkInternal: 'يشير الارتباط إلى داخل المصنف: {location}',
@@ -1552,6 +1559,11 @@ export const ar = {
   appVisualFlipV: 'قلب رأسي',
   appVisualFlipH: 'قلب أفقي',
   appCtxPasteVisual: 'لصق صورة أو شكل',
+  appDocumentChangedDuringAction: 'تغيّر المستند أثناء إعداد هذا الإجراء. حاول مرة أخرى.',
+  appClipboardUnsupported: 'لا يمكن لصق هذا المحتوى بعد. لم تتغير أي خلايا.',
+  appClipboardSelectionChanged: 'تغير التحديد قبل اللصق. حاول مرة أخرى.',
+  appClipboardBusy: 'انتظر حتى يكتمل التحرير الحالي.',
+  appClipboardReadUnavailable: 'تعذر قراءة الحافظة. استخدم {shortcut} للصق.',
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'التدقيق الإملائي',

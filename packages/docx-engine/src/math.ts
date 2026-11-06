@@ -40,7 +40,7 @@ export function mathTokensOf(xml: string): string[] {
   let match: RegExpExecArray | null
   while ((match = re.exec(xml)) !== null) {
     tokens.push(
-      match[1]
+      (match[1] ?? '')
         .replace(/&lt;/g, '<')
         .replace(/&gt;/g, '>')
         .replace(/&quot;/g, '"')
@@ -281,10 +281,10 @@ function runTextToMml(text: string, plain: boolean): string {
   let i = 0
   const chars = [...text]
   while (i < chars.length) {
-    const ch = chars[i]
+    const ch = chars[i]!
     if (/[0-9.]/.test(ch)) {
       let num = ''
-      while (i < chars.length && /[0-9.]/.test(chars[i])) num += chars[i++]
+      while (i < chars.length && /[0-9.]/.test(chars[i]!)) num += chars[i++]
       out += `<mn>${num}</mn>`
     } else if (/[A-Za-z\u0370-\u03FF\u{1D400}-\u{1D7FF}]/u.test(ch)) {
       out += `<mi>${escapeXmlText(ch)}</mi>`
@@ -538,7 +538,7 @@ export function ommlToLatex(ommlXml: string): string | null {
   if (sources.length !== 1) return null
   let parsed: XNode[]
   try {
-    parsed = xmlParser.parse(sources[0]) as XNode[]
+    parsed = xmlParser.parse(sources[0]!) as XNode[]
   } catch {
     return null
   }
@@ -665,22 +665,22 @@ function delimiterToLatex(node: XNode): string {
   const end = propVal(node, 'm:dPr', 'm:endChr') ?? ')'
   const slots = childrenOf(node).filter((c) => nameOf(c) === 'm:e')
   if (slots.length !== 1) throw new UnsupportedOmml()
-  const inner = contentChildren(slots[0])
+  const inner = contentChildren(slots[0]!)
 
   // \binom: parenthesised single noBar fraction
   if (
     beg === '(' &&
     end === ')' &&
     inner.length === 1 &&
-    nameOf(inner[0]) === 'm:f' &&
-    propVal(inner[0], 'm:fPr', 'm:type') === 'noBar'
+    nameOf(inner[0]!) === 'm:f' &&
+    propVal(inner[0]!, 'm:fPr', 'm:type') === 'noBar'
   ) {
-    return `\\binom{${latexSlot(inner[0], 'm:num')}}{${latexSlot(inner[0], 'm:den')}}`
+    return `\\binom{${latexSlot(inner[0]!, 'm:num')}}{${latexSlot(inner[0]!, 'm:den')}}`
   }
   // matrix environments: delimiters wrapping a single matrix / equation array
-  if (inner.length === 1 && (nameOf(inner[0]) === 'm:m' || nameOf(inner[0]) === 'm:eqArr')) {
+  if (inner.length === 1 && (nameOf(inner[0]!) === 'm:m' || nameOf(inner[0]!) === 'm:eqArr')) {
     const env = matrixEnvs().get(`${beg} ${end}`)
-    if (env) return `\\begin{${env}} ${matrixBody(inner[0])} \\end{${env}}`
+    if (env) return `\\begin{${env}} ${matrixBody(inner[0]!)} \\end{${env}}`
   }
   const begTok = delimTokens().get(beg)
   const endTok = delimTokens().get(end)
@@ -893,7 +893,7 @@ function parseAtom(p: LatexParser): string {
   // rewind so it becomes its own atom on the next pass
   const chars = [...text]
   if ((peek(p) === '^' || peek(p) === '_') && chars.length > 1) {
-    p.pos -= chars[chars.length - 1].length
+    p.pos -= chars[chars.length - 1]!.length
     return mathRun(chars.slice(0, -1).join(''))
   }
   return mathRun(text)
@@ -940,7 +940,7 @@ function matrixOmml(p: LatexParser, env: string): string {
       if (p.src.startsWith('\\end', p.pos)) return true
       return false
     })
-    rows[rows.length - 1].push(cell)
+    rows[rows.length - 1]!.push(cell)
     if (peek(p) === '&') {
       p.pos++
     } else if (p.src.startsWith('\\\\', p.pos)) {
@@ -994,25 +994,25 @@ function readDelimiter(p: LatexParser): string {
     p.pos++
     const name = readControlName(p)
     const key = '\\' + name
-    if (key in LEFT_RIGHT_CHARS) return LEFT_RIGHT_CHARS[key]
+    if (key in LEFT_RIGHT_CHARS) return LEFT_RIGHT_CHARS[key]!
     p.pos = start
     throw new LatexError(`Unsupported delimiter: \\${name}`)
   }
   const ch = peek(p)
   if (ch in LEFT_RIGHT_CHARS) {
     p.pos++
-    return LEFT_RIGHT_CHARS[ch]
+    return LEFT_RIGHT_CHARS[ch]!
   }
   throw new LatexError(`Unsupported delimiter: "${ch}"`)
 }
 
 function parseControl(p: LatexParser): string {
   const name = readControlName(p)
-  if (name in LATEX_SYMBOLS) return mathRun(LATEX_SYMBOLS[name])
-  if (name in NARY_OPS) return naryOmml(p, NARY_OPS[name].chr, NARY_OPS[name].limLoc)
+  if (name in LATEX_SYMBOLS) return mathRun(LATEX_SYMBOLS[name]!)
+  if (name in NARY_OPS) return naryOmml(p, NARY_OPS[name]!.chr, NARY_OPS[name]!.limLoc)
   if (name in ACCENT_CHARS) {
     const base = parseGroup(p)
-    return `<m:acc><m:accPr><m:chr m:val="${escapeXmlAttr(ACCENT_CHARS[name])}"/></m:accPr><m:e>${base}</m:e></m:acc>`
+    return `<m:acc><m:accPr><m:chr m:val="${escapeXmlAttr(ACCENT_CHARS[name]!)}"/></m:accPr><m:e>${base}</m:e></m:acc>`
   }
   if (LATEX_FUNCTIONS.has(name)) return mathRun(name, true)
   switch (name) {

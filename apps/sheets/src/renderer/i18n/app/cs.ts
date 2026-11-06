@@ -101,6 +101,7 @@ export const cs = {
   appLabelNumberFormat: 'Formát čísla popisků',
   appLabelFormatPlaceholder: 'např. 0.0% / #,##0',
   appGridlines: 'Mřížka',
+  appChartAxisRangeInvalid: 'Maximum musí být větší než minimum.',
   appAxisMin: 'Minimum',
   appAxisMax: 'Maximum',
   appBarSection: 'Pruh',
@@ -649,6 +650,13 @@ export const cs = {
   appScopeWorkbook: 'Sešit',
   appNamesNeedFile: 'Nejprve otevřete soubor XLSX — definované názvy se ukládají do souboru.',
   appNameGone: 'Tento název již neexistuje.',
+  appDefinedNameInvalid: 'Zadejte platný nevyhrazený název a odkaz.',
+  appDefinedNameDuplicate: 'Tento název se již v tomto oboru používá.',
+  appDefinedNameBindingConflict:
+    'Změna koliduje se skrytou definicí nebo definicí místní pro list.',
+  appAuditPendingValues:
+    'Kontrola chyb používá uložené hodnoty vzorců; některé výsledky čekají na přepočet.',
+  appDefinedNameLabelPending: 'Výsledky vzorců popisků nejsou ověřeny. Použijte textové popisky.',
   appNameApplyFailed: 'Název se nepodařilo použít.',
   appNamesUpdated: 'Definované názvy aktualizovány — uložte pomocí ⌘S.',
   appLinkInternal: 'Odkaz vede dovnitř sešitu: {location}',
@@ -1592,6 +1600,11 @@ export const cs = {
   appVisualFlipV: 'Převrátit svisle',
   appVisualFlipH: 'Převrátit vodorovně',
   appCtxPasteVisual: 'Vložit obrázek nebo obrazec',
+  appDocumentChangedDuringAction: 'Dokument se během přípravy této akce změnil. Zkuste to znovu.',
+  appClipboardUnsupported: 'Tento obsah zatím nelze vložit. Žádné buňky nebyly změněny.',
+  appClipboardSelectionChanged: 'Výběr se před vložením změnil. Zkuste to znovu.',
+  appClipboardBusy: 'Počkejte na dokončení aktuální úpravy.',
+  appClipboardReadUnavailable: 'Schránku nelze přečíst. Vložte obsah pomocí {shortcut}.',
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'Pravopis',

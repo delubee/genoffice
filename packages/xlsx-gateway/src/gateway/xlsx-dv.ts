@@ -8,6 +8,9 @@
 /// Excel itself writes for those rules.
 
 import { MAX_GRID_COLUMNS, MAX_GRID_ROWS } from '../shared/grid-bounds'
+import type { DvRule } from '../domain/workbook-dsl'
+import { parseRange } from '../domain/cell-address'
+import { offsetFormulaRefs } from '../domain/formula-shift'
 
 export class DvEditError extends Error {}
 
@@ -23,6 +26,68 @@ export interface DvCellArea {
 export interface DvWireRule {
   readonly ranges: readonly DvCellArea[]
   readonly rule: Record<string, unknown>
+}
+
+export function dvRuleToWireRule(rule: DvRule): Record<string, unknown> {
+  const options = rule.options ?? {}
+  const common = {
+    allowBlank: options.allowBlank ?? true,
+    showErrorMessage: options.showErrorMessage ?? true,
+    showInputMessage: options.showInputMessage ?? false,
+    ...(options.promptTitle === undefined ? {} : { promptTitle: options.promptTitle }),
+    ...(options.prompt === undefined ? {} : { prompt: options.prompt }),
+    ...(options.errorTitle === undefined ? {} : { errorTitle: options.errorTitle }),
+    ...(options.error === undefined ? {} : { error: options.error }),
+    ...(options.errorStyle === undefined
+      ? {}
+      : { errorStyle: { information: 0, stop: 1, warning: 2 }[options.errorStyle] }),
+  }
+  switch (rule.kind) {
+    case 'any':
+      return { ...common, type: 'any' }
+    case 'list':
+      return {
+        ...common,
+        type: 'list',
+        formula1: JSON.stringify(rule.values),
+        showDropDown: options.showDropdown ?? true,
+      }
+    case 'listRef':
+      return {
+        ...common,
+        type: 'list',
+        formula1: `=${rule.range}`,
+        showDropDown: options.showDropdown ?? true,
+      }
+    case 'numberBetween':
+      return {
+        ...common,
+        type: 'decimal',
+        operator: 'between',
+        formula1: String(rule.min),
+        formula2: String(rule.max),
+      }
+    case 'dateBetween':
+      return {
+        ...common,
+        type: 'date',
+        operator: 'between',
+        formula1: rule.start,
+        formula2: rule.end,
+      }
+    case 'checkbox':
+      return { ...common, type: 'checkbox' }
+    case 'formula':
+      return { ...common, type: 'custom', formula1: rule.formula }
+    case 'criterion':
+      return {
+        ...common,
+        type: rule.type,
+        operator: rule.operator,
+        formula1: rule.formula1,
+        ...(rule.formula2 === undefined ? {} : { formula2: rule.formula2 }),
+      }
+  }
 }
 
 const DV_TYPES = new Set(['whole', 'decimal', 'list', 'date', 'time', 'textLength', 'custom'])
@@ -99,23 +164,47 @@ function appendDvRules(
 ): string {
   const prepared = rules.map(prepareRule)
   const section = DV_SECTION_RE.exec(worksheetXml)
-  const replaced = new Set(
-    [...rules.flatMap((rule) => rule.ranges), ...remove].map((area) => normalizeRef(toRef(area))),
-  )
-  // an existing rule loses the areas the batch takes over; a multi-area sqref keeps the rest
+  const cuts = [...rules.flatMap((rule) => rule.ranges), ...remove]
+  // x14 entries keep the whole-area takeover semantics: an entry loses the exact areas the batch claims.
+  const replaced = new Set(cuts.map((area) => normalizeRef(toRef(area))))
+  // Split overlaps so new rules do not conflict with a surviving part of an old rule.
   const kept: string[] = []
   for (const entry of section?.[1] ? [...section[1].matchAll(DV_ENTRY_RE)].map((m) => m[0]) : []) {
     const sqref = /\bsqref="([^"]*)"/.exec(entry)?.[1] ?? ''
     const areas = sqref.split(/\s+/).filter(Boolean)
-    const remaining = areas.filter((area) => !replaced.has(normalizeRef(area)))
-    if (remaining.length === 0) continue
-    kept.push(
-      remaining.length === areas.length
-        ? entry
-        : // function replacer: a surviving area's text is document-controlled and a
-          // a string replacement would expand $& / $1 in the surviving area
-          entry.replace(/\bsqref="[^"]*"/, () => `sqref="${remaining.join(' ')}"`),
-    )
+    if (areas.length === 0) throw new DvEditError('A data-validation rule has no sqref area.')
+    // Areas outside the parser's grammar are document-controlled: keep them verbatim.
+    const stationary: string[] = [],
+      shifted: { original: DvCellArea; range: DvCellArea }[] = []
+    let changed = false
+    for (const ref of areas) {
+      const original = tryParseSqrefArea(ref)
+      if (!original) {
+        stationary.push(ref)
+        continue
+      }
+      const residuals = subtractDvAreas(original, cuts)
+      if (residuals.length !== 1 || !sameArea(original, residuals[0]!)) changed = true
+      for (const range of residuals)
+        if (range.startRow === original.startRow && range.startColumn === original.startColumn)
+          stationary.push(toRef(range))
+        else shifted.push({ original, range })
+    }
+    if (!changed) {
+      kept.push(entry)
+      continue
+    }
+    // function replacer: surviving area text must not expand $& / $1 patterns
+    if (stationary.length)
+      kept.push(entry.replace(/\bsqref="[^"]*"/, () => `sqref="${stationary.join(' ')}"`))
+    for (const { original, range } of shifted)
+      kept.push(
+        offsetValidationFormulas(
+          entry.replace(/\bsqref="[^"]*"/, () => `sqref="${toRef(range)}"`),
+          range.startRow - original.startRow,
+          range.startColumn - original.startColumn,
+        ),
+      )
   }
   const entries = [...kept, ...prepared.filter((rule) => !rule.needsX14).map(legacyEntry)]
   let xml = section ? worksheetXml.replace(section[0], '') : worksheetXml
@@ -134,9 +223,118 @@ function appendDvRules(
   return reconcileX14DataValidations(xml, x14Entries.join(''))
 }
 
+function tryParseSqrefArea(ref: string): DvCellArea | null {
+  try {
+    const area = parseRange(normalizeRef(ref))
+    toRef(area)
+    return area
+  } catch {
+    return null
+  }
+}
+
+function sameArea(left: DvCellArea, right: DvCellArea): boolean {
+  return (
+    left.startRow === right.startRow &&
+    left.endRow === right.endRow &&
+    left.startColumn === right.startColumn &&
+    left.endColumn === right.endColumn
+  )
+}
+
+export function subtractDvAreas(area: DvCellArea, cuts: readonly DvCellArea[]): DvCellArea[] {
+  let remaining = [area]
+  for (const cut of cuts) remaining = remaining.flatMap((part) => subtractArea(part, cut))
+  return remaining
+}
+
+/** Remove overlap from pending rules, keeping relative formulas anchored to each residual. */
+export function subtractDvRules(
+  rules: readonly DvWireRule[],
+  cuts: readonly DvCellArea[],
+): DvWireRule[] {
+  return rules.flatMap((entry) =>
+    entry.ranges.flatMap((original) =>
+      subtractDvAreas(original, cuts).map((range) => {
+        const row = range.startRow - original.startRow,
+          column = range.startColumn - original.startColumn
+        const rule = { ...entry.rule }
+        if (row || column)
+          for (const key of ['formula1', 'formula2']) {
+            const value = rule[key]
+            if (typeof value === 'string' && !(rule.type === 'list' && !value.startsWith('=')))
+              rule[key] = offsetFormulaRefs(value, row, column)
+          }
+        return { ranges: [range], rule }
+      }),
+    ),
+  )
+}
+
+/** Native list options are JSON arrays; legacy imports may still use comma text. */
+export function nativeDvListValues(text: string): string[] {
+  try {
+    const values: unknown = JSON.parse(text)
+    if (Array.isArray(values) && values.every((value) => typeof value === 'string'))
+      return values.filter(Boolean)
+  } catch {
+    /* Legacy comma lists are still supported. */
+  }
+  return text.split(',').filter(Boolean)
+}
+
+function subtractArea(area: DvCellArea, cut: DvCellArea): DvCellArea[] {
+  const top = Math.max(area.startRow, cut.startRow),
+    bottom = Math.min(area.endRow, cut.endRow),
+    left = Math.max(area.startColumn, cut.startColumn),
+    right = Math.min(area.endColumn, cut.endColumn)
+  if (top > bottom || left > right) return [area]
+  const pieces: DvCellArea[] = []
+  if (area.startRow < top) pieces.push({ ...area, endRow: top - 1 })
+  if (bottom < area.endRow) pieces.push({ ...area, startRow: bottom + 1 })
+  if (area.startColumn < left)
+    pieces.push({
+      startRow: top,
+      endRow: bottom,
+      startColumn: area.startColumn,
+      endColumn: left - 1,
+    })
+  if (right < area.endColumn)
+    pieces.push({
+      startRow: top,
+      endRow: bottom,
+      startColumn: right + 1,
+      endColumn: area.endColumn,
+    })
+  return pieces
+}
+
+function offsetValidationFormulas(entry: string, rowDelta: number, columnDelta: number): string {
+  return entry.replace(
+    /(<formula([12])>)([\s\S]*?)(<\/formula\2>)/g,
+    (_match, open: string, _index: string, encoded: string, close: string) =>
+      `${open}${escapeXmlText(offsetFormulaRefs(unescapeFormulaXml(encoded), rowDelta, columnDelta))}${close}`,
+  )
+}
+
+function unescapeFormulaXml(value: string): string {
+  return value.replace(/&(#x[0-9a-f]+|#\d+|quot|apos|lt|gt|amp);/gi, (entity, code: string) => {
+    if (code === 'quot') return '"'
+    if (code === 'apos') return "'"
+    if (code === 'lt') return '<'
+    if (code === 'gt') return '>'
+    if (code === 'amp') return '&'
+    const numeric =
+      code[1]?.toLowerCase() === 'x' ? Number.parseInt(code.slice(2), 16) : Number(code.slice(1))
+    return Number.isInteger(numeric) && numeric >= 0 && numeric <= 0x10ffff
+      ? String.fromCodePoint(numeric)
+      : entity
+  })
+}
+
 /** `A1:A1` and `$A$1` name the same cell as `A1`; `A:A` / `1:1` expand to the full grid. */
 function normalizeRef(ref: string): string {
-  const [a, b] = ref.replace(/\$/g, '').split(':')
+  const [a, b] = ref.replace(/\$/g, '').toUpperCase().split(':')
   if (b !== undefined) {
     if (/^[A-Z]+$/.test(a!) && /^[A-Z]+$/.test(b)) return `${a}1:${b}${MAX_GRID_ROWS}`
     if (/^\d+$/.test(a!) && /^\d+$/.test(b))
@@ -481,7 +679,13 @@ function formulaText(type: string | undefined, raw: unknown): string | undefined
   const text = String(raw)
   if (text === '') return undefined
   if (type === 'list') {
-    return text.startsWith('=') ? text.slice(1) : `"${text.replaceAll('"', '""')}"`
+    if (text.startsWith('=')) return text.slice(1)
+    const values = nativeDvListValues(text)
+    if (values.some((value) => value.includes(',')))
+      throw new DvEditError(
+        'An inline Excel validation option cannot contain a comma. Use a source range instead.',
+      )
+    return `"${values.join(',').replaceAll('"', '""')}"`
   }
   if (type === 'custom') {
     return text.startsWith('=') ? text.slice(1) : text

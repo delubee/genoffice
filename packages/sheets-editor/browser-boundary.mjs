@@ -8,11 +8,25 @@ export function browserBoundary() {
     name: 'genoffice-browser-boundary',
     enforce: 'pre',
     resolveId(source) {
+      // Pure constants/range redaction helpers shared by DOCX parsing; this
+      // explicit subpath imports no agent runtime, provider, process or network.
+      // The ai-provider `browser` entry is its renderer-safe settings surface (types and
+      // pure helpers; its own header keeps Node-backed transports out).
       if (
-        source.startsWith('node:') || builtins.has(source) ||
+        [
+          '@genoffice/agent-core/redact-range',
+          '@genoffice/agent-core/redact-core',
+          '@genoffice/ai-provider/browser',
+        ].includes(source)
+      )
+        return null
+      if (
+        source.startsWith('node:') ||
+        builtins.has(source) ||
         /^electron(?:\/|$)/.test(source) ||
         /^@genoffice\/(?:agent-core|ai-provider|ai-search|workbook-session)(?:\/|$)/.test(source)
-      ) throw new Error(`Browser bundle cannot import ${source}`)
+      )
+        throw new Error(`Browser bundle cannot import ${source}`)
       return null
     },
   }

@@ -1,10 +1,38 @@
+import type { SaveCalculationValue } from './calculation/save-values'
+import { sessionPivotAdditions } from '@genoffice/xlsx-gateway/domain/session-candidate'
+import {
+  sparklineCells,
+  type SessionSparklineGroup,
+} from '@genoffice/xlsx-gateway/domain/session-sparklines'
+import type { PivotRefreshUpdate } from '@genoffice/xlsx-gateway/gateway/xlsx-pivot-expand'
+import type {
+  SheetProtectedRangesState,
+  SheetProtectionState,
+  SheetTableAddition,
+  SheetTableEdit,
+} from '@genoffice/xlsx-gateway/gateway/xlsx-gateway'
+import type {
+  WorkbookPivotAdd,
+  WorkbookTableAdd,
+  WorkbookTableEdit,
+} from '@genoffice/xlsx-gateway/shared/workbook-protocol'
+import {
+  visibilityEditsSchema,
+  visibilityStructuralOp,
+} from '@genoffice/xlsx-gateway/domain/session-visibility'
+import {
+  outlineEditSchema,
+  outlineStructuralOp,
+} from '@genoffice/xlsx-gateway/domain/session-outline'
+import type { NameReferenceChange } from '@genoffice/xlsx-gateway/domain/defined-name-references'
+import { sessionDefinedNames } from '@genoffice/xlsx-gateway/domain/session-defined-names'
 import { copyFile, mkdtemp, rename, rm, unlink } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { z } from 'zod'
 import { columnIndex, parseAddress } from '@genoffice/xlsx-gateway/domain/cell-address'
 import { sessionMerges } from '@genoffice/xlsx-gateway/domain/session-merges'
 import { pixelsToColumnWidth } from '@genoffice/xlsx-gateway/domain/sheet-dimensions'
-import type { SheetVisual } from '@genoffice/xlsx-gateway/domain/chart-visual'
+import { chartKindFromVisual, type SheetVisual } from '@genoffice/xlsx-gateway/domain/chart-visual'
 import {
   saveWorkbookViaSidecar,
   type StreamingSaveRequest,
@@ -12,6 +40,10 @@ import {
 } from '@genoffice/xlsx-gateway/gateway/xlsx-package-io'
 import type { SheetEditPlan } from '@genoffice/xlsx-gateway/gateway/xlsx-sheets'
 import { workbookVisualAddSchema } from '@genoffice/xlsx-gateway/shared/workbook-protocol'
+import {
+  workbookChartEditSchema,
+  workbookVisualEditSchema,
+} from '@genoffice/xlsx-gateway/shared/edit-schemas'
 import { workbookFilterStateSchema } from '@genoffice/xlsx-gateway/shared/workbook-protocol'
 import type { SheetFilterState } from '@genoffice/xlsx-gateway/gateway/xlsx-filter'
 import { WorkbookError, assertNotCancelled, type WorkbookState } from './domain'
@@ -20,7 +52,12 @@ import { hashFile } from './resources'
 import { workbookStateSchema } from './schemas'
 import { workbookOperationSchema } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
 import type { SheetPageSetupState } from '@genoffice/xlsx-gateway/gateway/xlsx-page-setup'
-import type { SheetNoteState } from '@genoffice/xlsx-gateway/gateway/xlsx-gateway'
+import type {
+  SheetCfState,
+  SheetDvState,
+  SheetNoteState,
+} from '@genoffice/xlsx-gateway/gateway/xlsx-gateway'
+import type { DvCellArea, DvWireRule } from '@genoffice/xlsx-gateway/gateway/xlsx-dv'
 import { captureFileBaseline, publishStagedWorkbook, type FileBaseline } from './publish'
 
 const metadataSchema = z.object({ sheets: z.array(z.object({ id: z.string(), name: z.string() })) })
@@ -40,6 +77,8 @@ export class SessionPackageWriter implements PackageWriter {
     rawState: Readonly<WorkbookState>,
     targetPath: string,
     signal?: AbortSignal,
+    /** Fresh formula results to cache in the saved file (see calculateSaveValues). */
+    calculated: readonly SaveCalculationValue[] | null = null,
   ) {
     assertNotCancelled(signal)
     const state = workbookStateSchema.parse(rawState),
@@ -160,23 +199,97 @@ export class SessionPackageWriter implements PackageWriter {
             `The package writer cannot replay ${op.op}.`,
           )
       }
+      const nameJournal = state.features?.definedNamesEdits ? sessionDefinedNames(state) : null
+      const definedNamesState = nameJournal
+        ? {
+            preserveNames: nameJournal.preserveNames,
+            names: nameJournal.names.map(({ name, formula, scopeSheetId }) => {
+              const sheetIndex =
+                scopeSheetId === undefined
+                  ? undefined
+                  : state.sheets.findIndex((sheet) => sheet.id === scopeSheetId)
+              if (sheetIndex === -1)
+                throw new WorkbookError('invalid_document', 'Unknown defined-name scope.')
+              return { name, formula, ...(sheetIndex === undefined ? {} : { sheetIndex }) }
+            }),
+          }
+        : null
+      const chartEdits: NonNullable<StreamingSaveRequest['chartEdits']>[number][] = []
+      const visualEdits: NonNullable<StreamingSaveRequest['visualEdits']>[number][] = []
+      const hyperlinkEdits: NonNullable<StreamingSaveRequest['hyperlinkEdits']>[number][] = []
       const edits: StreamingSaveRequest['edits'][number][] = [],
         visualAdditions: NonNullable<StreamingSaveRequest['visualAdditions']>[number][] = [],
         formulaValues: NonNullable<StreamingSaveRequest['formulaValues']>[number][] = []
       const pageSetupStates: SheetPageSetupState[] = [],
         noteStates: SheetNoteState[] = []
       const filterStates: SheetFilterState[] = []
+      const sheetProtections: SheetProtectionState[] = []
+      const protectedRangeStates: SheetProtectedRangesState[] = []
+      const workbookLock = state.features?.workbookProtectionEdits as
+        { lockStructure: boolean } | undefined
+      const calcMode = state.features?.calcModeEdits as
+        { mode: 'auto' | 'manual' | 'autoNoTable' } | undefined
+      const dvStates: SheetDvState[] = []
+      const cfStates: SheetCfState[] = []
       for (const sheet of state.sheets) {
         if (names.get(sheet.id) !== sheet.name)
           throw new WorkbookError(
             'invalid_document',
             'The structural log does not produce the current sheet map.',
           )
+        for (const [chartPath, patch] of Object.entries(
+          (sheet.features?.chartEdits ?? {}) as Record<string, object>,
+        )) {
+          const metadata = state.features?.originalMetadata as
+            { visuals?: { id: string; sheetId: string; chartPath?: string }[] } | undefined
+          const matches =
+            metadata?.visuals?.filter((visual) => visual.chartPath === chartPath) ?? []
+          const native = matches[0]
+          if (matches.length !== 1 || !native || native.sheetId !== sheet.originalSheetId)
+            throw new WorkbookError('invalid_document', 'Unknown original chart owner.')
+          if (
+            (sheet.features?.visualEdits as Record<string, { remove?: true }> | undefined)?.[
+              native.id
+            ]?.remove
+          )
+            continue
+          chartEdits.push(workbookChartEditSchema.parse({ ...patch, chartPath }))
+        }
+        for (const [visualId, patch] of Object.entries(
+          (sheet.features?.visualEdits ?? {}) as Record<string, unknown>,
+        )) {
+          const original = (
+            state.features?.originalMetadata as
+              | {
+                  visuals?: {
+                    id: string
+                    sheetId: string
+                    drawingPath?: string
+                    drawingIndex?: number
+                  }[]
+                }
+              | undefined
+          )?.visuals?.find(
+            (visual) => visual.id === visualId && visual.sheetId === sheet.originalSheetId,
+          )
+          if (!original)
+            throw new WorkbookError(
+              'invalid_document',
+              'A visual edit has no original drawing mapping.',
+            )
+          visualEdits.push(
+            workbookVisualEditSchema.parse({
+              ...(patch as object),
+              drawingPath: original.drawingPath,
+              drawingIndex: original.drawingIndex,
+            }),
+          )
+        }
         const heights = z
-          .record(z.string().regex(/^[1-9][0-9]*$/), z.number().finite().min(2).max(409))
+          .record(z.string().regex(/^[1-9][0-9]*$/), z.number().finite().min(0).max(409.5))
           .parse(sheet.features?.rowHeights ?? {})
         const widths = z
-          .record(z.string().regex(/^[A-Z]{1,3}$/), z.number().finite().min(10).max(2000))
+          .record(z.string().regex(/^[A-Z]{1,3}$/), z.number().finite().min(0).max(8000))
           .parse(sheet.features?.colWidths ?? {})
         const sizeOps = [
           ...Object.entries(heights).map(([row, height]) => ({
@@ -189,9 +302,20 @@ export class SessionPackageWriter implements PackageWriter {
             kind: 'set-col-size' as const,
             start: columnIndex(column),
             end: columnIndex(column),
-            size: pixelsToColumnWidth(width),
+            size:
+              ((sheet.features?.columnWidthsCharacters ?? {}) as Record<string, number>)[column] ??
+              pixelsToColumnWidth(width),
           })),
         ]
+        const outlineOps = z
+          .array(outlineEditSchema)
+          .parse(sheet.features?.outlineEdits ?? [])
+          .map(outlineStructuralOp)
+        if (outlineOps.length)
+          await writeStage({
+            edits: [],
+            structuralOps: [{ sheetName: sheet.name, ops: outlineOps }],
+          })
         if (sizeOps.length)
           await writeStage({ edits: [], structuralOps: [{ sheetName: sheet.name, ops: sizeOps }] })
         if (sheet.features?.mergeEdits) {
@@ -210,6 +334,20 @@ export class SessionPackageWriter implements PackageWriter {
           )
           filterStates.push({ sheetName: sheet.name, ...filter })
         }
+        const cfEdits = sheet.features?.cfEdits as { rules: SheetCfState['rules'] } | undefined
+        if (cfEdits) cfStates.push({ sheetName: sheet.name, rules: cfEdits.rules })
+        const validationEdits = sheet.features?.dataValidationEdits as
+          { rules?: DvWireRule[]; remove?: DvCellArea[] } | undefined
+        if (
+          validationEdits &&
+          ((validationEdits.rules?.length ?? 0) || validationEdits.remove?.length)
+        )
+          dvStates.push({
+            sheetName: sheet.name,
+            rules: validationEdits.rules ?? [],
+            append: true,
+            remove: validationEdits.remove ?? [],
+          })
         if (sheet.features?.pageSetupEdits || sheet.features?.freezeEdits) {
           const page = sheet.features.pageSetupEdits
             ? workbookOperationSchema.parse({
@@ -235,27 +373,69 @@ export class SessionPackageWriter implements PackageWriter {
           } = page ?? { op: undefined, sheetId: undefined }
           pageSetupStates.push({ sheetName: sheet.name, ...settings, ...freeze })
         }
-        if (sheet.features?.noteEdits) {
+        const protection = sheet.features?.protectionEdits as
+          (Omit<SheetProtectionState, 'sheetName'> & { hasPassword: boolean }) | undefined
+        const allowRanges = sheet.features?.protectedRangeEdits as
+          { name: string; sqref: string }[] | undefined
+        if (allowRanges) protectedRangeStates.push({ sheetName: sheet.name, ranges: allowRanges })
+        if (protection) {
+          const { hasPassword: _hasPassword, ...write } = protection
+          sheetProtections.push({ sheetName: sheet.name, ...write })
+        }
+        if (sheet.features?.hyperlinkEdits) {
+          hyperlinkEdits.push({
+            sheetName: sheet.name,
+            edits: Object.entries(sheet.features.hyperlinkEdits).map(([address, target]) => {
+              if (target !== null && typeof target !== 'string')
+                throw new WorkbookError('invalid_document', 'Invalid hyperlink target.')
+              const cell = parseAddress(address)
+              return { row: cell.row, column: cell.column, target }
+            }),
+          })
+        }
+        if (sheet.features?.noteEdits || sheet.features?.threadEdits) {
           const original =
             (sheet.features.originalMetadata as { comments?: SheetNoteState['notes'] } | undefined)
               ?.comments ?? []
           const notes = new Map(
             original.map((note) => [String(note.row) + ':' + String(note.column), note]),
           )
+          // Threads first: a thread converted to a note keeps its author.
+          const threadAuthors = new Map<string, string>()
+          for (const [address, thread] of Object.entries(
+            (sheet.features.threadEdits ?? {}) as Record<
+              string,
+              (NonNullable<SheetNoteState['notes'][number]['thread']> & { text: string }) | null
+            >,
+          )) {
+            const point = parseAddress(address),
+              key = `${point.row}:${point.column}`
+            const existing = notes.get(key)
+            if (thread === null) {
+              if (existing?.thread) threadAuthors.set(key, existing.thread.author)
+              notes.delete(key)
+              continue
+            }
+            const { text, ...meta } = thread
+            notes.set(key, { ...point, author: thread.author, text, thread: meta })
+          }
           const changes = z
             .record(z.string(), z.string().min(1).max(32000).nullable())
-            .parse(sheet.features.noteEdits)
+            .parse(sheet.features.noteEdits ?? {})
           for (const [address, text] of Object.entries(changes)) {
             const point = parseAddress(address),
               key = `${point.row}:${point.column}`
             if (text === null) notes.delete(key)
-            else
+            else {
+              const existing = notes.get(key)
               notes.set(key, {
-                ...notes.get(key),
+                ...existing,
                 ...point,
-                author: notes.get(key)?.author ?? 'GenOffice',
+                author: existing?.author ?? threadAuthors.get(key) ?? 'GenOffice',
                 text,
+                ...(existing?.thread || threadAuthors.has(key) ? { thread: null } : {}),
               })
+            }
           }
           noteStates.push({ sheetName: sheet.name, notes: [...notes.values()] })
         }
@@ -269,6 +449,7 @@ export class SessionPackageWriter implements PackageWriter {
             row: point.row,
             column: point.column,
             writeValue: true,
+            ...(cell.styleReset ? { styleReset: true } : {}),
             cell: {
               value: cell.formula && cell.calculationState !== 'ready' ? null : cell.rawValue,
               ...(cell.kind === 'error' ? { error: true } : {}),
@@ -290,37 +471,125 @@ export class SessionPackageWriter implements PackageWriter {
               value: cell.kind === 'error' ? { error: String(cell.cachedValue) } : cell.cachedValue,
             })
         }
-        if (formulaCells.length) formulaValues.push({ sheetName: sheet.name, cells: formulaCells })
-        for (const visual of (sheet.features?.charts ?? []) as unknown as SheetVisual[]) {
-          const chart = visual.chart
-          if (
-            chart.chartTypes.length !== 1 ||
-            !['barChart', 'lineChart', 'pieChart'].includes(chart.chartTypes[0]!)
+        // Fresh results replace whatever the edited cells carried.
+        for (const result of calculated ?? []) {
+          if (result.sheetId !== sheet.id) continue
+          const at = formulaCells.findIndex(
+            (cell) => cell.row === result.row && cell.column === result.column,
           )
-            throw new WorkbookError(
-              'unsupported_operation',
-              'The chart type cannot be serialized by this editor yet.',
-            )
-          const chartType = chart.chartTypes.includes('pieChart')
-            ? 'pie'
-            : chart.chartTypes.includes('lineChart')
-              ? 'line'
-              : chart.barDirection === 'bar'
-                ? 'bar'
-                : 'column'
+          const entry = { row: result.row, column: result.column, value: result.value }
+          if (at >= 0) formulaCells[at] = entry
+          else formulaCells.push(entry)
+        }
+        if (formulaCells.length) formulaValues.push({ sheetName: sheet.name, cells: formulaCells })
+        for (const visual of (sheet.features?.visuals ??
+          sheet.features?.charts ??
+          []) as unknown as SheetVisual[]) {
+          if (visual.kind === 'image') {
+            const addition = workbookVisualAddSchema.parse({
+              sheetId: sheet.id,
+              anchor: visual.anchor,
+              image: {
+                mediaType: visual.mediaType,
+                base64: visual.mediaDataUrl.split(',')[1],
+                altText: visual.altText,
+                editAs: visual.editAs,
+                rotation: visual.rotation,
+                flipH: visual.flipH,
+                flipV: visual.flipV,
+                ...(visual.frameWidth && visual.frameHeight
+                  ? { frameSize: { width: visual.frameWidth, height: visual.frameHeight } }
+                  : {}),
+              },
+            })
+            visualAdditions.push({
+              sheetName: sheet.name,
+              anchor: addition.anchor,
+              image: addition.image,
+            })
+            continue
+          }
+          if (visual.kind === 'shape') {
+            const addition = workbookVisualAddSchema.parse({
+              sheetId: sheet.id,
+              anchor: visual.anchor,
+              shape: {
+                shapeType: visual.shapeType,
+                text: visual.text,
+                isTextBox: visual.isTextBox,
+                fillColor: visual.fillColor,
+                lineColor: visual.lineColor,
+                altText: visual.altText,
+                editAs: visual.editAs,
+                rotation: visual.rotation,
+                flipH: visual.flipH,
+                flipV: visual.flipV,
+                ...(visual.frameWidth && visual.frameHeight
+                  ? { frameSize: { width: visual.frameWidth, height: visual.frameHeight } }
+                  : {}),
+              },
+            })
+            visualAdditions.push({
+              sheetName: sheet.name,
+              anchor: addition.anchor,
+              shape: addition.shape,
+            })
+            continue
+          }
+          const chart = visual.chart
+          const chartType = chartKindFromVisual(chart)
+          if (!chartType) throw new WorkbookError('unsupported_operation', 'Unknown chart type.')
           const addition = workbookVisualAddSchema.parse({
             sheetId: sheet.id,
             anchor: visual.anchor,
             chart: {
+              altText: visual.altText,
+              editAs: visual.editAs,
               chartType,
               title: chart.title,
               series: chart.series.map((series) => ({
                 name: series.name,
                 categories: series.categories,
                 values: series.values,
+                ...(series.explosionPct === undefined ? {} : { explosionPct: series.explosionPct }),
+                ...(series.pointExplosions?.length
+                  ? {
+                      pointExplosions: Object.fromEntries(
+                        series.pointExplosions.map((point) => [String(point.index), point.pct]),
+                      ),
+                    }
+                  : {}),
+                ...(series.color ? { color: series.color } : {}),
+                ...(series.pointColors?.length
+                  ? {
+                      pointColors: Object.fromEntries(
+                        series.pointColors.map((point) => [String(point.index), point.color]),
+                      ),
+                    }
+                  : {}),
                 ...(series.valuesRef ? { valuesRef: series.valuesRef } : {}),
                 ...(series.categoriesRef ? { categoriesRef: series.categoriesRef } : {}),
               })),
+              ...(chart.dataLabelPosition === undefined
+                ? {}
+                : { dataLabelPosition: chart.dataLabelPosition }),
+              ...(chart.dataLabelFormat === undefined
+                ? {}
+                : { dataLabelFormat: chart.dataLabelFormat }),
+              ...(chart.grouping === undefined ? {} : { grouping: chart.grouping }),
+              ...(chart.gridlines === undefined ? {} : { gridlines: chart.gridlines }),
+              ...(chart.valueAxis === undefined ? {} : { valueAxis: chart.valueAxis }),
+              ...(chart.gapWidthPct === undefined ? {} : { gapWidthPct: chart.gapWidthPct }),
+              ...(chart.holeSizePct === undefined ? {} : { holeSizePct: chart.holeSizePct }),
+              ...(chart.axisTitles
+                ? {
+                    axisTitles: Object.fromEntries(
+                      Object.entries(chart.axisTitles).filter(
+                        ([, value]) => typeof value === 'string',
+                      ),
+                    ),
+                  }
+                : {}),
               ...(chart.legend ? { legend: chart.legend } : {}),
               ...(chart.dataLabels ? { dataLabels: chart.dataLabels } : {}),
             },
@@ -332,23 +601,149 @@ export class SessionPackageWriter implements PackageWriter {
           })
         }
       }
+      // Refreshed file pivots: refreshOnLoad for their caches and widened locations. The
+      // writer checks growth areas against its input, so they share the cell-edit stage.
+      const pivotCacheRefreshPaths: string[] = [],
+        pivotRefreshUpdates: PivotRefreshUpdate[] = []
+      for (const sheet of state.sheets) {
+        const refresh = (sheet.features?.pivotRefresh ?? {}) as {
+          cachePaths?: string[]
+          outputRefs?: Record<string, string>
+        }
+        pivotCacheRefreshPaths.push(...(refresh.cachePaths ?? []))
+        const relayouts = Object.values(
+          (sheet.features?.pivotRelayouts ?? {}) as Record<
+            string,
+            WorkbookPivotAdd & { cachePath: string }
+          >,
+        )
+        for (const [cachePath, newOutputRef] of Object.entries(refresh.outputRefs ?? {})) {
+          const edited = relayouts.find((item) => item.cachePath === cachePath)
+          let relayout: NonNullable<PivotRefreshUpdate['relayout']> | undefined
+          if (edited) {
+            const { sheetId: _sheet, sourceSheetId, cachePath: _cache, ...layout } = edited
+            const origin = state.sheets.find((item) => item.id === sourceSheetId)
+            if (!origin)
+              throw new WorkbookError('invalid_document', 'An edited PivotTable lost its source.')
+            relayout = { ...layout, sourceSheetName: origin.name }
+          }
+          pivotRefreshUpdates.push({
+            cachePath,
+            sheetName: sheet.name,
+            newOutputRef,
+            ...(relayout ? { relayout } : {}),
+          })
+        }
+      }
       if (
         edits.length ||
+        sheetProtections.length ||
+        protectedRangeStates.length ||
+        workbookLock !== undefined ||
+        calcMode !== undefined ||
+        pivotCacheRefreshPaths.length ||
+        pivotRefreshUpdates.length ||
+        hyperlinkEdits.length ||
         visualAdditions.length ||
+        visualEdits.length ||
+        chartEdits.length ||
         state.structuralLog.length ||
         pageSetupStates.length ||
         noteStates.length ||
-        filterStates.length
+        filterStates.length ||
+        dvStates.length ||
+        cfStates.length ||
+        definedNamesState !== null
       )
         await writeStage({
           edits,
-          visualAdditions,
+          sheetProtections,
+          protectedRangeStates,
+          workbookProtectionState: workbookLock ?? null,
+          calcModeState: calcMode ?? null,
+          pivotCacheRefreshPaths,
+          pivotRefreshUpdates,
+          hyperlinkEdits,
+          visualAdditions: visualAdditions.slice(0, 50),
+          visualEdits,
+          chartEdits,
           formulaValues,
           pageSetupStates,
           noteStates,
           filterStates,
+          dvStates,
+          cfStates,
+          definedNamesState,
+          nameReferencePlan: state.features?.definedNameReferences
+            ? {
+                changes: state.features.definedNameReferences as unknown as NameReferenceChange[],
+                sheets: state.sheets.map(({ id, name }) => ({ id, name })),
+              }
+            : null,
           invalidateFormulaCaches: true,
         })
+      for (const sheet of state.sheets) {
+        const ops = visibilityEditsSchema
+          .parse(sheet.features?.visibilityEdits ?? [])
+          .map(visibilityStructuralOp)
+        if (ops.length)
+          await writeStage({ edits: [], structuralOps: [{ sheetName: sheet.name, ops }] })
+      }
+      for (let start = 50; start < visualAdditions.length; start += 50)
+        await writeStage({ edits: [], visualAdditions: visualAdditions.slice(start, start + 50) })
+      // New PivotTables pin final coordinates and names, so they follow every
+      // structural and sheet stage in a stage of their own.
+      const pivots = sessionPivotAdditions(state).map(({ sheetId, sourceSheetId, ...pivot }) => {
+        const owner = state.sheets.find((sheet) => sheet.id === sheetId),
+          origin = state.sheets.find((sheet) => sheet.id === sourceSheetId)
+        if (!owner || !origin)
+          throw new WorkbookError('invalid_document', 'A new PivotTable lost its worksheet.')
+        return { ...pivot, sheetName: owner.name, sourceSheetName: origin.name }
+      })
+      // Tables pin final coordinates and names too: their own stage after
+      // every structural and sheet stage (header cells were written above).
+      const tableAdditions: SheetTableAddition[] = [],
+        tableEdits: SheetTableEdit[] = []
+      for (const sheet of state.sheets) {
+        for (const add of (sheet.features?.tableAdditions ?? []) as WorkbookTableAdd[]) {
+          const {
+            sheetId: _sheet,
+            headerRow,
+            totalsRow,
+            firstColumn,
+            lastColumn,
+            bandedColumns,
+            filterButton,
+            ...rest
+          } = add
+          tableAdditions.push({
+            ...rest,
+            sheetName: sheet.name,
+            options: { headerRow, totalsRow, firstColumn, lastColumn, bandedColumns, filterButton },
+          })
+        }
+        for (const edit of Object.values(
+          (sheet.features?.tableEdits ?? {}) as Record<string, WorkbookTableEdit>,
+        )) {
+          const { sheetId: _sheet, ...rest } = edit
+          tableEdits.push({ ...rest, sheetName: sheet.name })
+        }
+      }
+      if (tableAdditions.length || tableEdits.length)
+        await writeStage({ edits: [], tableAdditions, tableEdits })
+      const sparklineAdditions = state.sheets.flatMap((sheet) =>
+        ((sheet.features?.sparklineAdditions ?? []) as unknown as SessionSparklineGroup[]).map(
+          (group) => ({
+            sheetName: sheet.name,
+            type: group.type,
+            ...(group.color === undefined ? {} : { color: group.color }),
+            cells: sparklineCells(sheet.name, group),
+          }),
+        ),
+      )
+      if (sparklineAdditions.length) await writeStage({ edits: [], sparklineAdditions })
+      for (let start = 0; start < pivots.length; start += 20)
+        await writeStage({ edits: [], pivotAdditions: pivots.slice(start, start + 20) })
       assertNotCancelled(signal)
       if ((await hashFile(originalPath)) !== originalHash)
         throw new WorkbookError(

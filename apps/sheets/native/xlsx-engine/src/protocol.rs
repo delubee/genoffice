@@ -58,6 +58,10 @@ pub enum Command {
         #[serde(rename = "sheetId")]
         sheet_id: String,
     },
+    ReadCalculationContext {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+    },
     ReadFormulaCells {
         #[serde(rename = "sessionId")]
         session_id: String,
@@ -588,6 +592,9 @@ pub fn handle_request(
             sheet_id,
         } => sessions
             .read_merge_ranges(&session_id, &sheet_id)
+            .and_then(to_json_value),
+        Command::ReadCalculationContext { session_id } => sessions
+            .read_calculation_context(&session_id, &in_flight.flag())
             .and_then(to_json_value),
         Command::ReadFormulaCells {
             session_id,

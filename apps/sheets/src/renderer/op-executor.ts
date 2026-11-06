@@ -1,10 +1,13 @@
+import { threadStore } from './threaded-comments'
+import { nextSheetName } from './sheet-default-name'
+import { reorder } from './visual-arrange-actions'
 /**
  * Applies a planned batch of workbook operations to the live Univer workbook:
  * prechecks, one undo item per batch, per-op facade calls and journal
  * records. Extracted from App.tsx so ribbon actions can run the same ops the
  * AI proposes; every function receives its App-scope context explicitly.
  */
-import { IUndoRedoService } from '@univerjs/core'
+import { IUndoRedoService, CellValueType } from '@univerjs/core'
 import type { CellBounds } from '@genoffice/xlsx-gateway/domain/chart-visual'
 import {
   columnIndex,
@@ -31,6 +34,7 @@ import type {
 import { pushBulkFillUndo } from './bulk-fill-undo'
 import {
   journalCellContentAt,
+  fromNeutralStyle,
   plainCellValue,
   journalSize,
   recordBulkConstantFill,
@@ -42,6 +46,8 @@ import {
   restoreJournalCells,
   type HeaderFooterParts,
   type PageSetupJournalState,
+  recordWorkbookProtection,
+  recordProtectedRangesChange,
 } from './edit-journal'
 import { indexedFormulaText } from './formula-view'
 import { buildLazyChangePlan } from './lazy-plan'
@@ -95,6 +101,7 @@ import {
   buildAiChartEdit,
   insertAiChartVisual,
   insertAiImageVisual,
+  insertInlinePictureVisual,
   insertAiShapeVisual,
   type VisualActionContext,
 } from './visual-actions'
@@ -332,15 +339,6 @@ export function planFromOps(
   )
 }
 
-/** Excel-style default name for an inserted sheet: the lowest free SheetN. */
-export function nextSheetName(taken: readonly string[]): string {
-  const lower = new Set(taken.map((name) => name.toLowerCase()))
-  for (let n = 1; ; n += 1) {
-    const candidate = `Sheet${n}`
-    if (!lower.has(candidate.toLowerCase())) return candidate
-  }
-}
-
 function planTargetSheets(plan: ChangePlan): Set<string> {
   const sheets = new Set<string>()
   for (const structural of plan.structuralChanges) {
@@ -386,6 +384,25 @@ async function applyChangePlanNow(
   const notices: string[] = []
   let imageData: Map<string, LoadedImage>
   try {
+    if (
+      plannedOps.some(
+        (op) =>
+          op.op === 'relocate_range' ||
+          (op.op === 'paste_cells' &&
+            (op.writeValues !== undefined ||
+              op.format !== undefined ||
+              op.skipCells !== undefined)),
+      )
+    )
+      throw new Error(t('appClipboardUnsupported'))
+    if (
+      plannedOps.some(
+        (op) =>
+          op.op === 'paste_cells' &&
+          op.cells.some((row) => row.some((c) => c.kind === 'error' && !c.formula)),
+      )
+    )
+      throw new Error(t('appClipboardUnsupported'))
     imageData = await prefetchOpImages(plannedOps)
     const spanError = await precheckStructuralDeletes(state, workbook, plannedOps)
     if (spanError) throw new Error(options.userFacing ? t('appDeleteSpanFormulas') : spanError)
@@ -498,6 +515,8 @@ async function applyChangePlanNow(
     // Same facade setters as the ribbon, so the edit journal records them
     // (indent included — it lands as a pd patch in set-range-values).
     for (const formatChange of plan.formatChanges) {
+      if (formatChange.reset)
+        sheetById(formatChange.sheetId).getRange(formatChange.range).clearFormat()
       applyFormatPatchToRange(
         sheetById(formatChange.sheetId).getRange(formatChange.range),
         formatChange.format,
@@ -540,7 +559,53 @@ async function executeOp(op: PlannedOp, run: OpRun): Promise<void> {
   // here so a gated op fails loud instead of reporting success.
   const gate = lazyGateFailure(state, op)
   if (gate) throw new Error(run.userFacing && gate.messageKey ? t(gate.messageKey) : gate.reason)
-  if (op.op === 'insert_rows') sheetById(op.sheetId).insertRowsBefore(op.row - 1, op.count)
+  if (op.op === 'subtotal')
+    throw new Error('unsupported_operation: subtotal requires a canonical workbook session')
+  if (op.op === 'edit_pivot')
+    throw new Error('unsupported_operation: edit_pivot requires a canonical workbook session')
+  if (op.op === 'filter_pivot')
+    throw new Error('unsupported_operation: filter_pivot requires a canonical workbook session')
+  if (op.op === 'set_conditional_formats')
+    throw new Error(
+      'unsupported_operation: set_conditional_formats requires a canonical workbook session',
+    )
+  if (op.op === 'edit_table')
+    throw new Error('unsupported_operation: edit_table requires a canonical workbook session')
+  if (op.op === 'relocate_range')
+    throw new Error('unsupported_operation: canonical range relocation')
+  if (op.op === 'paste_cells') {
+    const origin = parseAddress(op.start),
+      range = sheetById(op.sheetId).getRange(
+        origin.row,
+        origin.column,
+        op.cells.length,
+        op.cells[0]!.length,
+      )
+    if (op.merges !== undefined) range.breakApart()
+    range.clearFormat()
+    range.setValues(
+      op.cells.map((row) =>
+        row.map((cell) => ({
+          v: cell.formula ? (cell.cachedValue ?? null) : cell.rawValue,
+          f: cell.formula ?? null,
+          si: null,
+          p: null,
+          ...(cell.kind === 'error'
+            ? { t: CellValueType.STRING }
+            : cell.kind === 'boolean'
+              ? { t: CellValueType.BOOLEAN }
+              : cell.kind === 'string'
+                ? { t: CellValueType.FORCE_STRING }
+                : {}),
+          s: fromNeutralStyle({
+            ...cell.style,
+            ...(cell.numberFormat ? { numberFormat: cell.numberFormat } : {}),
+          }),
+        })),
+      ),
+    )
+    for (const merged of op.merges ?? []) sheetById(op.sheetId).getRange(merged).merge()
+  } else if (op.op === 'insert_rows') sheetById(op.sheetId).insertRowsBefore(op.row - 1, op.count)
   else if (op.op === 'delete_rows') sheetById(op.sheetId).deleteRows(op.row - 1, op.count)
   else if (op.op === 'insert_cols')
     sheetById(op.sheetId).insertColumnsBefore(columnIndex(op.column), op.count)
@@ -630,6 +695,44 @@ async function executeOp(op: PlannedOp, run: OpRun): Promise<void> {
       ctx.sparklineDisposablesRef,
       ctx.sparklineTimerRef,
     )
+  } else if (op.op === 'edit_visual') {
+    const visual = [...state.file.visuals, ...state.editJournal.visualAdds].find(
+      (v) => v.id === op.visualId,
+    )
+    if (!visual) throw new Error(`Unknown visual: ${op.visualId}`)
+    const added = state.editJournal.visualAdds.some((v) => v.id === visual.id)
+    if ((op.fillColor !== undefined || op.lineColor !== undefined) && visual.kind !== 'shape')
+      throw new Error('unsupported_visual_paint')
+    if (
+      (op.rotation !== undefined ||
+        op.flipH !== undefined ||
+        op.flipV !== undefined ||
+        op.frameSize !== undefined) &&
+      visual.kind !== 'shape' &&
+      visual.kind !== 'image'
+    )
+      throw new Error('unsupported_visual_transform')
+    if (!added) {
+      if (visual.drawingPath === undefined || visual.drawingIndex === undefined)
+        throw new Error('unsupported_visual_anchor')
+      if (op.editAs !== undefined && visual.editAs === undefined)
+        throw new Error('unsupported_visual_placement')
+      if (op.frameSize !== undefined && !state.editJournal.visualEdits.get(visual.id)?.anchor)
+        throw new Error('visual_frame_requires_anchor')
+    }
+    const changes = Object.fromEntries(
+      Object.entries(op).filter(
+        ([key, value]) => !['op', 'visualId', 'zIndex'].includes(key) && value !== undefined,
+      ),
+    ) as ShapeEditChanges
+    if (Object.keys(changes).length) ctx.shapeEditRef.current(visual.id, changes)
+    if (op.zIndex !== undefined) reorder(ctx.visualContext(), runtime, state, visual, op.zIndex)
+  } else if (op.op === 'set_visual_anchor') {
+    const visual = [...state.file.visuals, ...state.editJournal.visualAdds].find(
+      (candidate) => candidate.id === op.visualId && candidate.sheetId === op.sheetId,
+    )
+    if (!visual) throw new Error(`Unknown visual: ${op.visualId}`)
+    ctx.shapeEditRef.current(visual.id, { anchor: op.anchor })
   } else if (op.op === 'delete_visual') {
     const visual = [...state.file.visuals, ...state.editJournal.visualAdds].find(
       (candidate) => candidate.id === op.visualId || candidate.chartPath === op.visualId,
@@ -647,6 +750,8 @@ async function executeOp(op: PlannedOp, run: OpRun): Promise<void> {
     insertAiShapeVisual(ctx.visualContext(), runtime, state, op)
   } else if (op.op === 'edit_shape') {
     applyAiShapeEdit(ctx.visualContext(), runtime, state, op)
+  } else if (op.op === 'add_picture') {
+    insertInlinePictureVisual(ctx.visualContext(), runtime, state, op)
   } else if (op.op === 'add_image') {
     const image = imageData.get(op.path)
     if (!image) throw new Error(t('appImageNotLoaded', { path: op.path }))
@@ -715,11 +820,39 @@ async function executeOp(op: PlannedOp, run: OpRun): Promise<void> {
     if (target.getFilter()) {
       throw new Error(t('appAutoFilterRemoveFailed'))
     }
+  } else if (op.op === 'clear_filter_criteria' || op.op === 'reapply_filter') {
+    const target = sheetById(op.sheetId)
+    if (!target.getFilter()) throw new Error('This sheet has no auto-filter.')
+    const command =
+      op.op === 'clear_filter_criteria'
+        ? 'sheet.command.clear-filter-criteria'
+        : 'sheet.command.re-calc-filter'
+    if (
+      !(await runtime.univerAPI.executeCommand(command, {
+        unitId: target.getWorkbook().getUnitId(),
+        subUnitId: op.sheetId,
+      }))
+    )
+      throw new Error('The filter command was not applied.')
   } else if (op.op === 'set_filter_criteria') {
     applyFilterCriteria(
       sheetById(op.sheetId),
       op.column,
-      op.values === null ? null : { values: op.values },
+      op.colors
+        ? { colors: op.colors }
+        : op.customs
+          ? {
+              customs: {
+                and: !!op.customs.and,
+                filters: op.customs.filters.map((filter) => ({
+                  operator: filter.operator ?? 'equal',
+                  val: String(filter.val),
+                })),
+              },
+            }
+          : op.values === null
+            ? null
+            : { values: op.values! },
     )
   } else if (op.op === 'add_conditional_format') {
     applyAiConditionalFormat(sheetById(op.sheetId), op)
@@ -733,10 +866,22 @@ async function executeOp(op: PlannedOp, run: OpRun): Promise<void> {
     }
   } else if (op.op === 'set_data_validation') {
     applyAiDataValidation(runtime, sheetById(op.sheetId), op)
+  } else if (op.op === 'set_outline' || op.op === 'set_outline_settings') {
+    throw new Error('Outline DSL operations require an authoritative workbook session.')
+  } else if (op.op === 'manage_defined_name' || op.op === 'add_defined_names') {
+    throw new Error('Reference-aware name operations require an authoritative workbook session.')
   } else if (op.op === 'add_defined_name') {
+    if (op.scopeSheetId !== undefined)
+      throw new Error(
+        'Scoped defined-name DSL operations require an authoritative workbook session.',
+      )
     if (!workbook) throw new Error(t('appNoWorkbookOpen'))
     workbook.insertDefinedName(op.name, op.ref)
   } else if (op.op === 'delete_defined_name') {
+    if (op.scopeSheetId !== undefined)
+      throw new Error(
+        'Scoped defined-name DSL operations require an authoritative workbook session.',
+      )
     if (!workbook) throw new Error(t('appNoWorkbookOpen'))
     workbook.deleteDefinedName(op.name)
   } else if (op.op === 'set_page_setup') {
@@ -745,7 +890,8 @@ async function executeOp(op: PlannedOp, run: OpRun): Promise<void> {
     if (
       op.zoomScale !== undefined ||
       op.showGridlines !== undefined ||
-      op.showHeadings !== undefined
+      op.showHeadings !== undefined ||
+      op.showFormulas !== undefined
     )
       throw new Error(
         'unsupported_view_settings: use the desktop View ribbon or the VS Code workbook editor',
@@ -1493,6 +1639,11 @@ async function executeOp(op: PlannedOp, run: OpRun): Promise<void> {
       dataRows.map((row) => row.map((cell) => cell.v)),
       columnIndex(op.byColumn) - bounds.startColumn,
       op.order === 'asc',
+      undefined,
+      op.levels?.map((level) => ({
+        keyOffset: columnIndex(level.byColumn) - bounds.startColumn,
+        ascending: level.order === 'asc',
+      })),
     )
     const movedRows = order
       .map((sourceIndex, target) => ({ sourceIndex, target }))
@@ -1579,6 +1730,28 @@ async function executeOp(op: PlannedOp, run: OpRun): Promise<void> {
         note: op.text,
       })
     }
+  } else if (op.op === 'set_thread') {
+    sheetById(op.sheetId)
+    const { row, column } = parseAddress(op.address)
+    if (op.thread === null) threadStore.remove(op.sheetId, row, column)
+    else threadStore.put(op.sheetId, row, column, op.thread)
+  } else if (op.op === 'protect_workbook') {
+    const file = state.file.workbookProtection
+    if (file?.hasPassword) throw new Error(t('appWorkbookProtectedWithPassword'))
+    recordWorkbookProtection(state.editJournal, op.locked, file?.lockStructure ?? false)
+  } else if (op.op === 'set_protected_ranges') {
+    sheetById(op.sheetId)
+    // A rewrite cannot preserve per-range password hashes; fail closed.
+    if ((state.sheetProtectedRanges.get(op.sheetId) ?? []).some((range) => range.hasPassword))
+      throw new Error(t('appRangesPasswordBlocked'))
+    state.sheetProtectedRanges.set(
+      op.sheetId,
+      op.ranges.map((range) => ({ name: range.name, sqref: range.sqref, hasPassword: false })),
+    )
+    recordProtectedRangesChange(state.editJournal, op.sheetId)
+  } else if (op.op === 'set_calculation_mode') {
+    // The saved calculation mode belongs to the VS Code editor; the desktop keeps it as a window setting.
+    throw new Error('Calculation mode edits are only supported in the VS Code editor.')
   } else {
     ctx.chartEditRef.current(
       op.chartPath,
@@ -1602,3 +1775,5 @@ function headerFooterParts(
     ...(parts.right === undefined ? {} : { right: parts.right }),
   }
 }
+
+export { nextSheetName }

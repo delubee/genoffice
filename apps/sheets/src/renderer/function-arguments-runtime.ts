@@ -3,6 +3,7 @@
  * what the cell editor holds when the dialog opens, live sub-expression
  * evaluation, grid range picks and the formula bar's fx button.
  */
+import type { DesktopApi } from '../shared/desktop-api'
 import { DOCS_FORMULA_BAR_EDITOR_UNIT_ID_KEY, DOCS_NORMAL_EDITOR_UNIT_ID_KEY } from '@univerjs/core'
 import { IEditorService } from '@univerjs/docs-ui'
 import { IFormulaEditorManagerService } from '@univerjs/sheets-ui'
@@ -38,7 +39,7 @@ export interface ExternalPickTarget {
 
 export interface FunctionArgumentsHost {
   readTarget(): Promise<FunctionTarget | null>
-  write(target: FunctionTarget, formula: string): string | null
+  write(target: FunctionTarget, formula: string): string | null | Promise<string | null>
   evaluate(target: FunctionTarget, expressions: readonly string[]): Promise<PreviewValue[]>
   observeRangePick(target: FunctionTarget, onPick: (ref: string) => void): () => void
   /** Linked workbooks of the file being edited, flagged by whether their
@@ -99,10 +100,16 @@ export function formatExternalPickRef(
   return formatExternalRef(target.index, stored, body)
 }
 
+/** The desktop bridge; absent when the editor is embedded (VS Code view), where external picks are unavailable. */
+function desktopBridge(): DesktopApi | undefined {
+  return (window as unknown as { desktopApi?: DesktopApi }).desktopApi
+}
+
 export function createFunctionArgumentsHost(
   getRuntime: () => UniverRuntime | null,
   notReady: () => string,
   getSessionId: () => string | null = () => null,
+  gridElement?: HTMLElement,
 ): FunctionArgumentsHost {
   return {
     async readTarget() {
@@ -180,7 +187,12 @@ export function createFunctionArgumentsHost(
       // grid after the dialog opened counts as a pick.
       let armed = false
       const arm = (event: PointerEvent): void => {
-        if (event.target instanceof Element && event.target.closest('#univer-container')) {
+        if (
+          event.target instanceof Element &&
+          (gridElement
+            ? gridElement.contains(event.target)
+            : event.target.closest('#univer-container'))
+        ) {
           armed = true
         }
       }
@@ -200,10 +212,11 @@ export function createFunctionArgumentsHost(
     },
     async listExternalPickTargets() {
       const sessionId = getSessionId()
-      if (!sessionId) return []
+      const api = desktopBridge()
+      if (!sessionId || !api) return []
       const [links, tabs] = await Promise.all([
-        window.desktopApi.listExternalLinks({ sessionId }),
-        window.desktopApi.listWorkbookTabs(),
+        api.listExternalLinks({ sessionId }),
+        api.listWorkbookTabs(),
       ])
       const normalize = (value: string): string => value.replaceAll('\\', '/').toLowerCase()
       // renderer bundles cannot reach node:path; link targets arrive with
@@ -227,30 +240,31 @@ export function createFunctionArgumentsHost(
       })
     },
     pickExternalRange(target, onPick) {
-      if (target.wcId === null) return () => undefined
+      const api = desktopBridge()
+      if (target.wcId === null || !api) return () => undefined
       const wcId = target.wcId
       let disposed = false
       let offSelected: (() => void) | null = null
       let pickId: string | null = null
       void (async () => {
-        const armed = await window.desktopApi.armWorkbookPick(wcId)
+        const armed = await api.armWorkbookPick(wcId)
         if (disposed) {
-          void window.desktopApi.cancelWorkbookPick(armed.pickId)
+          void api.cancelWorkbookPick(armed.pickId)
           return
         }
         pickId = armed.pickId
-        offSelected = window.desktopApi.onWorkbookPickSelected((selection) => {
+        offSelected = api.onWorkbookPickSelected((selection) => {
           if (selection.pickId !== pickId) return
           onPick(formatExternalPickRef(target, selection))
           // the pick is consumed; release the other tabs
-          void window.desktopApi.cancelWorkbookPick(pickId!)
+          void api.cancelWorkbookPick(pickId!)
         })
       })()
       return () => {
         disposed = true
         offSelected?.()
         offSelected = null
-        if (pickId !== null) void window.desktopApi.cancelWorkbookPick(pickId)
+        if (pickId !== null) void api.cancelWorkbookPick(pickId)
       }
     },
     cancel(target) {
@@ -293,11 +307,13 @@ export function registerFxButtonOpener(open: () => void): () => void {
  * re-activates the editing tab.
  */
 export function installWorkbookPickRelay(runtime: UniverRuntime): { dispose(): void } {
+  const api = desktopBridge()
+  if (!api) return { dispose() {} }
   let armed: string | null = null
-  const offArmed = window.desktopApi.onWorkbookPickArmed(({ pickId }) => {
+  const offArmed = api.onWorkbookPickArmed(({ pickId }) => {
     armed = pickId
   })
-  const offCancelled = window.desktopApi.onWorkbookPickCancelled(({ pickId }) => {
+  const offCancelled = api.onWorkbookPickCancelled(({ pickId }) => {
     if (armed === pickId) armed = null
   })
   const disposable = runtime.univerAPI.addEvent(
@@ -308,7 +324,7 @@ export function installWorkbookPickRelay(runtime: UniverRuntime): { dispose(): v
       if (!range) return
       const pickId = armed
       armed = null
-      void window.desktopApi.sendWorkbookPickSelection({
+      void api.sendWorkbookPickSelection({
         pickId,
         sheetName: params.worksheet.getSheetName(),
         startRow: range.startRow,
@@ -330,10 +346,13 @@ export function installWorkbookPickRelay(runtime: UniverRuntime): { dispose(): v
 
 /// The formula bar's fx button: Univer opens the cell editor on pointer down
 /// and emits on click; nothing in Univer listens, so the click is ours.
-export function installFxButtonHook(runtime: UniverRuntime): { dispose(): void } {
+export function installFxButtonHook(
+  runtime: UniverRuntime,
+  onOpen?: () => void,
+): { dispose(): void } {
   const subscription = runtime.univer
     .__getInjector()
     .get(IFormulaEditorManagerService)
-    .fxBtnClick$.subscribe(() => fxOpener?.())
+    .fxBtnClick$.subscribe(() => (onOpen ?? fxOpener)?.())
   return { dispose: () => subscription.unsubscribe() }
 }

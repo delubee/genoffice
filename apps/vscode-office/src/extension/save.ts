@@ -4,7 +4,8 @@ import { WorkbookError } from '@genoffice/workbook-session/domain'
 import { captureFileBaseline } from '@genoffice/workbook-session/publish'
 import type { XlsxSidecarClient } from '@genoffice/workbook-session/sidecar/client'
 import type { WorkbookTransactions } from '@genoffice/workbook-session/transactions'
-import type { OriginalBase } from '@genoffice/workbook-session/domain'
+import type { OriginalBase, WorkbookState } from '@genoffice/workbook-session/domain'
+import type { SaveCalculationValue } from '@genoffice/workbook-session/calculation/save-values'
 import type { FileBaseline } from '@genoffice/workbook-session/publish'
 import type { BridgeMethod } from '@genoffice/xlsx-gateway/shared/session-bridge'
 import { rm } from 'node:fs/promises'
@@ -20,6 +21,11 @@ export interface WorkbookSaveDocument {
   fileBaseline: FileBaseline
   readonly bridge: { request(method: BridgeMethod, payload: unknown): Promise<unknown> } | undefined
   pauseFileChecks(): () => void
+  /** Fresh formula results for the frozen root, or null when it cannot be calculated exactly. */
+  calculateForSave?(
+    state: Readonly<WorkbookState>,
+    signal: AbortSignal,
+  ): Promise<SaveCalculationValue[] | null>
 }
 export async function saveWorkbookDocument(
   document: WorkbookSaveDocument,
@@ -55,11 +61,24 @@ export async function saveWorkbookDocument(
       const baseline = saveAs ? await captureFileBaseline(targetPath) : document.fileBaseline,
         expected = saveAs ? baseline.sha256 : document.baselineHash
       const writer = new SessionPackageWriter(client, document.metadata)
+      // A changed workbook is saved with freshly calculated formula caches when the host can
+      // calculate it exactly; any failure keeps the caches empty for the recalculating reader.
+      const changed =
+        state.structuralLog.length > 0 ||
+        state.sheets.some((sheet) => Object.keys(sheet.cells).length > 0)
+      const calculated =
+        changed && document.calculateForSave
+          ? await document.calculateForSave(
+              state,
+              AbortSignal.any([controller.signal, AbortSignal.timeout(20_000)]),
+            )
+          : null
       const staged = await writer.stage(
         document.original.path,
         state,
         targetPath,
         controller.signal,
+        calculated,
       )
       if (controller.signal.aborted || document.isClosed || document.sessionId !== sessionId) {
         await rm(dirname(staged.stagedPath), { recursive: true, force: true })

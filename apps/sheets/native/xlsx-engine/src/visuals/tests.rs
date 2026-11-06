@@ -295,6 +295,7 @@ fn fill_info(body: &str, colors: &ColorContext) -> FillInfo {
 #[test]
 fn gradient_fill_blends_outermost_stops() {
     let colors = ColorContext {
+        filter_styles: Vec::new(),
         theme: vec![
             (0xFF, 0xFF, 0xFF),
             (0x00, 0x00, 0x00),
@@ -318,6 +319,7 @@ fn gradient_fill_blends_outermost_stops() {
 #[test]
 fn dxf_gradient_fill_becomes_the_blended_highlight_color() {
     let colors = ColorContext {
+        filter_styles: Vec::new(),
         theme: vec![(0xFF, 0xFF, 0xFF)],
         ..ColorContext::default()
     };
@@ -348,6 +350,7 @@ fn gradient_fill_without_resolvable_stops_stays_unfilled() {
 #[test]
 fn indexed_palette_override_wins_below_system_slots() {
     let colors = ColorContext {
+        filter_styles: Vec::new(),
         indexed: vec!["112233".into(); 20],
         ..ColorContext::default()
     };
@@ -362,6 +365,7 @@ fn indexed_palette_override_wins_below_system_slots() {
     );
     // 64/65 stay the fixed system slots even when overridden.
     let colors = ColorContext {
+        filter_styles: Vec::new(),
         indexed: vec!["112233".into(); 66],
         ..ColorContext::default()
     };
@@ -576,6 +580,7 @@ fn sole_unnamed_series_keeps_placeholder_title() {
 
 fn theme_colors() -> ColorContext {
     ColorContext {
+        filter_styles: Vec::new(),
         theme: (0..12).map(|slot| (slot as u8, 0x22, 0x33)).collect(),
         fill_styles: Vec::new(),
         indexed: Vec::new(),
@@ -1787,6 +1792,7 @@ fn resolves_style_fill_ref_theme_gradient() {
         .collect();
     assert!(fill_styles[0].is_none());
     let colors = ColorContext {
+        filter_styles: Vec::new(),
         fill_styles,
         ..theme_colors()
     };
@@ -1946,6 +1952,7 @@ const CHART_NS: &str = r#"xmlns:c="http://schemas.openxmlformats.org/drawingml/2
 #[test]
 fn drawing_gradient_fill_blends_its_outermost_stops() {
     let colors = ColorContext {
+        filter_styles: Vec::new(),
         theme: vec![
             (0xFF, 0xFF, 0xFF),
             (0x00, 0x00, 0x00),
@@ -1968,6 +1975,7 @@ fn drawing_gradient_fill_blends_its_outermost_stops() {
 #[test]
 fn chart_space_and_plot_area_fills_reach_the_metadata() {
     let colors = ColorContext {
+        filter_styles: Vec::new(),
         theme: vec![(0xFF, 0xFF, 0xFF), (0x00, 0x00, 0x00)],
         ..ColorContext::default()
     };
@@ -2030,6 +2038,7 @@ fn srgb_fills_apply_their_child_modifiers() {
 #[test]
 fn axis_text_sizes_colors_and_display_units_are_read() {
     let colors = ColorContext {
+        filter_styles: Vec::new(),
         theme: vec![(0xFF, 0xFF, 0xFF), (0x00, 0x00, 0x00)],
         ..ColorContext::default()
     };

@@ -8,7 +8,7 @@ import { t } from './i18n/locale'
 import type { RibbonCommandContext } from './ribbon-actions'
 import { neighbourThread, threadPane, threadStore, type CellThread } from './threaded-comments'
 import { notePicturesPane } from './note-pictures'
-import { revealCellBelowFreeze } from './univer-sync'
+import { revealCellBelowFreeze } from './reveal-cell'
 
 interface Position {
   readonly row: number

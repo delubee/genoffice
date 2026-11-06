@@ -21,8 +21,11 @@ export async function backupWorkbookDocument(
   try {
     if (controller.signal.aborted)
       throw new WorkbookError('operation_cancelled', 'The backup was cancelled.')
+    // Background recovery captures committed state without blurring an active chart draft.
     if (document.bridge) {
-      const flush = (await document.bridge.request('view.flush', {})) as { ready?: boolean }
+      const flush = (await document.bridge.request('view.flush', { commitChartDraft: false })) as {
+        ready?: boolean
+      }
       if (!flush.ready)
         throw new WorkbookError(
           'editor_busy',

@@ -363,6 +363,7 @@ pub fn read_theme_palette(archive: &mut ZipArchive<File>) -> Result<ColorContext
         })
         .unwrap_or_default();
     Ok(ColorContext {
+        filter_styles: Vec::new(),
         theme,
         fill_styles,
         indexed: Vec::new(),

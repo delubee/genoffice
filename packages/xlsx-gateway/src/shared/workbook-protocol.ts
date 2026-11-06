@@ -1,3 +1,5 @@
+import { colorFilterCriteriaSchema } from '../domain/color-filter'
+import { customFilterCriteriaSchema } from '../domain/custom-filter'
 import { z } from 'zod'
 import { ADDABLE_SHAPE_TYPES } from './shape-types'
 import { PIVOT_AGGREGATIONS, PIVOT_SHOW_DATA_AS } from '../domain/pivot-value-modes'
@@ -782,6 +784,19 @@ export const workbookFileSchema = z
     styles: z.array(cellStyleSchema),
     dxfStyles: z.array(cellStyleSchema),
     visuals: z.array(visualObjectSchema),
+    /// Names kept file-only; no private formula text crosses this boundary.
+    reservedDefinedNames: z
+      .array(
+        z
+          .object({
+            name: z.string().min(1),
+            sheetIndex: z.number().int().nonnegative().optional(),
+            sheetId: z.string().min(1).optional(),
+          })
+          .strict(),
+      )
+      .optional(),
+    nameBindingsComplete: z.boolean().optional(),
     definedNames: z.array(
       z
         .object({
@@ -839,6 +854,8 @@ export const workbookFileSchema = z
       .optional(),
     /// workbookPr/@date1904: serial dates count from 1904-01-01.
     date1904: z.boolean().optional(),
+    /// calcPr/@calcMode; absent means the file did not state it (automatic).
+    calcMode: z.string().optional(),
     /// System short-date pattern the sidecar applied to builtin numFmtIds 14/22.
     shortDateFormat: z.string().optional(),
   })
@@ -887,15 +904,6 @@ const workbookCellRecordSchema = z
 
 /// OOXML customFilter comparison operators; absent means "equal". Wildcard
 /// matching (contains / begins with) is encoded in the value string itself.
-const customFilterOperatorSchema = z.enum([
-  'equal',
-  'notEqual',
-  'greaterThan',
-  'greaterThanOrEqual',
-  'lessThan',
-  'lessThanOrEqual',
-])
-
 /// One filter column's criteria — shared by the save snapshot
 /// (WorkbookFilterState) and the open-time restore (WorkbookRangeResult).
 const filterColumnStateSchema = z
@@ -905,29 +913,18 @@ const filterColumnStateSchema = z
     /// Filter values are cell texts, so they share the cell's 32,767 cap.
     values: z.array(z.string().max(32_767)).max(10_000).optional(),
     blank: z.boolean().optional(),
-    customs: z
-      .object({
-        and: z.boolean().optional(),
-        filters: z
-          .array(
-            z
-              .object({
-                val: z.union([z.string().max(32_767), z.number().finite()]),
-                operator: customFilterOperatorSchema.optional(),
-              })
-              .strict(),
-          )
-          .min(1)
-          .max(2),
-      })
-      .strict()
-      .optional(),
+    customs: customFilterCriteriaSchema.optional(),
+    colors: colorFilterCriteriaSchema.optional(),
   })
   .strict()
   .refine(
     (column) =>
-      column.values !== undefined || column.blank !== undefined || column.customs !== undefined,
-    { message: 'A filter column needs values, a blank flag, or custom criteria.' },
+      [
+        column.values !== undefined || column.blank !== undefined,
+        column.customs !== undefined,
+        column.colors !== undefined,
+      ].filter(Boolean).length === 1,
+    { message: 'A filter column needs exactly one of values/blank, custom criteria or colors.' },
   )
 
 export const workbookMergeRangesResultSchema = z
@@ -1163,7 +1160,7 @@ export const workbookFindCellsRequestSchema = z
     query: z.string().min(1).max(10_000),
     matchCase: z.boolean(),
     matchEntireCell: z.boolean(),
-    lookIn: z.enum(['values', 'formulas', 'formulas_only', 'both']),
+    lookIn: z.enum(['values', 'formulas', 'formulas_only', 'both', 'stored_cells']),
     wildcards: z.boolean(),
     resumeAt: findCellsCursorSchema.optional(),
     limit: z.number().int().min(1).max(MAX_FIND_CELLS_PAGE),
@@ -1182,6 +1179,8 @@ export const workbookFindCellsResultSchema = z
             value: cellScalarSchema,
             valueText: z.string().nullable(),
             formulaText: z.string().optional(),
+            // Internal stored-cell enumeration preserves source array ownership.
+            arrayRef: z.string().max(64).optional(),
           })
           .strict(),
       )
@@ -1343,7 +1342,7 @@ export const workbookStructuralOpSchema = z.union([
       end: z.number().int().nonnegative().max(1_048_575),
       /// File units: points for rows (Excel max 409.5), character width for
       /// columns (max 255). null resets to the sheet default.
-      size: z.union([z.number().positive().max(500), z.null()]),
+      size: z.union([z.number().min(0).max(500), z.null()]),
     })
     .strict()
     .refine((op) => op.end >= op.start && op.end - op.start < 100_000, {
@@ -1676,10 +1675,7 @@ export const workbookVisualAddSchema = z
     shape: z
       .object({
         shapeType: z.enum(ADDABLE_SHAPE_TYPES),
-        fillColor: z
-          .string()
-          .regex(/^#[0-9a-fA-F]{6}$/)
-          .optional(),
+        fillColor: shapePaintSchema.optional(),
         lineColor: shapePaintSchema.optional(),
         text: z.string().max(1_000).optional(),
         isTextBox: z.boolean().optional(),
@@ -2267,6 +2263,12 @@ export const workbookSaveRequestSchema = z
       .strict()
       .nullable()
       .default(null),
+    /// Desired calcPr/@calcMode (null = untouched).
+    calcModeState: z
+      .object({ mode: z.enum(['auto', 'manual', 'autoNoTable']) })
+      .strict()
+      .nullable()
+      .default(null),
     /// Full allow-edit-range snapshots for sheets whose set changed. A range may
     /// carry its password as the hash the renderer already computed (legacy or
     /// spi form, see SheetPasswordHash); the file never hands hashes back.
@@ -2327,6 +2329,7 @@ export const workbookSaveRequestSchema = z
       request.definedNamesState !== null ||
       request.themeState !== null ||
       request.workbookProtectionState !== null ||
+      request.calcModeState !== null ||
       request.protectedRangeStates.length > 0 ||
       request.visualAdditions.length > 0 ||
       (request.cellImageAdditions?.length ?? 0) > 0 ||

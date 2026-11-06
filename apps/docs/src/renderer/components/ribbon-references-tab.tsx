@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { docsHost } from '../docs-host'
 import type { Editor } from '@tiptap/core'
 import type { ZoteroCommand } from '../../shared/ipc'
 import {
@@ -11,7 +12,7 @@ import {
   type SourceInfo,
   type TocEntry,
 } from '@genoffice/docx-engine'
-import { Dropdown } from '@genoffice/ui'
+import { Dropdown } from '@genoffice/ui/chrome'
 import { PromptModal } from './PromptModal'
 import { collectHeadings } from '../editor/headings'
 import { t, useI18n, type StringKey } from '../i18n/locale'
@@ -385,7 +386,7 @@ export function ReferencesTab({
     }
     setZoteroBusy(command)
     try {
-      const result = await window.desktop.zoteroCommand(command)
+      const result = await docsHost().zoteroCommand(command)
       if (!result.ok) {
         console.error('Zotero integration failed', result.error)
         window.alert(

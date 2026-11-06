@@ -2,7 +2,15 @@ import * as vscode from 'vscode'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { rm } from 'node:fs/promises'
-import { WorkbookError, type OriginalBase } from '@genoffice/workbook-session/domain'
+import {
+  WorkbookError,
+  type OriginalBase,
+  type WorkbookState,
+} from '@genoffice/workbook-session/domain'
+import {
+  calculateLiveValues,
+  calculateSaveValues,
+} from '@genoffice/workbook-session/calculation/save-values'
 import { WorkbookTransactions } from '@genoffice/workbook-session/transactions'
 import { FileResourceStore } from '@genoffice/workbook-session/store'
 import { openWorkbookSnapshot } from '@genoffice/workbook-session/open'
@@ -15,6 +23,8 @@ import type { WorkbookLease } from '@genoffice/workbook-session/registry'
 import { nativeHistoryEdit, requestNativeHistory } from './document-history'
 import { readCurrentRange } from '@genoffice/workbook-session/read'
 import { prepareImportCandidate } from '@genoffice/workbook-session/exchange/import-candidate'
+import { prepareStagedCandidate } from '@genoffice/workbook-session/staged-candidate'
+import { buildMergeStages } from '@genoffice/workbook-session/merge-workbooks'
 type Recovery = Awaited<ReturnType<typeof readWorkbookBackup>>
 interface Actor {
   sessionId: string
@@ -95,6 +105,37 @@ export class WorkbookDocument implements vscode.CustomDocument {
   pauseFileChecks() {
     return this.fileWatcher?.pause() ?? (() => {})
   }
+  /**
+   * Fresh formula results of an immutable root, calculated once on demand for tool and search
+   * reads (the editor view calculates for itself). A root that cannot be calculated exactly keeps
+   * its `pending` formula cells.
+   */
+  private readonly liveCalculations = new WeakMap<
+    object,
+    Promise<Awaited<ReturnType<typeof calculateLiveValues>>>
+  >()
+  private liveCalculation(state: Readonly<WorkbookState>) {
+    let work = this.liveCalculations.get(state)
+    if (!work) {
+      work = calculateLiveValues({
+        state,
+        source: this.source,
+        sourceSessionId: this.actor.original.sidecarSessionId,
+        signal: AbortSignal.timeout(8_000),
+      })
+      this.liveCalculations.set(state, work)
+    }
+    return work
+  }
+  /** Fresh formula results of a frozen root for the saved file's cached values. */
+  calculateForSave(state: Readonly<WorkbookState>, signal: AbortSignal) {
+    return calculateSaveValues({
+      state,
+      source: this.source,
+      sourceSessionId: this.actor.original.sidecarSessionId,
+      signal,
+    })
+  }
   requestHistory(direction: 'undo' | 'redo') {
     return requestNativeHistory(this, direction)
   }
@@ -122,8 +163,57 @@ export class WorkbookDocument implements vscode.CustomDocument {
           logicalSheetId: sheetId,
           range,
           signal,
+          calculate: () => this.liveCalculation(state),
         }),
       release: actor.opened.retain(),
+    }
+  }
+  /** Data → Merge Workbooks: private read-only source snapshots, one staged commit. */
+  async mergeWorkbooks(files: readonly vscode.Uri[], signal?: AbortSignal) {
+    if (this.closed) throw new WorkbookError('session_closed', 'The document is closed.')
+    const actor = this.actor
+    const opened: Awaited<ReturnType<typeof openWorkbookSnapshot>>[] = []
+    try {
+      const sources = []
+      for (const file of files) {
+        if (file.scheme !== 'file')
+          throw new WorkbookError('unsupported_resource', 'Merge workbooks from local files.')
+        const snapshot = await openWorkbookSnapshot({
+          uri: file.toString(),
+          storageDirectory: this.storageDirectory,
+          source: this.source,
+          signal,
+        })
+        opened.push(snapshot)
+        sources.push({
+          fileName: file.path.split('/').pop() ?? file.path,
+          state: initialState(snapshot.metadata),
+          sessionId: snapshot.original.sidecarSessionId,
+        })
+      }
+      const state = actor.engine.state,
+        revision = actor.engine.descriptor.revision
+      const built = await buildMergeStages({ target: state, sources, source: this.source, signal })
+      if (this.actor !== actor || actor.engine.state !== state)
+        throw new WorkbookError(
+          'revision_conflict',
+          'The workbook changed while merging. Try again.',
+        )
+      await actor.engine.submitStaged(
+        {
+          schemaVersion: 1,
+          sessionId: actor.sessionId,
+          transactionId: randomUUID(),
+          expectedRevision: revision,
+          origin: 'manual',
+          summary: 'Merge workbooks',
+        },
+        built.stages,
+        signal,
+      )
+      return { sheets: built.sheetNames.length, files: built.files, sheetNames: built.sheetNames }
+    } finally {
+      for (const snapshot of opened) await snapshot.dispose()
     }
   }
   static async open(
@@ -163,6 +253,15 @@ export class WorkbookDocument implements vscode.CustomDocument {
             state,
             intent,
             batch,
+            signal,
+            source: this.source,
+            sourceSessionId: opened.original.sidecarSessionId,
+          }),
+        prepareStaged: (state, intent, stages, signal) =>
+          prepareStagedCandidate({
+            state,
+            intent,
+            stages,
             signal,
             source: this.source,
             sourceSessionId: opened.original.sidecarSessionId,
@@ -232,6 +331,7 @@ export class WorkbookDocument implements vscode.CustomDocument {
       getState: () => actor.engine.state,
       getDescriptor: () => actor.engine.descriptor,
       submit: (intent) => actor.engine.submit(intent),
+      submitStaged: (intent, stages) => actor.engine.submitStaged(intent, stages),
       history: async (direction) => {
         if (this.closed || this.actor !== actor)
           throw new WorkbookError('session_closed', 'The history view belongs to a closed session.')

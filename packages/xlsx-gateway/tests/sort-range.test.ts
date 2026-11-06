@@ -82,3 +82,85 @@ describe('sort_range over formatted cells', () => {
     expect(plan.cellChanges.map((change) => change.after.value)).toEqual([10, 20, 30])
   })
 })
+
+describe('multi-level row ordering', () => {
+  it('uses secondary directions, keeps blanks last and retains source order for complete ties', () => {
+    const rows = [
+      ['b', 1],
+      ['a', 1],
+      ['a', 3],
+      ['a', null],
+      ['a', 3],
+      [null, 9],
+    ]
+    expect(
+      computeSortedRowOrder(rows as (string | number | null)[][], 0, true, 'en', [
+        { keyOffset: 0, ascending: true },
+        { keyOffset: 1, ascending: false },
+      ]),
+    ).toEqual([2, 4, 1, 3, 0, 5])
+  })
+
+  it('plans the same multi-column permutation through the authoritative adapter', () => {
+    const adapter = new InMemoryWorkbookAdapter({
+      revision: 0,
+      sheets: [
+        {
+          id: 's',
+          name: 'Data',
+          cells: {
+            A1: { value: 'a' },
+            B1: { value: 1 },
+            A2: { value: 'a' },
+            B2: { value: 3 },
+            A3: { value: 'b' },
+            B3: { value: 2 },
+          },
+        },
+      ],
+    })
+    const plan = adapter.plan({
+      dslVersion: 1,
+      transactionId: 'multi',
+      baseRevision: 0,
+      summary: 'multi-level sort',
+      operations: [
+        {
+          op: 'sort_range',
+          sheetId: 's',
+          range: 'A1:B3',
+          byColumn: 'A',
+          order: 'asc',
+          levels: [
+            { byColumn: 'A', order: 'asc' },
+            { byColumn: 'B', order: 'desc' },
+          ],
+        },
+      ],
+    })
+    expect(
+      plan.cellChanges.map((change) => ({ address: change.address, value: change.after.value })),
+    ).toEqual([
+      { address: 'B1', value: 3 },
+      { address: 'B2', value: 1 },
+    ])
+    expect(() =>
+      adapter.plan({
+        dslVersion: 1,
+        transactionId: 'invalid',
+        baseRevision: 0,
+        summary: 'bad level',
+        operations: [
+          {
+            op: 'sort_range',
+            sheetId: 's',
+            range: 'A1:B3',
+            byColumn: 'A',
+            order: 'asc',
+            levels: [{ byColumn: 'C', order: 'asc' }],
+          },
+        ],
+      }),
+    ).toThrow('outside')
+  })
+})

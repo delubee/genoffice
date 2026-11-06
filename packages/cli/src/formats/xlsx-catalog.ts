@@ -42,6 +42,8 @@ export const SHEET_OP_GROUPS: Record<string, readonly string[]> = {
     'set_filter',
     'set_filter_criteria',
     'clear_filter',
+    'clear_filter_criteria',
+    'reapply_filter',
     'set_page_setup',
     'protect_sheet',
   ],
@@ -91,7 +93,8 @@ const NOTES: Record<string, string> = {
   set_data_validation:
     'adds to the rules the sheet already has; on a range that has one it replaces it, null removes it',
   set_freeze: '0/0 unfreezes',
-  set_filter_criteria: 'needs a filter without criteria; null clears the column',
+  set_filter_criteria:
+    'requires a filter; provide values, customs or colors (fill/font arrays; null fill means no fill); values:null clears the column',
   set_page_setup:
     'paperSize 9 = A4, 1 = Letter; scale and fitToWidth/fitToHeight are exclusive; margins normal|wide|narrow; printArea/printTitles/header/footer null clears; rowBreaks/colBreaks replace the manual breaks',
   add_pivot:

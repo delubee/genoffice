@@ -1,3 +1,4 @@
+import type { WorkbookOperation } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
 import type {
   CommitReceipt,
   DocumentDescriptor,
@@ -8,10 +9,19 @@ import type {
 import type { ImportBatch } from './exchange/schemas'
 
 export interface WorkbookSource {
+  readRowOutline?(sessionId: string, sheetId: string): Promise<unknown>
+  /** Host-private calculation resources; never forward to the renderer. */
+  readCalculationContext?(sessionId: string): Promise<unknown>
+  findBaseCells?(
+    input: import('@genoffice/xlsx-gateway/shared/workbook-protocol').WorkbookFindCellsRequest,
+  ): Promise<unknown>
+  readMedia?(sessionId: string, visualId: string): Promise<unknown>
   openSnapshot(path: string): Promise<{ sessionId: string; metadata: unknown }>
   readBaseRange(sessionId: string, sheetId: string, range: string): Promise<unknown>
   readFeatures(sessionId: string, sheetId: string): Promise<unknown>
   archiveManifest(path: string): Promise<unknown>
+  /** One package part as text (pivot definitions); hosts without it skip those features. */
+  readArchiveText?(path: string, entry: string): Promise<string>
   close(sessionId: string): Promise<void>
 }
 
@@ -25,6 +35,13 @@ export interface CandidateInterpreter {
     state: WorkbookState,
     intent: TransactionInput,
     batch: ImportBatch,
+    signal?: AbortSignal,
+  ): Promise<PreparedChangeset>
+  /** Host-built bounded stages published as one root (see staged-candidate). */
+  prepareStaged?(
+    state: WorkbookState,
+    intent: TransactionInput,
+    stages: readonly (readonly WorkbookOperation[])[],
     signal?: AbortSignal,
   ): Promise<PreparedChangeset>
   dispose(): void | Promise<void>

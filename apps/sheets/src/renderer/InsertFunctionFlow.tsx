@@ -43,8 +43,10 @@ export function InsertFunctionFlow({
     span ? (catalog.find((spec) => spec.name === span.name) ?? null) : null,
   )
   const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
 
   const close = (): void => {
+    if (busy) return
     host.cancel(target)
     onClose()
   }
@@ -70,12 +72,21 @@ export function InsertFunctionFlow({
       host={host}
       error={error}
       onCancel={close}
-      onOk={(args) => {
-        const failure = host.write(target, finishedFormula(target, span, picked.name, args))
-        setError(failure)
-        if (failure !== null) return
-        setRecent(pushHistory(globalThis.localStorage, RECENT_FUNCTIONS_KEY, picked.name))
-        onClose()
+      busy={busy}
+      onOk={async (args) => {
+        if (busy) return
+        setBusy(true)
+        try {
+          const failure = await host.write(target, finishedFormula(target, span, picked.name, args))
+          setError(failure)
+          if (failure !== null) return
+          setRecent(pushHistory(globalThis.localStorage, RECENT_FUNCTIONS_KEY, picked.name))
+          onClose()
+        } catch (error) {
+          setError(error instanceof Error ? error.message : String(error))
+        } finally {
+          setBusy(false)
+        }
       }}
     />
   )

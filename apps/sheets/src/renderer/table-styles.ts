@@ -1,4 +1,4 @@
-import type { WorkbookFile } from '../shared/desktop-api'
+import type { WorkbookFile } from '@genoffice/xlsx-gateway/shared/workbook-protocol'
 
 /// Excel's built-in table styles, resolved against the workbook theme the
 /// same way the file reader does (accent cycle (n-1) % 7 with 0 = dk1,

@@ -1,3 +1,5 @@
+import { buildSubtotalPlan } from '@genoffice/xlsx-gateway/domain/subtotal-plan'
+import { definedNameFromLabel } from './defined-name-label'
 /**
  * Cell navigation (Name Box / Go To / formula / symbol) and data tools
  * (advanced filter, subtotal, consolidate, outline, format-as-table).
@@ -7,11 +9,13 @@
 import { ILayoutService } from '@univerjs/preset-sheets-core'
 
 import { columnLabel } from '@genoffice/xlsx-gateway/domain/cell-address'
+import { decodeCsvBuffer } from '@genoffice/xlsx-gateway/gateway/csv-import'
 import {
-  decodeCsvBuffer,
-  isNumericCell,
-  parseCsv,
-} from '@genoffice/xlsx-gateway/gateway/csv-import'
+  CSV_CHARSET_BY_LANG,
+  CSV_IMPORT_MAX_BYTES,
+  csvImportMatrix,
+  pickCsvFile,
+} from './csv-import-model'
 import type { AdvancedFilterColumn, AdvancedFilterCriteria } from './AdvancedFilterDialog'
 import {
   buildLabelMatrix,
@@ -52,29 +56,12 @@ export interface DataToolsContext {
   setAdvancedFilterColumns: (columns: readonly AdvancedFilterColumn[] | null) => void
 }
 
-/// Matches the paste ceiling in spirit: one setValues command, journaled and
-/// undoable; larger files should open as their own workbook instead.
-const CSV_IMPORT_MAX_CELLS = 50_000
-
-/// Excel writes CSV in the system's legacy charset; the UI language is the
-/// best tie-breaker we have (same map as the main-process open path).
-const CSV_CHARSET_BY_LANG: Record<string, string> = {
-  zh: 'gb18030',
-  'zh-TW': 'big5',
-  ja: 'shift_jis',
-  ko: 'euc-kr',
-}
-
 /// Data → From Text/CSV: reads a delimited file (encoding and delimiter
 /// sniffed by the shared CSV pipeline) into the active sheet at the selection.
 export function handleImportCsv(ctx: DataToolsContext): void {
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = '.csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain'
-  input.onchange = () => {
-    const file = input.files?.[0]
+  void pickCsvFile().then((file) => {
     if (!file) return
-    if (file.size > 32 * 1024 * 1024) {
+    if (file.size > CSV_IMPORT_MAX_BYTES) {
       ctx.setMessage(t('appCsvTooLarge'))
       return
     }
@@ -84,8 +71,7 @@ export function handleImportCsv(ctx: DataToolsContext): void {
         importCsvText(ctx, decodeCsvBuffer(new Uint8Array(buffer), CSV_CHARSET_BY_LANG[getLang()]))
       })
       .catch(() => ctx.setMessage(t('appCsvTooLarge')))
-  }
-  input.click()
+  })
 }
 
 function importCsvText(ctx: DataToolsContext, text: string): void {
@@ -97,33 +83,24 @@ function importCsvText(ctx: DataToolsContext, text: string): void {
     ctx.setMessage(t('appSelectCellFirst'))
     return
   }
-  const rows = parseCsv(text)
-  const columns = rows.reduce((width, row) => Math.max(width, row.length), 0)
-  if (rows.length === 0 || columns === 0) {
-    ctx.setMessage(t('appCsvEmpty'))
+  const matrix = csvImportMatrix(text)
+  if ('error' in matrix) {
+    ctx.setMessage(t(matrix.error))
     return
   }
-  if (rows.length * columns > CSV_IMPORT_MAX_CELLS) {
-    ctx.setMessage(t('appCsvTooLarge'))
-    return
-  }
-  const values = rows.map((row) =>
-    Array.from({ length: columns }, (_, index) => {
-      const cell = row[index] ?? ''
-      return isNumericCell(cell) ? { v: Number(cell) } : { v: cell }
-    }),
-  )
+  const { rows, columns } = matrix
+  const values = matrix.values.map((row) => row.map((v) => ({ v })))
   const row = range.getRow()
   const column = range.getColumn()
   try {
-    worksheet.getRange(row, column, rows.length, columns).setValues(values)
+    worksheet.getRange(row, column, rows, columns).setValues(values)
   } catch (error: unknown) {
     ctx.setMessage(error instanceof Error ? error.message : t('appCsvImportFailed'))
     return
   }
   ctx.setMessage(
     t('appCsvImported', {
-      rows: rows.length,
+      rows,
       columns,
       cell: `${columnLetter(column)}${row + 1}`,
     }),
@@ -227,13 +204,6 @@ export function handleApplyFormula(ctx: DataToolsContext, formula: string): stri
 /// A label turned into a legal defined name, Excel-style: illegal characters
 /// become underscores, and anything that could read as a cell reference gets
 /// an underscore prefix.
-function definedNameFromLabel(label: string): string | null {
-  const cleaned = label.trim().replace(/[^\p{L}\p{N}_.]/gu, '_')
-  if (!cleaned || /^\.+$/.test(cleaned)) return null
-  const named = /^[\p{L}_]/u.test(cleaned) ? cleaned : `_${cleaned}`
-  const cellLike = /^[A-Za-z]{1,3}\d+$/.test(named) || /^[Rr]\d*([Cc]\d*)?$/.test(named)
-  return cellLike ? `_${named}` : named
-}
 
 /// Formulas → Create from Selection: one defined name per column (labels in
 /// the selection's top row) or per row (labels in its left column). The
@@ -395,43 +365,37 @@ export function handleCreateSubtotal(
   if (groupOffset === valueOffset) return t('appSubtotalSameColumns')
   const body = values.slice(1)
   if (body.length === 0) return t('appRangeNoDataRows')
-  // SUBTOTAL function numbers: 9 = SUM, 3 = COUNTA, 1 = AVERAGE.
-  const fn = config.agg === 'sum' ? 9 : config.agg === 'count' ? 3 : 1
-  const valueColumn = columnLetter(config.valueCol)
-  const groups: { label: string; startAbs: number; endAbs: number }[] = []
-  let currentLabel = String(body[0]?.[groupOffset] ?? '')
-  let groupStart = startRow + 1
-  for (let index = 1; index <= body.length; index++) {
-    const label = index < body.length ? String(body[index]?.[groupOffset] ?? '') : null
-    if (label !== currentLabel) {
-      groups.push({ label: currentLabel, startAbs: groupStart, endAbs: startRow + index })
-      if (label !== null) {
-        currentLabel = label
-        groupStart = startRow + 1 + index
-      }
-    }
+  let plan: ReturnType<typeof buildSubtotalPlan>
+  try {
+    plan = buildSubtotalPlan(
+      {
+        startRow,
+        startColumn,
+        endRow: startRow + values.length - 1,
+        endColumn: startColumn + (values[0]?.length ?? 1) - 1,
+      },
+      body.map((row) => row[groupOffset]),
+      config,
+    )
+  } catch (reason) {
+    const message = reason instanceof Error ? reason.message : String(reason)
+    if (message === 'appSubtotalTooManyGroups') return t('appSubtotalTooManyGroups')
+    return message
   }
-  if (groups.length > 200) return t('appSubtotalTooManyGroups')
-  const writeTotalRow = (row: number, label: string, from: number, to: number): void => {
+  const groups = plan.groups.map((group) => ({ startAbs: group.start, endAbs: group.end }))
+  const writeTotalRow = (row: number, label: string, formula: string): void => {
     const labelCell = worksheet.getRange(row, config.groupCol, 1, 1)
     labelCell.setValue({ v: label })
     labelCell.setFontWeight('bold')
     const valueCell = worksheet.getRange(row, config.valueCol, 1, 1)
-    valueCell.setValue({
-      f: `=SUBTOTAL(${fn},$${valueColumn}$${from + 1}:$${valueColumn}$${to + 1})`,
-    })
+    valueCell.setValue({ f: formula })
     valueCell.setFontWeight('bold')
   }
   try {
-    // Bottom-up so earlier group indices stay valid across the inserts.
-    for (const group of [...groups].reverse()) {
-      worksheet.insertRowsBefore(group.endAbs + 1, 1)
-      writeTotalRow(group.endAbs + 1, `${group.label} Total`, group.startAbs, group.endAbs)
-    }
-    const lastRowAbs = startRow + body.length + groups.length
-    worksheet.insertRowsBefore(lastRowAbs + 1, 1)
-    // SUBTOTAL skips the nested per-group subtotal rows inside the span.
-    writeTotalRow(lastRowAbs + 1, 'Grand Total', startRow + 1, lastRowAbs)
+    for (const row of plan.insertBefore) worksheet.insertRowsBefore(row, 1)
+    for (const total of [...plan.totals, plan.grand])
+      writeTotalRow(total.row, total.label, total.formula)
+    const lastRowAbs = plan.grand.row - 1
     recordSubtotalOutline(ctx, worksheet.getSheetId(), groups, startRow + 1, lastRowAbs)
   } catch (error: unknown) {
     return error instanceof Error ? error.message : t('appSubtotalInsertFailed')
@@ -452,6 +416,15 @@ function recordSubtotalOutline(
   const state = ctx.lazyWorkbookRef.current
   if (!state || isSheetRemoved(state.editJournal, sheetId)) return
   const outline = sheetOutline(state, sheetId)
+  // Generated totals sit below their detail rows in both hosts.
+  if (!outline.summaryBelow) {
+    outline.summaryBelow = true
+    recordStructuralOp(state.editJournal, sheetId, {
+      kind: 'set-outline-pr',
+      summaryBelow: true,
+      summaryRight: outline.summaryRight,
+    })
+  }
   const record = (start: number, end: number, level: number): void => {
     for (let index = start; index <= end; index += 1) {
       outline.rows.set(index, { level, collapsed: false })

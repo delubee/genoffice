@@ -20,7 +20,10 @@ import type {
 import { columnLabel, parseRange } from '@genoffice/xlsx-gateway/domain/cell-address'
 import { fillDisplayColor, resolveStyleColor } from '@genoffice/xlsx-gateway/domain/style-color'
 import { splitSheetRef } from '@genoffice/xlsx-gateway/domain/chart-visual'
-import { CHART_CATEGORY_WIRE_MAX, CHART_TEXT_WIRE_MAX } from '../shared/desktop-api'
+import {
+  CHART_CATEGORY_WIRE_MAX,
+  CHART_TEXT_WIRE_MAX,
+} from '@genoffice/xlsx-gateway/shared/edit-schemas'
 import { ADDABLE_SHAPE_TYPES } from '@genoffice/xlsx-gateway/shared/shape-types'
 import { INDENT_STEP_PX } from './selection-format'
 import type { SharedFormulaResolver } from './shared-formula-journal'
@@ -256,11 +259,8 @@ export interface EditJournal {
 /// One printed header or footer: Excel's left/center/right sections. Text
 /// carries Excel field codes verbatim (&P page, &N pages, &D date, &T time,
 /// &F file name, &A sheet name, && literal ampersand).
-export interface HeaderFooterParts {
-  readonly left?: string
-  readonly center?: string
-  readonly right?: string
-}
+export type { HeaderFooterParts } from './ribbon-model'
+import type { HeaderFooterParts } from './ribbon-model'
 
 export interface PageSetupJournalState {
   orientation?: 'portrait' | 'landscape'
@@ -2398,7 +2398,25 @@ function extractRgb(value: unknown): string | undefined {
   const rgb = (value as Record<string, unknown>).rgb
   if (typeof rgb !== 'string') return undefined
   const match = /^#?([0-9a-fA-F]{6})$/.exec(rgb)
-  return match?.[1] ? `#${match[1].toUpperCase()}` : undefined
+  if (match?.[1]) return `#${match[1].toUpperCase()}`
+  const short = /^#([0-9a-f]{3})$/i.exec(rgb)
+  if (short)
+    return `#${[...short[1]!]
+      .map((v) => v + v)
+      .join('')
+      .toUpperCase()}`
+  // Native HTML clipboard styles may be computed CSS RGB rather than hex.
+  const css =
+    /^rgba?\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)(?:\s*,\s*(1(?:\.0+)?))?\s*\)$/i.exec(
+      rgb,
+    )
+  if (!css) return undefined
+  const channels = css.slice(1, 4).map(Number)
+  if (channels.some((v) => v < 0 || v > 255)) return undefined
+  return `#${channels
+    .map((v) => Math.round(v).toString(16).padStart(2, '0'))
+    .join('')
+    .toUpperCase()}`
 }
 
 /// The three shapes Univer uses for "no color": a bare `null` (Clear

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { Dropdown } from '@genoffice/ui'
+import { Dropdown } from '@genoffice/ui/chrome'
 
 import { ColorDropdown } from './ColorDropdown'
 import { draftFromSelection, formatCellsCommands, type FormatCellsDraft } from './format-cells'
@@ -129,14 +129,18 @@ export function FormatCellsDialog({
   anchorValue,
   onCommand,
   onClose,
+  onApply,
 }: {
   readonly selectionFormat: SelectionFormat | null
   /// Value of the selection's top-left cell, for the number-format preview.
   readonly anchorValue: number | string | null
   readonly onCommand: (command: string) => void
   readonly onClose: () => void
+  /** Embedded hosts submit the complete dialog as one validated transaction. */
+  readonly onApply?: (commands: readonly string[]) => Promise<boolean>
 }): React.JSX.Element {
   const { t } = useI18n()
+  const [applying, setApplying] = useState(false)
   const [tab, setTab] = useState<Tab>('Number')
   // The selection format at open time is the change baseline; the live echo
   // must not move it while the dialog is up.
@@ -172,14 +176,27 @@ export function FormatCellsDialog({
       ? FONT_SIZES
       : [...FONT_SIZES, draft.size].sort((a, b) => Number(a) - Number(b))
 
-  function handleApply(): void {
-    for (const command of formatCellsCommands(initial, draft)) onCommand(command)
-    onClose()
+  async function handleApply(): Promise<void> {
+    const commands = formatCellsCommands(initial, draft)
+    if (onApply) {
+      setApplying(true)
+      try {
+        if (await onApply(commands)) onClose()
+      } finally {
+        setApplying(false)
+      }
+    } else {
+      for (const command of commands) onCommand(command)
+      onClose()
+    }
   }
 
-  const modal = useModalDialog(onClose)
+  const close = () => {
+    if (!applying) onClose()
+  }
+  const modal = useModalDialog(close)
   return (
-    <div className="dialog-backdrop" onClick={onClose}>
+    <div className="dialog-backdrop" onClick={close}>
       <div
         className="format-cells-dialog"
         role="dialog"
@@ -580,10 +597,10 @@ export function FormatCellsDialog({
           )}
         </section>
         <footer className="dialog-actions">
-          <button className="secondary" onClick={onClose}>
+          <button className="secondary" disabled={applying} onClick={close}>
             {t('dlgCancel')}
           </button>
-          <button className="primary-action" onClick={handleApply}>
+          <button className="primary-action" disabled={applying} onClick={() => void handleApply()}>
             {t('dlgOk')}
           </button>
         </footer>

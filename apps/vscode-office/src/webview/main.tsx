@@ -1,3 +1,6 @@
+import { workbookMediaResultSchema } from '@genoffice/xlsx-gateway/shared/workbook-protocol'
+import { z } from 'zod'
+import { workbookViewCommandSchema } from '@genoffice/xlsx-gateway/shared/workbook-view-command'
 import { useState, useSyncExternalStore } from 'react'
 import { workbookAppearance, type WorkbookAppearance } from '@genoffice/sheets-editor/appearance'
 import { createRoot } from 'react-dom/client'
@@ -7,6 +10,10 @@ import type { WorkbookRuntime } from '@genoffice/sheets-editor/runtime'
 import type { EditorHost } from '@genoffice/sheets-editor/ports'
 import { formatAddress } from '@genoffice/xlsx-gateway/domain/cell-address'
 import './theme.css'
+import { threadStore } from '../../../sheets/src/renderer/threaded-comments'
+
+// New threaded comments and notes carry the VS Code user's name, as the desktop's settings name.
+threadStore.setAuthor(document.documentElement.dataset.author ?? '')
 declare const acquireVsCodeApi: () => { postMessage(message: unknown): void }
 
 const sessionId = document.documentElement.dataset.sessionId
@@ -29,6 +36,15 @@ const projection = new Promise<WorkbookRuntime>((resolve, reject) => {
 })
 void projection.catch(() => {})
 const host: EditorHost = {
+  outline: (sheetId, stateId) => bridge.request('source.outline', { sheetId, stateId }),
+  goalSeek: (request) => bridge.request('source.goalSeek', request),
+  media: async (visualId, stateId) =>
+    workbookMediaResultSchema.parse(await bridge.request('source.media', { visualId, stateId })),
+  audit: (request) => bridge.request('source.audit', request),
+  search: (request) => bridge.request('source.find', request),
+  action: async (request) => {
+    await bridge.request('office.action', request)
+  },
   read: (logicalSheetId, range, stateId) =>
     bridge.request('source.read', {
       logicalSheetId,
@@ -43,6 +59,18 @@ const host: EditorHost = {
       origin: 'manual',
       summary: 'Manual workbook edit',
     }),
+  submitStaged: (intent, stages) =>
+    bridge.request('view.stagedIntent', {
+      intent: {
+        schemaVersion: 1,
+        ...intent,
+        sessionId,
+        origin: 'manual',
+        summary: 'Manual workbook edit',
+      },
+      stages: JSON.parse(JSON.stringify(stages)),
+    }),
+  mergeWorkbooks: () => bridge.request('workbook.mergeWorkbooks', {}),
   selection: () => {}, // Binding explicitly requests the flushed selection.
   history: async (direction) => {
     await bridge.request('history.request', { direction })
@@ -64,8 +92,19 @@ bridge.handle('view.resync', async (raw) => {
   await (await projection).install(descriptor.stateId, descriptor.revision, state)
   return { projected: descriptor.stateId }
 })
-bridge.handle('view.flush', async () => ({ ready: await (await projection).flushEditor() }))
+const flushOptionsSchema = z
+  .object({ commitChartDraft: z.boolean().optional() })
+  .strict()
+  .default({})
+bridge.handle('view.flush', async (raw) => ({
+  ready: await (await projection).flushEditor(flushOptionsSchema.parse(raw)),
+}))
 bridge.handle('view.selection', async () => (await projection).selectionContext)
+bridge.handle('view.command', async (raw) => {
+  const { command } = workbookViewCommandSchema.parse(raw)
+  await (await projection).openViewCommand(command)
+  return { opened: command }
+})
 bridge.handle('view.presentation', async (raw) => {
   const request = raw as { stateId?: unknown; range?: unknown }
   if (
@@ -82,6 +121,7 @@ bridge.handle('view.presentation', async (raw) => {
   return {
     stateId: runtime.selectionContext.stateId,
     values: runtime.projectedValues(request.range),
+    styles: runtime.projectedStyles(request.range),
     merges: runtime.projectedMerges(),
     dimensions: runtime.projectedDimensions(request.range),
     view: runtime.projectedView(),
@@ -147,8 +187,24 @@ void bridge
     root.render(
       <StyledWorkbook
         onReady={(runtime) => {
-          void runtime
-            .install(descriptor.stateId, descriptor.revision, state)
+          // A host commit can land during the first reads; resync to the newest state instead of failing.
+          const install = async (
+            current: { stateId: string; revision: number },
+            data: unknown,
+            attempts: number,
+          ): Promise<void> => {
+            try {
+              await runtime.install(current.stateId, current.revision, data)
+            } catch (error) {
+              if (attempts <= 0 || !/no longer current/.test(String(error))) throw error
+              const next = (await bridge.request('view.resync', {})) as {
+                descriptor: { stateId: string; revision: number }
+                state: unknown
+              }
+              await install(next.descriptor, next.state, attempts - 1)
+            }
+          }
+          void install(descriptor, state, 3)
             .then(() => {
               document.documentElement.dataset.editorReady = 'true'
               ready(runtime)

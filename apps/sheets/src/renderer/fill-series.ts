@@ -1,4 +1,4 @@
-import { DATE_1904_OFFSET } from './numfmt-fix'
+import { DATE_1904_OFFSET } from './date-1904'
 
 export type FillSeriesDirection = 'rows' | 'columns'
 export type FillSeriesType = 'linear' | 'growth' | 'date' | 'autofill'

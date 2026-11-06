@@ -897,3 +897,91 @@ describe('genoffice sheet apply --ops: pivots, sparklines, print setup', () => {
     expect(sheet).toMatch(/<c r="C2"[^>]*>\s*<f>A2\*B2<\/f>/)
   })
 })
+
+it('serializes custom AND filters and combines them with legacy values using raw numeric comparisons', async () => {
+  const dir = tempDir()
+  const out = await book(dir)
+  const result = await apply(out, [
+    { op: 'set_filter', range: 'A1:C4' },
+    {
+      op: 'set_filter_criteria',
+      column: 'B',
+      customs: {
+        and: true,
+        filters: [
+          { operator: 'greaterThanOrEqual', val: '100' },
+          { operator: 'lessThan', val: '190' },
+        ],
+      },
+    },
+    { op: 'set_filter_criteria', column: 'A', values: ['North', 'West'] },
+  ])
+  expect(result.code).toBe(0)
+  const xml = (await parts(out)).get('xl/worksheets/sheet1.xml')!
+  expect(xml).toContain('<customFilters and="1">')
+  expect(xml).toContain('operator="greaterThanOrEqual" val="100"')
+  expect(xml).toContain('operator="lessThan" val="190"')
+  expect(xml).toMatch(/<row r="3"[^>]*hidden="1"/)
+  expect(xml).toMatch(/<row r="4"[^>]*hidden="1"/)
+  expect(xml).not.toMatch(/<row r="2"[^>]*hidden="1"/)
+})
+
+it('reapplies new-filter criteria and clears them while retaining the auto-filter range', async () => {
+  const dir = tempDir()
+  const out = await book(dir)
+  const result = await apply(out, [
+    { op: 'set_filter', range: 'A1:C4' },
+    {
+      op: 'set_filter_criteria',
+      column: 'B',
+      customs: { filters: [{ operator: 'greaterThan', val: '100' }] },
+    },
+    { op: 'reapply_filter' },
+  ])
+  expect(result.code).toBe(0)
+  let xml = (await parts(out)).get('xl/worksheets/sheet1.xml')!
+  expect(xml).toMatch(/<row r="3"[^>]*hidden="1"/)
+  const clear = await apply(out, [{ op: 'clear_filter_criteria' }])
+  expect(clear.code).toBe(0)
+  xml = (await parts(out)).get('xl/worksheets/sheet1.xml')!
+  expect(xml).toContain('<autoFilter ref="A1:C4"')
+  expect(xml).not.toContain('<customFilter')
+  expect(xml).not.toMatch(/hidden="1"/)
+  const saved = readFileSync(out)
+  const structural = await apply(out, [
+    { op: 'insert_rows', row: 2, count: 1 },
+    { op: 'clear_filter_criteria' },
+  ])
+  expect(structural.code).toBe(1)
+  expect(readFileSync(out)).toEqual(saved)
+})
+
+it('persists color criteria from shared DSL using current fill and font styles', async () => {
+  for (const [colors, hidden] of [
+    [{ fill: ['#ff0000', null] }, [3]],
+    [{ font: ['#ff0000'] }, [2, 4]],
+  ] as const) {
+    const out = await book(tempDir())
+    const result = await apply(out, [
+      { op: 'format_range', range: 'A2', format: { fillColor: '#FF0000', fontColor: '#0000FF' } },
+      { op: 'format_range', range: 'A3', format: { fillColor: '#0000FF', fontColor: '#FF0000' } },
+      { op: 'set_filter', range: 'A1:C4' },
+      { op: 'set_filter_criteria', column: 'A', colors },
+    ])
+    expect(result.code, result.stdout + result.stderr).toBe(0)
+    const entries = await parts(out),
+      xml = entries.get('xl/worksheets/sheet1.xml')!
+    expect(xml).toContain('urn:genoffice:filter-colors:v1')
+    for (const row of [2, 3, 4]) {
+      const pattern = new RegExp('<row\\b[^>]*r="' + row + '"[^>]*hidden="1"')
+      if ((hidden as readonly number[]).includes(row)) expect(xml).toMatch(pattern)
+      else expect(xml).not.toMatch(pattern)
+    }
+    if ('font' in colors) {
+      expect(xml).toContain('cellColor="0"')
+      expect(entries.get('xl/styles.xml')).toContain(
+        '<dxf><font><color rgb="FFFF0000"/></font></dxf>',
+      )
+    }
+  }
+})

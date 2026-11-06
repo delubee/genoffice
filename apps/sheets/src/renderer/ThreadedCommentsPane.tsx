@@ -17,7 +17,7 @@ import {
   type CellThread,
   type ThreadReply,
 } from './threaded-comments'
-import { revealCellBelowFreeze } from './univer-sync'
+import { revealCellBelowFreeze } from './reveal-cell'
 import type { UniverRuntime } from './univer-state'
 
 function formatStamp(dT: string): string {

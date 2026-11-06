@@ -16,22 +16,34 @@ export function GoToDialog({
 }: {
   readonly names: readonly GoToNameEntry[]
   /// Returns an error message, or null on success.
-  readonly onGo: (ref: string) => string | null
+  readonly onGo: (ref: string) => string | null | Promise<string | null>
   readonly onClose: () => void
 }): React.JSX.Element {
   const { t } = useI18n()
   const [reference, setReference] = useState('')
   const [error, setError] = useState<string | null>(null)
-
-  const go = (ref: string): void => {
-    const failure = onGo(ref)
-    setError(failure)
-    if (failure === null) onClose()
+  const [pending, setPending] = useState(false)
+  const close = () => {
+    if (!pending) onClose()
   }
 
-  const modal = useModalDialog(onClose)
+  const go = async (ref: string): Promise<void> => {
+    if (pending) return
+    setPending(true)
+    try {
+      const failure = await onGo(ref)
+      setError(failure)
+      if (failure === null) onClose()
+    } catch (error) {
+      setError(String(error))
+    } finally {
+      setPending(false)
+    }
+  }
+
+  const modal = useModalDialog(close)
   return (
-    <div className="dialog-backdrop" onClick={onClose}>
+    <div className="dialog-backdrop" onClick={close}>
       <div
         className="format-cells-dialog"
         role="dialog"
@@ -45,12 +57,13 @@ export function GoToDialog({
             <label className="dialog-span">
               {t('dlgGoToRef')}
               <input
+                disabled={pending}
                 autoFocus
                 value={reference}
                 placeholder={t('dlgGoToRefPlaceholder')}
                 onChange={(event) => setReference(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === 'Enter' && reference.trim() !== '') go(reference)
+                  if (event.key === 'Enter' && reference.trim() !== '') void go(reference)
                 }}
               />
             </label>
@@ -61,9 +74,12 @@ export function GoToDialog({
                 <li key={entry.name}>
                   <button
                     type="button"
+                    disabled={pending}
                     data-tip={t('dlgGoToNameHint', { ref: entry.ref })}
                     onClick={() => setReference(entry.name)}
-                    onDoubleClick={() => go(entry.name)}
+                    onDoubleClick={() => {
+                      void go(entry.name)
+                    }}
                   >
                     <strong>{entry.name}</strong>
                     <span>{entry.ref}</span>
@@ -80,13 +96,15 @@ export function GoToDialog({
           )}
         </section>
         <div className="dialog-actions">
-          <button className="secondary" onClick={onClose}>
+          <button className="secondary" disabled={pending} onClick={close}>
             {t('dlgCancel')}
           </button>
           <button
             className="primary-action"
-            disabled={reference.trim() === ''}
-            onClick={() => go(reference)}
+            disabled={pending || reference.trim() === ''}
+            onClick={() => {
+              void go(reference)
+            }}
           >
             {t('dlgGoToGo')}
           </button>

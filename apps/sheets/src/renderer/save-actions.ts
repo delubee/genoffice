@@ -761,6 +761,7 @@ export async function handleSave(
     definedNamesState,
     themeState,
     workbookProtectionState,
+    calcModeState: null,
     protectedRangeStates,
     redactionStates,
     externalLinkOps,
@@ -819,6 +820,7 @@ export async function handleSave(
       definedNamesState: splitSave ? null : definedNamesState,
       themeState,
       workbookProtectionState,
+      calcModeState: null,
       protectedRangeStates,
       redactionStates,
       externalLinkOps,
@@ -901,6 +903,7 @@ export async function handleSave(
         definedNamesState: heldNames,
         themeState: null,
         workbookProtectionState: null,
+        calcModeState: null,
         protectedRangeStates: [],
         // Phase one already wrote the marks, re-keyed for the renames it
         // performed. Sending them again would rewrite the part under the names

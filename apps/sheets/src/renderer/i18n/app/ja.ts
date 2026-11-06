@@ -105,6 +105,7 @@ export const ja = {
   appLabelNumberFormat: 'ラベルの表示形式',
   appLabelFormatPlaceholder: '例: 0.0% / #,##0',
   appGridlines: '目盛線',
+  appChartAxisRangeInvalid: '最大値は最小値より大きくしてください。',
   appAxisMin: '最小値',
   appAxisMax: '最大値',
   appBarSection: '縦棒',
@@ -683,6 +684,13 @@ export const ja = {
   appScopeWorkbook: 'ブック',
   appNamesNeedFile: '先に XLSX ファイルを開いてください。定義した名前はファイルに保存されます。',
   appNameGone: 'その名前は既に存在しません。',
+  appDefinedNameInvalid: '有効で予約されていない名前と参照を入力してください。',
+  appDefinedNameDuplicate: 'このスコープでは同じ名前が既に使用されています。',
+  appDefinedNameBindingConflict: '非表示またはシート単位の定義と競合します。',
+  appAuditPendingValues:
+    'エラーチェックは保存済みの数式の値を使用します。一部の結果は再計算待ちです。',
+  appDefinedNameLabelPending:
+    'ラベルの数式結果は未検証です。文字列のラベルで名前を作成してください。',
   appNameApplyFailed: 'この名前を適用できません。',
   appNamesUpdated: '名前を更新しました — ⌘S で保存します。',
   appLinkInternal: 'リンクはブック内を指しています：{location}',
@@ -1643,6 +1651,12 @@ export const ja = {
   appVisualFlipV: '上下反転',
   appVisualFlipH: '左右反転',
   appCtxPasteVisual: '図または図形を貼り付け',
+  appDocumentChangedDuringAction: '操作の準備中に文書が変更されました。もう一度お試しください。',
+  appClipboardUnsupported:
+    'このクリップボードの内容はまだ貼り付けられません。セルは変更されていません。',
+  appClipboardSelectionChanged: '貼り付け前に選択範囲が変わりました。もう一度お試しください。',
+  appClipboardBusy: '現在の編集が完了するまでお待ちください。',
+  appClipboardReadUnavailable: 'クリップボードを読み取れません。{shortcut} で貼り付けてください。',
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'スペル チェック',

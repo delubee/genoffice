@@ -104,6 +104,7 @@ export const pl = {
   appLabelNumberFormat: 'Format liczbowy etykiety',
   appLabelFormatPlaceholder: 'np. 0.0% / #,##0',
   appGridlines: 'Linie siatki',
+  appChartAxisRangeInvalid: 'Wartość maksymalna musi być większa od minimalnej.',
   appAxisMin: 'Minimum',
   appAxisMax: 'Maksimum',
   appBarSection: 'Kolumny',
@@ -670,6 +671,13 @@ export const pl = {
   appScopeWorkbook: 'Skoroszyt',
   appNamesNeedFile: 'Najpierw otwórz plik XLSX — zdefiniowane nazwy są zapisywane w pliku.',
   appNameGone: 'Ta nazwa już nie istnieje.',
+  appDefinedNameInvalid: 'Wprowadź poprawną, niezastrzeżoną nazwę i odwołanie.',
+  appDefinedNameDuplicate: 'Ta nazwa jest już używana w tym zakresie.',
+  appDefinedNameBindingConflict: 'Zmiana koliduje z definicją ukrytą lub lokalną dla arkusza.',
+  appAuditPendingValues:
+    'Sprawdzanie błędów używa zapisanych wartości formuł; niektóre wyniki czekają na przeliczenie.',
+  appDefinedNameLabelPending:
+    'Wyniki formuł etykiet nie zostały zweryfikowane. Użyj etykiet tekstowych.',
   appNameApplyFailed: 'Nie można zastosować nazwy.',
   appNamesUpdated: 'Zaktualizowano zdefiniowane nazwy — zapisz za pomocą ⌘S.',
   appLinkInternal: 'Link wskazuje wnętrze skoroszytu: {location}',
@@ -1620,6 +1628,13 @@ export const pl = {
   appVisualFlipV: 'Odbij w pionie',
   appVisualFlipH: 'Odbij w poziomie',
   appCtxPasteVisual: 'Wklej obraz lub kształt',
+  appDocumentChangedDuringAction:
+    'Dokument zmienił się podczas przygotowywania tej operacji. Spróbuj ponownie.',
+  appClipboardUnsupported:
+    'Nie można jeszcze wkleić tej zawartości. Żadna komórka nie została zmieniona.',
+  appClipboardSelectionChanged: 'Zaznaczenie zmieniło się przed wklejeniem. Spróbuj ponownie.',
+  appClipboardBusy: 'Poczekaj na zakończenie bieżącej edycji.',
+  appClipboardReadUnavailable: 'Nie można odczytać schowka. Użyj {shortcut}, aby wkleić.',
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'Pisownia',

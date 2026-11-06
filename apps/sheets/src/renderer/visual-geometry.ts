@@ -3,7 +3,7 @@
  * commands work on sheet-pixel boxes and write back twoCellAnchor markers.
  */
 import type { WorkbookVisualObject } from '../shared/desktop-api'
-import type { ArrangeBox } from './visual-arrange'
+import { normalizeDegrees, rotatedAabb, type ArrangeBox } from './visual-arrange'
 import { EMU_PER_PIXEL, markerFrom, walkMarker, type InstalledVisualFrame } from './WorkbookVisuals'
 
 export interface SheetMetrics {
@@ -92,5 +92,31 @@ export function anchorForBox(
     toColumn: toX.index,
     toRowOffset: Math.round(toY.offset * EMU_PER_PIXEL),
     toColumnOffset: Math.round(toX.offset * EMU_PER_PIXEL),
+  }
+}
+
+/** Resize/rotate a true frame around the center of its installed bounding box. */
+export function frameChangeFromBox(
+  box: ArrangeBox,
+  next: { width: number; height: number; rotation: number },
+  metrics: SheetMetrics,
+) {
+  const rotation = normalizeDegrees(next.rotation),
+    aabb = rotatedAabb(next.width, next.height, rotation)
+  return {
+    anchor: anchorForBox(
+      {
+        x: box.x + box.width / 2 - aabb.width / 2,
+        y: box.y + box.height / 2 - aabb.height / 2,
+        width: aabb.width,
+        height: aabb.height,
+      },
+      metrics,
+    ),
+    rotation,
+    frameSize: {
+      width: Math.max(1, Math.round(next.width * EMU_PER_PIXEL)),
+      height: Math.max(1, Math.round(next.height * EMU_PER_PIXEL)),
+    },
   }
 }

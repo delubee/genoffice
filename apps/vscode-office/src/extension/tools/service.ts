@@ -348,7 +348,7 @@ export class WorkbookTools {
         })),
         capabilities: {
           operations: SESSION_OPERATION_NAMES,
-          charts: ['column', 'bar', 'line', 'pie'],
+          charts: ['column', 'bar', 'line', 'area', 'pie', 'scatter', 'radar', 'doughnut', 'combo'],
           pythonExchange: !!this.host.exchange,
           automaticSave: false,
         },

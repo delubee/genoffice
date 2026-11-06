@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Dropdown } from '@genoffice/ui'
+import { Dropdown } from '@genoffice/ui/chrome'
 import { useI18n } from './i18n/locale'
 import { useModalDialog } from './modal-dialog'
 
@@ -34,7 +34,7 @@ export function NameManagerDialog({
   readonly names: readonly DefinedNameRow[]
   readonly sheets: readonly { id: string; name: string }[]
   /// Returns an error message, or null on success.
-  readonly onAction: (action: DefinedNameAction) => string | null
+  readonly onAction: (action: DefinedNameAction) => string | null | Promise<string | null>
   readonly onClose: () => void
 }): React.JSX.Element {
   const { t } = useI18n()
@@ -43,26 +43,39 @@ export function NameManagerDialog({
   const [ref, setRef] = useState('')
   const [scope, setScope] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const close = () => {
+    if (!busy) onClose()
+  }
 
   const pick = (row: DefinedNameRow): void => {
+    if (busy) return
     setSelected(row)
     setName(row.name)
     setRef(row.ref)
     setError(null)
   }
-  const run = (action: DefinedNameAction): void => {
-    const failure = onAction(action)
-    setError(failure)
-    if (failure === null) {
-      setSelected(null)
-      setName('')
-      setRef('')
+  const run = async (action: DefinedNameAction) => {
+    if (busy) return
+    setBusy(true)
+    try {
+      const failure = await onAction(action)
+      setError(failure)
+      if (failure === null) {
+        setSelected(null)
+        setName('')
+        setRef('')
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setBusy(false)
     }
   }
 
-  const modal = useModalDialog(onClose)
+  const modal = useModalDialog(close)
   return (
-    <div className="dialog-backdrop" onClick={onClose}>
+    <div className="dialog-backdrop" onClick={close}>
       <div
         className="format-cells-dialog name-manager-dialog"
         role="dialog"
@@ -104,6 +117,7 @@ export function NameManagerDialog({
                   <td>{row.scopeLabel}</td>
                   <td>
                     <button
+                      disabled={busy}
                       data-tip={t('dlgNmDeleteName')}
                       aria-label={t('dlgNmDeleteName')}
                       onClick={(event) => {
@@ -121,11 +135,19 @@ export function NameManagerDialog({
           <div className="dialog-grid">
             <label>
               {t('dlgNmName')}
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="MyRange" />
+              <input
+                disabled={busy}
+                maxLength={255}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="MyRange"
+              />
             </label>
             <label>
               {t('dlgNmRefersTo')}
               <input
+                disabled={busy}
+                maxLength={8192}
                 value={ref}
                 onChange={(e) => setRef(e.target.value)}
                 placeholder="=Sheet1!$A$1:$B$9"
@@ -135,6 +157,7 @@ export function NameManagerDialog({
               <label>
                 {t('dlgNmScope')}
                 <Dropdown
+                  disabled={busy}
                   ariaLabel={t('dlgNmScope')}
                   value={scope}
                   options={[
@@ -146,14 +169,19 @@ export function NameManagerDialog({
               </label>
             )}
           </div>
-          {error && <p className="dialog-note dialog-error">{error}</p>}
+          {error && (
+            <p className="dialog-note dialog-error" role="alert">
+              {error}
+            </p>
+          )}
         </section>
         <footer className="dialog-actions">
-          <button className="secondary" onClick={onClose}>
+          <button className="secondary" disabled={busy} onClick={close}>
             {t('dlgClose')}
           </button>
           {selected !== null && (
             <button
+              disabled={busy}
               className="secondary"
               onClick={() => {
                 setSelected(null)
@@ -167,7 +195,7 @@ export function NameManagerDialog({
           )}
           <button
             className="primary-action"
-            disabled={name.trim() === '' || ref.trim() === ''}
+            disabled={busy || name.trim() === '' || ref.trim() === ''}
             onClick={() =>
               run(
                 selected === null

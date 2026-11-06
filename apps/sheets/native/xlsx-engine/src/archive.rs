@@ -777,6 +777,8 @@ mod tests {
 mod sync_tests {
     use super::*;
 
+    // the errno table is empty off macOS/Linux, so there is no ENOTSUP to index
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
     #[test]
     fn refused_flushes_are_tolerated() {
         let enotsup = TOLERATED_SYNC_ERRNOS[0];
@@ -791,6 +793,8 @@ mod sync_tests {
         )));
     }
 
+    // raw Win32 codes 5/28/30 map to kinds the tolerance list accepts; the errnos are POSIX
+    #[cfg(unix)]
     #[test]
     fn real_write_failures_still_fail() {
         for raw in [5, 28, 30] {

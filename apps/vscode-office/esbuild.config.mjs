@@ -3,6 +3,24 @@ import { mkdir, readdir } from 'node:fs/promises'
 
 await mkdir('test-workspace', { recursive: true })
 await build({
+  entryPoints: ['src/extension/docx/provider.ts'],
+  outfile: 'dist/docx-host.cjs',
+  bundle: true,
+  platform: 'node',
+  target: 'node22',
+  format: 'cjs',
+  external: ['vscode'],
+  define: { 'import.meta.env': '{"DEV":false}' },
+})
+await build({
+  entryPoints: ['../../packages/workbook-session/src/calculation/worker-entry.ts'],
+  outfile: 'dist/calc-worker.cjs',
+  bundle: true,
+  platform: 'node',
+  target: 'node22',
+  format: 'cjs',
+})
+await build({
   entryPoints: ['src/extension/tools/manifest.ts'],
   outfile: 'dist/tool-schema.cjs',
   bundle: true,
@@ -39,7 +57,7 @@ if (entries.length)
     platform: 'node',
     target: 'node22',
     format: 'cjs',
-    external: ['vscode', 'mocha'],
+    external: ['vscode', 'mocha', '@playwright/test'],
     sourcemap: true,
   })
 

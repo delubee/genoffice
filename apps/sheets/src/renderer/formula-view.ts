@@ -18,8 +18,12 @@ import {
   type DocumentDataModel,
 } from '@univerjs/core'
 import { CoverContentCommand } from '@univerjs/docs-ui'
-import { RENDER_RAW_FORMULA_KEY } from '@univerjs/preset-sheets-core'
-import { BEFORE_CELL_EDIT, INTERCEPTOR_POINT, SheetInterceptorService } from '@univerjs/sheets'
+import {
+  RENDER_RAW_FORMULA_KEY,
+  BEFORE_CELL_EDIT,
+  INTERCEPTOR_POINT,
+  SheetInterceptorService,
+} from '@univerjs/preset-sheets-core'
 import { IEditorBridgeService } from '@univerjs/sheets-ui'
 
 import type { LazyWorkbookState, UniverRuntime } from './univer-state'
@@ -38,8 +42,11 @@ export function applyShowFormulasView(
   state: LazyWorkbookState | null,
   sheetId: string,
 ): void {
+  setShowFormulasView(runtime, formulaViewSheets(state).has(sheetId))
+}
+
+export function setShowFormulasView(runtime: UniverRuntime, next: boolean): void {
   const contextService = runtime.univer.__getInjector().get(IContextService)
-  const next = formulaViewSheets(state).has(sheetId)
   if (Boolean(contextService.getContextValue(RENDER_RAW_FORMULA_KEY)) !== next) {
     contextService.setContextValue(RENDER_RAW_FORMULA_KEY, next)
   }
@@ -66,6 +73,7 @@ export function indexedFormulaText(
 export function installFormulaViewInterceptor(
   runtime: UniverRuntime,
   lazyWorkbookRef: { readonly current: LazyWorkbookState | null },
+  isShown?: (sheetId: string) => boolean,
 ): { dispose(): void } {
   const injector = runtime.univer.__getInjector()
   const interceptorService = injector.get(SheetInterceptorService)
@@ -75,7 +83,7 @@ export function installFormulaViewInterceptor(
     priority: 9999,
     handler: (cell, location, next) => {
       const state = lazyWorkbookRef.current
-      if (!formulaViewSheets(state).has(location.subUnitId)) {
+      if (!(isShown?.(location.subUnitId) ?? formulaViewSheets(state).has(location.subUnitId))) {
         return next(cell)
       }
       const formula =

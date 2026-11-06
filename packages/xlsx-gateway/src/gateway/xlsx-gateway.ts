@@ -1,3 +1,4 @@
+import { rewriteNameReferences, type NameReferencePlan } from '../domain/defined-name-references'
 import { createHash } from 'node:crypto'
 import { closeSync, fsyncSync, openSync, readFileSync, writeFileSync } from 'node:fs'
 import { rename, rm } from 'node:fs/promises'
@@ -105,9 +106,10 @@ import {
   worksheetReferencesSheet,
 } from './xlsx-sheets'
 import type { StructuralOp } from './xlsx-structure'
-import { applyCfRules, type CfWireRule } from './xlsx-cf'
+import { applyCfRules, type CfWireRule, type DxfSink } from './xlsx-cf'
 import {
   applyDefinedNamesState,
+  rewriteSourceDefinedNameReferences,
   DefinedNameError,
   type DefinedNamesState,
 } from './xlsx-defined-names'
@@ -1072,6 +1074,8 @@ export async function planCellEditsToXlsx(
   redactionStates: readonly SheetRedactionState[] | null = null,
   // The fork's arguments follow so existing positional callers keep their meaning.
   invalidateFormulaCaches = false,
+  nameReferencePlan: NameReferencePlan | null = null,
+  calcModeState: { readonly mode: 'auto' | 'manual' | 'autoNoTable' } | null = null,
 ): Promise<MutationPlan> {
   // A pending pivot pins final coordinates for its source and output; shifts
   // on either sheet, and sheet renames (worksheetSource@sheet), would desync
@@ -1177,7 +1181,7 @@ export async function planCellEditsToXlsx(
   // Formula caches can be refreshed on a sheet the user did not edit (a
   // cross-sheet dependent), so those worksheets must be loaded too.
   const sheetNames = new Set([
-    ...(invalidateFormulaCaches
+    ...(invalidateFormulaCaches || nameReferencePlan !== null
       ? parseSheetElements(await pkg.readText('xl/workbook.xml')).map((sheet) => sheet.name)
       : []),
     ...formulaValues.map((sheet) => sheet.sheetName),
@@ -1201,7 +1205,38 @@ export async function planCellEditsToXlsx(
     const worksheetPath =
       additionPaths.get(sheetName) ?? (await resolveWorksheetPath(pkg, sheetName))
     worksheetPaths.set(sheetName, worksheetPath)
-    const worksheetXml = await pkg.readText(worksheetPath)
+    let worksheetXml = await pkg.readText(worksheetPath)
+    if (nameReferencePlan) {
+      const owner = nameReferencePlan.sheets.find((sheet) => sheet.name === sheetName)
+      if (!owner) throw new Error('Unknown name-reference worksheet owner.')
+      // Only authored cell formulas belong to this reference plan. Foreign
+      // extension payloads may also contain <f> and must remain byte-for-byte.
+      worksheetXml = worksheetXml.replace(
+        /(<sheetData\b[^>]*>)([\s\S]*?)(<\/sheetData>)/,
+        (_sheetData, open: string, body: string, close: string) =>
+          open +
+          body.replace(/<c\b[^>]*(?<!\/)>[\s\S]*?<\/c>/g, (cell) => {
+            const extension = cell.indexOf('<extLst')
+            const editable = extension < 0 ? cell : cell.slice(0, extension)
+            const suffix = extension < 0 ? '' : cell.slice(extension)
+            return (
+              editable.replace(
+                /<f(\s[^>]*?)?>([\s\S]*?)<\/f>/g,
+                (element, attrs: string | undefined, text: string) => {
+                  const before = decodeXmlText(
+                    text.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, (_literal, value: string) =>
+                      escapeXmlText(value),
+                    ),
+                  )
+                  const after = rewriteNameReferences(before, owner.id, nameReferencePlan)
+                  return before === after ? element : `<f${attrs ?? ''}>${escapeXmlText(after)}</f>`
+                },
+              ) + suffix
+            )
+          }) +
+          close,
+      )
+    }
     // Every later anchor lookup would report a bare "no sheetData"; name the
     // part and what was read so an empty or truncated extraction is visible.
     if (!worksheetXml.includes('<sheetData')) {
@@ -1243,6 +1278,7 @@ export async function planCellEditsToXlsx(
   if (
     edits.some((edit) => edit.style !== undefined) ||
     cfStates.length > 0 ||
+    filterStates.some((state) => state.filter?.columns.some((column) => column.colors)) ||
     structuralOps.some(({ ops }) => ops.some((op) => op.kind === 'set-col-style'))
   ) {
     if (!(await pkg.has(stylesPath))) await addDefaultStylesheet(pkg, touchedEntries)
@@ -1433,11 +1469,16 @@ export async function planCellEditsToXlsx(
     for (const [sheetName, xml] of worksheetXmls)
       worksheetXmls.set(
         sheetName,
-        xml.replace(/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g, (cell) => {
-          if (!/<f[\s/>]/.test(cell)) return cell
-          const address = /\br="([A-Z]+[1-9][0-9]*)"/.exec(cell)?.[1]
-          return address ? patchFormulaCachedValue(cell, address, null) : cell
-        }),
+        xml.replace(
+          /(<sheetData\b[^>]*>)([\s\S]*?)(<\/sheetData>)/,
+          (_sheetData, open: string, body: string, close: string) =>
+            open +
+            body.replace(/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g, (cell) => {
+              const address = /\br="([A-Z]+[1-9][0-9]*)"/.exec(cell)?.[1]
+              return address ? patchFormulaCachedValue(cell, address, null) : cell
+            }) +
+            close,
+        ),
       )
   // Recalculated formula results: refresh each formula cell's cached
   // <v> while leaving its <f> alone. Applied after the value edits so a cell the
@@ -1712,7 +1753,18 @@ export async function planCellEditsToXlsx(
         additionPaths.get(state.sheetName) ??
         worksheetPaths.get(state.sheetName) ??
         (await resolveWorksheetPath(pkg, state.sheetName))
-      await applyRoutedFilterState(pkg, worksheetPath, state, touchedEntries)
+      await applyRoutedFilterState(
+        pkg,
+        worksheetPath,
+        state,
+        touchedEntries,
+        stylesheet ?? undefined,
+      )
+    }
+    // Color filters intern differential formats while the filters are written, after the first flush.
+    if (stylesheet?.changed) {
+      pkg.write(stylesPath, stylesheet.serialize())
+      touchedEntries.add(stylesPath)
     }
   }
 
@@ -1783,6 +1835,8 @@ export async function planCellEditsToXlsx(
     )
   }
 
+  if (nameReferencePlan !== null)
+    workbookXml = rewriteSourceDefinedNameReferences(workbookXml, nameReferencePlan)
   if (definedNamesState !== null) {
     workbookXml = applyDefinedNamesState(workbookXml, definedNamesState)
   }
@@ -1790,6 +1844,8 @@ export async function planCellEditsToXlsx(
   if (workbookProtectionState !== null) {
     workbookXml = applyWorkbookProtection(workbookXml, workbookProtectionState.lockStructure)
   }
+
+  if (calcModeState !== null) workbookXml = applyCalcMode(workbookXml, calcModeState.mode)
 
   if (themeState !== null) {
     const themePath = 'xl/theme/theme1.xml'
@@ -2444,6 +2500,7 @@ async function applyRoutedFilterState(
   worksheetPath: string,
   state: SheetFilterState,
   touchedEntries: Set<string>,
+  dxfs?: DxfSink,
 ): Promise<void> {
   const match = state.filter?.range ?? state.visibilityRange
   let routed: { table: LocatedTable; area: TableArea } | undefined
@@ -2468,14 +2525,14 @@ async function applyRoutedFilterState(
   }
   const worksheetXml = await pkg.readText(worksheetPath)
   if (routed === undefined) {
-    pkg.write(worksheetPath, applyFilterState(worksheetXml, state))
+    pkg.write(worksheetPath, applyFilterState(worksheetXml, state, dxfs))
     touchedEntries.add(worksheetPath)
     return
   }
   const { table, area } = routed
   pkg.write(
     table.path,
-    applyTableFilterState(table.xml, { area, ...tablePartCounts(table.xml) }, state.filter),
+    applyTableFilterState(table.xml, { area, ...tablePartCounts(table.xml) }, state.filter, dxfs),
   )
   touchedEntries.add(table.path)
   pkg.write(worksheetPath, applyRowVisibilityState(worksheetXml, state))
@@ -2753,7 +2810,10 @@ function patchFormulaCachedValue(
   const existing = cellPattern.exec(worksheetXml)
   if (!existing || existing[3] === undefined) return worksheetXml
   const body = existing[3] ?? ''
-  if (!/<f[\s/>]/.test(body)) return worksheetXml
+  const extensionAt = body.indexOf('<extLst')
+  const content = extensionAt < 0 ? body : body.slice(0, extensionAt)
+  const extension = extensionAt < 0 ? '' : body.slice(extensionAt)
+  if (!/<f[\s/>]/.test(content)) return worksheetXml
   const attrs = `${existing[1] ?? ''}${existing[2] ?? ''}`
   // Formula results carry t="str" for text, t="e" for an engine-typed error,
   // no t (numeric default) otherwise; booleans use t="b" with 1/0. A null
@@ -2781,8 +2841,8 @@ function patchFormulaCachedValue(
     valueXml = `<v>${escapeCellText(String(value))}</v>`
   }
   // Keep <f> (and any other children apart from the cached value) verbatim.
-  const kept = body.replace(/<v\b[^>]*\/>|<v\b[^>]*>[\s\S]*?<\/v>/g, '')
-  const replacement = `<c r="${address}"${stripped ? ` ${stripped}` : ''}${typeAttr}>${kept}${valueXml}</c>`
+  const kept = content.replace(/<v\b[^>]*\/>|<v\b[^>]*>[\s\S]*?<\/v>/g, '')
+  const replacement = `<c r="${address}"${stripped ? ` ${stripped}` : ''}${typeAttr}>${kept}${valueXml}${extension}</c>`
   return worksheetXml.replace(cellPattern, () => replacement)
 }
 
@@ -3419,6 +3479,21 @@ function serializeRunProperties(run: WorkbookRichRun): string {
   }
   if (run.vertAlign !== undefined) parts.push(`<vertAlign val="${run.vertAlign}"/>`)
   return parts.length === 0 ? '' : `<rPr>${parts.join('')}</rPr>`
+}
+
+/// Formulas > Calculation Options: rewrite calcPr/@calcMode (`auto` is the default and is omitted).
+function applyCalcMode(workbookXml: string, mode: 'auto' | 'manual' | 'autoNoTable'): string {
+  const attribute = mode === 'auto' ? '' : ` calcMode="${mode}"`
+  if (/<calcPr\b/.test(workbookXml))
+    return workbookXml.replace(
+      /<calcPr\b([^>]*?)(\/?>)/,
+      (_full, attributes: string, close: string) =>
+        `<calcPr${attributes.replace(/\s*calcMode="[^"]*"/, '')}${attribute}${close}`,
+    )
+  if (mode === 'auto') return workbookXml
+  const anchor = workbookXml.includes('</definedNames>') ? '</definedNames>' : '</sheets>'
+  if (!workbookXml.includes(anchor)) return workbookXml
+  return workbookXml.replace(anchor, `${anchor}<calcPr${attribute}/>`)
 }
 
 function ensureFullCalcOnLoad(workbookXml: string): string {

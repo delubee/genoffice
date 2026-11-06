@@ -653,6 +653,7 @@ pub(crate) struct BorderSet {
 /// versus the clrScheme document order, per the xlsx theme index mapping).
 #[derive(Clone, Default)]
 pub struct ColorContext {
+    pub(crate) filter_styles: Vec<CellStyle>,
     theme: Vec<(u8, u8, u8)>,
     /// fmtScheme/fillStyleLst entries (1-based fillRef idx order); None for
     /// non-gradient entries.
@@ -702,6 +703,7 @@ impl ColorContext {
     #[cfg(test)]
     pub(crate) fn with_theme(theme: Vec<(u8, u8, u8)>) -> Self {
         ColorContext {
+            filter_styles: Vec::new(),
             theme,
             fill_styles: Vec::new(),
             indexed: Vec::new(),

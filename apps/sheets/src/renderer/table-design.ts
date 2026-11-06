@@ -56,17 +56,8 @@ export function liveFileTables(state: LazyWorkbookState, sheetId: string): LiveF
   return live
 }
 
-export interface TableStyleOptionFlags {
-  readonly headerRow: boolean
-  readonly totalsRow: boolean
-  readonly bandedRows: boolean
-  readonly bandedColumns: boolean
-  readonly firstColumn: boolean
-  readonly lastColumn: boolean
-  readonly filterButton: boolean
-}
-
-export type TableOptionKey = keyof TableStyleOptionFlags
+export type { TableStyleOptionFlags, TableOptionKey } from './ribbon-model'
+import type { TableStyleOptionFlags, TableOptionKey } from './ribbon-model'
 
 export const TABLE_OPTION_KEYS: readonly TableOptionKey[] = [
   'headerRow',

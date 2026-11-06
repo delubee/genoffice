@@ -8,7 +8,7 @@
  */
 import { BooleanNumber } from '@univerjs/core'
 import { IRenderManagerService, SHEET_VIEWPORT_KEY } from '@univerjs/engine-render'
-import { shapeClipCss } from '@genoffice/ui'
+import { shapeClipCss } from '@genoffice/ui/chrome'
 import type { UniverRuntime } from './univer-state'
 import { EMU_PER_PIXEL, walkMarker, type AnchorMarker } from './WorkbookVisuals'
 import type { WorkbookVisualObject } from '../shared/desktop-api'
@@ -98,13 +98,14 @@ export function anchorAxisMarkers(
 export function rectToAnchor(
   runtime: UniverRuntime,
   rect: DrawRectPx,
+  container?: HTMLElement,
 ): WorkbookVisualObject['anchor'] | null {
   const workbook = runtime.univerAPI.getActiveWorkbook()
   const worksheet = workbook?.getActiveSheet()
   if (!workbook || !worksheet) return null
   // getCellRect is relative to the grid's render surface — the largest canvas
   // in the container (the container itself has extra chrome above the grid)
-  const hostEl = document.getElementById('univer-container')
+  const hostEl = container ?? document.getElementById('univer-container')
   if (!hostEl) return null
   let surface: DOMRect | null = null
   for (const canvas of hostEl.querySelectorAll('canvas')) {
@@ -180,6 +181,8 @@ function clickInsertRect(runtime: UniverRuntime, x: number, y: number): DrawRect
  * module while a mode is armed, and the stale instance's listeners must still
  * be torn down by the replacement before it arms its own.
  */
+let shapeDragActive = false
+export const isSheetShapeDragging = () => shapeDragActive
 const CANCEL_KEY = '__sheetShapeDrawCancel'
 // Lazy: this module is imported by node-env test suites where window is absent
 const cancelStore = (): Record<string, (() => void) | undefined> =>
@@ -190,9 +193,10 @@ export function startSheetShapeDraw(
   runtime: UniverRuntime,
   prst: string,
   commit: (anchor: WorkbookVisualObject['anchor']) => void,
-): void {
+  container?: HTMLElement,
+): (() => void) | undefined {
   cancelStore()[CANCEL_KEY]?.()
-  const host = document.getElementById('univer-container')
+  const host = container ?? document.getElementById('univer-container')
   if (!host) return
   host.classList.add('sheet-shape-drawing')
 
@@ -200,6 +204,7 @@ export function startSheetShapeDraw(
   let cur: { x: number; y: number } | null = null
   let shift = false
   let ghost: HTMLDivElement | null = null
+  let cleaned = false
 
   const updateGhost = () => {
     if (!start || !cur) return
@@ -212,7 +217,7 @@ export function startSheetShapeDraw(
       ghost.style.pointerEvents = 'none'
       // Ghost of the default light-blue shape the gesture will insert
       ghost.style.background = 'rgba(221,235,247,0.75)'
-      ghost.style.border = '1px solid #9db8d4'
+      ghost.style.border = '1px solid var(--accent)'
       ghost.style.boxSizing = 'border-box'
       document.body.appendChild(ghost)
     }
@@ -225,10 +230,14 @@ export function startSheetShapeDraw(
     ghost.style.height = `${r.h}px`
   }
 
+  const onPointerDown = (event: PointerEvent) => {
+    if (event.button === 0) event.stopPropagation()
+  }
   const onMouseDown = (e: MouseEvent) => {
     if (e.button !== 0) return
     e.preventDefault()
     e.stopPropagation()
+    shapeDragActive = true
     start = { x: e.clientX, y: e.clientY }
     cur = { ...start }
     shift = e.shiftKey
@@ -249,7 +258,7 @@ export function startSheetShapeDraw(
       ? clickInsertRect(runtime, s.x, s.y)
       : resolveDrawRect(s.x, s.y, e.clientX, e.clientY, e.shiftKey)
     cleanup()
-    const anchor = rectToAnchor(runtime, rect)
+    const anchor = rectToAnchor(runtime, rect, host)
     if (anchor) commit(anchor)
   }
   const onKey = (e: KeyboardEvent) => {
@@ -264,20 +273,28 @@ export function startSheetShapeDraw(
   }
 
   const cleanup = () => {
+    if (cleaned) return
+    cleaned = true
+    shapeDragActive = false
     delete cancelStore()[CANCEL_KEY]
     host.classList.remove('sheet-shape-drawing')
+    host.removeEventListener('pointerdown', onPointerDown, true)
     host.removeEventListener('mousedown', onMouseDown, true)
     window.removeEventListener('mousemove', onWinMove, true)
     window.removeEventListener('mouseup', onWinUp, true)
     window.removeEventListener('keydown', onKey, true)
     window.removeEventListener('keyup', onKey, true)
+    window.removeEventListener('blur', cleanup)
     ghost?.remove()
     ghost = null
     start = null
   }
 
+  host.addEventListener('pointerdown', onPointerDown, true)
   host.addEventListener('mousedown', onMouseDown, true)
   window.addEventListener('keydown', onKey, true)
   window.addEventListener('keyup', onKey, true)
+  window.addEventListener('blur', cleanup)
   cancelStore()[CANCEL_KEY] = cleanup
+  return cleanup
 }

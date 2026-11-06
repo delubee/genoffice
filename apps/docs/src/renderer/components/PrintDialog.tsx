@@ -11,6 +11,7 @@
  * preview source, so what the dialog shows is exactly what prints.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { docsHost } from '../docs-host'
 import type { PrintDuplex, PrintPaper, PrinterInfo } from '../../shared/ipc'
 import { useI18n } from '../i18n/locale'
 import { parsePrintRange } from '../print-range'
@@ -163,7 +164,7 @@ export function PrintDialog({
     els.forEach((el, i) => el.classList.toggle('pv-print-skip', !sel.has(i)))
     const scale = setPrintZoom('printer')
     try {
-      const r = await window.desktop.print(
+      const r = await docsHost().print(
         scale,
         systemDialog ? { deviceName: null } : { deviceName, copies, collate, duplex },
         paperOfPreview(),

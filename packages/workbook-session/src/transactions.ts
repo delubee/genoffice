@@ -16,6 +16,8 @@ import { stageDocumentRoot } from './save-state'
 import { assertFreshRevision } from './freshness'
 import { importBatchSchema, type ImportBatch } from './exchange/schemas'
 import { importValueOperations } from './exchange/import-candidate'
+import { stagedOperationsSchema } from './staged-candidate'
+import type { WorkbookOperation } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
 import {
   intentFingerprint,
   operationRecordSchema,
@@ -100,6 +102,18 @@ export class WorkbookTransactions {
     this.queue = result.catch(() => {})
     return result
   }
+  /** One commit and history entry for host-built bounded stages. */
+  submitStaged(
+    raw: Record<string, unknown>,
+    stagesInput: unknown,
+    signal?: AbortSignal,
+  ): Promise<CommitReceipt> {
+    const stages = immutable(stagedOperationsSchema.parse(stagesInput))
+    const intent = { ...raw, operations: stages.flat() }
+    const result = this.queue.then(() => this.execute(intent, signal, undefined, stages))
+    this.queue = result.catch(() => {})
+    return result
+  }
   private assertActive() {
     if (this.closed) throw new WorkbookError('session_closed', 'The workbook session has closed.')
   }
@@ -115,13 +129,18 @@ export class WorkbookTransactions {
     raw: unknown,
     signal?: AbortSignal,
     batch?: ImportBatch,
+    stages?: readonly (readonly WorkbookOperation[])[],
   ): Promise<CommitReceipt> {
     this.assertActive()
     const intent = transactionInputSchema.parse(raw)
     assertFreshRevision(this.descriptor, intent.sessionId)
     const payloadHash = batch
         ? hash(`${intentFingerprint(intent)}:${JSON.stringify(batch)}`)
-        : intentFingerprint(intent),
+        : stages
+          ? hash(
+              `${intentFingerprint(intent)}:staged:${stages.map((stage) => stage.length).join()}`,
+            )
+          : intentFingerprint(intent),
       previous = this.operations.get(intent.transactionId)
     // Retried committed requests carry their original revision. Check identity first.
     if (previous) return resolveIdempotent(previous, payloadHash)
@@ -143,7 +162,15 @@ export class WorkbookTransactions {
             Promise.reject(
               new WorkbookError('unsupported_operation', 'This host cannot prepare imports.'),
             ))
-        : await this.options.interpreter.prepare(before, intent, signal)
+        : stages
+          ? await (this.options.interpreter.prepareStaged?.(before, intent, stages, signal) ??
+              Promise.reject(
+                new WorkbookError(
+                  'unsupported_operation',
+                  'This host cannot prepare staged transactions.',
+                ),
+              ))
+          : await this.options.interpreter.prepare(before, intent, signal)
       this.assertActive()
       assertNotCancelled(signal)
       if (

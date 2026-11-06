@@ -3,15 +3,32 @@ import { WorkbookEditorProvider, EDITOR_ID } from './provider'
 import { registerWorkbookTools } from './tools/register'
 import { registerBindSelection } from './commands/bind-selection'
 import { registerWorkbookSkillCommands } from './commands/install-skill'
+import { LazyDocxProvider } from './docx-proxy'
+import { join } from 'node:path'
+import { setCalculationWorkerPath } from '@genoffice/workbook-session/calculation/worker-client'
 export function activate(context: vscode.ExtensionContext) {
+  // Formula calculations for saving and tool reads run on a worker thread when the bundle is present.
+  setCalculationWorkerPath(join(context.extensionPath, 'dist', 'calc-worker.cjs'))
   const output = vscode.window.createOutputChannel('GenOffice Workbook')
   const provider = new WorkbookEditorProvider(context, output)
+  const docx = new LazyDocxProvider(context)
   context.subscriptions.push(
     output,
     provider,
+    docx,
+    docx.registerTools(),
+    vscode.window.registerCustomEditorProvider('genoffice.docx', docx, {
+      supportsMultipleEditorsPerDocument: false,
+      webviewOptions: { retainContextWhenHidden: true },
+    }),
     registerWorkbookTools(provider),
     registerBindSelection(provider),
     registerWorkbookSkillCommands(context),
+    vscode.commands.registerCommand('genoffice.workbook.find', () => provider.viewCommand('find')),
+    vscode.commands.registerCommand('genoffice.workbook.replace', () =>
+      provider.viewCommand('replace'),
+    ),
+    vscode.commands.registerCommand('genoffice.workbook.goto', () => provider.viewCommand('goto')),
     vscode.commands.registerCommand('genoffice.recoverWorkbook', (uri?: vscode.Uri) =>
       provider.recoverWorkbook(uri),
     ),
@@ -43,6 +60,8 @@ export function activate(context: vscode.ExtensionContext) {
     operationStatus: provider.operationStatus.bind(provider),
     ...(context.extensionMode === vscode.ExtensionMode.Test
       ? {
+          docxBackupForTests: docx.backupForTests.bind(docx),
+          docxRestoreForTests: docx.restoreForTests.bind(docx),
           revertForTests: async (uri: vscode.Uri) => {
             const document = provider.getDocument(uri)
             if (!document) throw new Error('The test workbook is not open.')

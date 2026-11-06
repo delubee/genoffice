@@ -1,3 +1,4 @@
+import { customFilterPredicate } from '@genoffice/xlsx-gateway/domain/custom-filter'
 /**
  * Filtering for streamed workbooks past the Full Load budget. The filter
  * panel's value list and the hidden-row set are computed over a per-column
@@ -20,12 +21,9 @@ import {
 } from '@univerjs/core'
 import type { IFilterColumn } from '@univerjs/preset-sheets-filter'
 import {
-  type CustomFilterOperator,
   FilterBy,
   type FilterColumn,
   type FilterModel,
-  getCustomFilterFn,
-  notEquals,
   SheetsFilterService,
 } from '@univerjs/sheets-filter'
 
@@ -53,32 +51,6 @@ export function projectionText(value: ProjectionValue): string {
   return value.toString()
 }
 
-/// Value the condition filter compares (Univer: getFilterValueForConditionalFiltering).
-function conditionValue(value: ProjectionValue): string | number | null {
-  if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE'
-  return value
-}
-
-function customFilterFn(filter: {
-  val: string | number
-  operator?: CustomFilterOperator | undefined
-}): (value: string | number | null) => boolean {
-  const compare = filter.val
-  const numericCompare =
-    typeof compare === 'number' || (typeof compare === 'string' && isNumeric(compare))
-  if (filter.operator === 'notEqual' && !numericCompare) {
-    return (value) => notEquals.fn(value as never, compare as never)
-  }
-  if (filter.operator) {
-    if (!numericCompare) return () => false
-    const fn = getCustomFilterFn(filter.operator)
-    const ensured = Number(compare)
-    return (value) => fn.fn(value as never, ensured as never)
-  }
-  const fn = getCustomFilterFn(undefined)
-  return (value) => fn.fn(value as never, compare as never)
-}
-
 /// Mirrors Univer's generateFilterFn; color filters are not evaluated here.
 export function buildFilterPredicate(column: IFilterColumn): FilterPredicate | null {
   if (column.filters) {
@@ -90,16 +62,11 @@ export function buildFilterPredicate(column: IFilterColumn): FilterPredicate | n
     }
   }
   if (column.customFilters) {
-    const fns = column.customFilters.customFilters.map((filter) => customFilterFn(filter))
-    const [first, second] = fns
-    if (!first) return null
-    const combined =
-      second === undefined
-        ? first
-        : column.customFilters.and
-          ? (value: string | number | null) => first(value) && second(value)
-          : (value: string | number | null) => first(value) || second(value)
-    return (value) => combined(conditionValue(value))
+    if (!column.customFilters.customFilters.length) return null
+    return customFilterPredicate({
+      and: !!column.customFilters.and,
+      filters: column.customFilters.customFilters,
+    })
   }
   return null
 }

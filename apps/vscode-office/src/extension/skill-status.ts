@@ -21,9 +21,10 @@ export async function workbookSkillStatus(input: {
   registeredToolNames: readonly string[]
 }) {
   const source = await readFile(join(input.bundleDirectory, 'SKILL.md'), 'utf8')
-  const version = /^ {2}version:\s*"([0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?)"\s*$/m.exec(
-    source,
-  )?.[1]
+  const version =
+    /^ {2}version:\s*(['"]?)([0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?)\1\s*$/m.exec(
+      source,
+    )?.[2]
   if (!version)
     throw new WorkbookError(
       'skill_bundle_invalid',

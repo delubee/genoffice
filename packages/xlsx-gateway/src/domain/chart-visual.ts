@@ -1,3 +1,4 @@
+import { hasNumericYearAxis } from './chart-data-kind'
 import * as numfmt from 'numfmt'
 
 import { columnLabel, parseAddress, parseRange, rangeCellCount } from './cell-address'
@@ -18,13 +19,48 @@ export interface SheetVisualAnchor {
 
 export type ChartSeriesState = ChartSeriesVisualState
 
-export interface SheetVisual {
+export interface SheetChartVisual {
   id: string
   sheetId: string
   kind: 'chart'
+  altText?: string | undefined
+  editAs?: 'twoCell' | 'oneCell' | 'absolute' | undefined
+  /** Original-file chart part, absent for session-added visuals. */
+  chartPath?: string | undefined
   anchor: SheetVisualAnchor
   chart: ChartVisualState
 }
+
+export interface SheetShapeVisual {
+  id: string
+  sheetId: string
+  kind: 'shape'
+  anchor: SheetVisualAnchor
+  shapeType: string
+  fillColor?: string | undefined
+  lineColor?: string | undefined
+  text?: string | undefined
+  isTextBox?: boolean | undefined
+  altText?: string | undefined
+  editAs?: 'twoCell' | 'oneCell' | 'absolute' | undefined
+  rotation?: number | undefined
+  flipH?: boolean | undefined
+  flipV?: boolean | undefined
+  frameWidth?: number | undefined
+  frameHeight?: number | undefined
+  chart?: undefined
+  chartPath?: undefined
+}
+export interface SheetPictureVisual extends Omit<
+  SheetShapeVisual,
+  'kind' | 'shapeType' | 'fillColor' | 'lineColor' | 'text' | 'isTextBox'
+> {
+  kind: 'image'
+  mediaType: 'image/png' | 'image/jpeg' | 'image/gif'
+  mediaDataUrl: string
+  name: string
+}
+export type SheetVisual = SheetChartVisual | SheetShapeVisual | SheetPictureVisual
 
 export type ChartGridValue = string | number | boolean | null | undefined
 
@@ -485,6 +521,21 @@ function mergeValueAxis(
 /// Applies an edit over a chart state (immutably). Both the on-screen
 /// preview of pending file-chart edits and the baked edits of in-memory
 /// charts run through here, so they cannot drift apart.
+/** Remove settings whose OOXML elements cease to exist during conversion. */
+export function pruneChartSettingsForType<T extends object>(value: T, type: string): T {
+  const next = { ...value } as T & Record<string, unknown>
+  const pie = type === 'pie' || type === 'doughnut'
+  const remove = [
+    ...(pie ? ['axisTitles', 'valueAxis', 'gridlines'] : []),
+    ...(!['column', 'bar', 'line', 'area'].includes(type) ? ['grouping'] : []),
+    ...(!['column', 'bar'].includes(type) ? ['gapWidthPct'] : []),
+    ...(type !== 'doughnut' ? ['holeSizePct'] : []),
+    ...(!pie ? ['explosionPct', 'pointExplosions'] : []),
+  ]
+  for (const key of remove) delete next[key]
+  return next
+}
+
 export function applyChartStateEdit(
   chart: ChartVisualState,
   edit: ChartStateEdit | undefined,
@@ -521,7 +572,7 @@ export function applyChartStateEdit(
       }))
     : chart.series
   const valueAxis = mergeValueAxis(chart.valueAxis, edit.valueAxis)
-  return {
+  const next: ChartVisualState = {
     ...chart,
     ...(derivedTypes === undefined ? {} : { chartTypes: derivedTypes }),
     ...(edit.title === undefined ? {} : { title: edit.title }),
@@ -559,7 +610,7 @@ export function applyChartStateEdit(
         ...(index === 0 && edit.explosionPct !== undefined
           ? { explosionPct: edit.explosionPct }
           : {}),
-        ...(data?.name === undefined ? {} : { name: data.name }),
+        ...(data?.name === undefined ? {} : { name: data.name, nameRef: undefined }),
         // New values are dense numbers — stale blank markers must not
         // survive them.
         ...(data?.values === undefined ? {} : { values: data.values, blanks: undefined }),
@@ -572,6 +623,16 @@ export function applyChartStateEdit(
       }
     }),
   }
+  if (edit.chartType !== undefined) {
+    if (edit.chartType !== 'pie' && edit.chartType !== 'doughnut') {
+      for (const series of next.series) {
+        delete series.explosionPct
+        delete series.pointExplosions
+      }
+    }
+    return pruneChartSettingsForType(next, edit.chartType)
+  }
+  return next
 }
 
 export interface ParsedChartData {
@@ -771,15 +832,35 @@ const CHART_KIND_TO_TYPES: Record<BuildChartVisualInput['chartType'], string[]> 
   combo: ['barChart', 'lineChart'],
 }
 
+/** Recognize supported plot sets without silently converting an unknown chart. */
+export function chartKindFromVisual(
+  chart: Pick<ChartVisualState, 'chartTypes' | 'barDirection'>,
+): BuildChartVisualInput['chartType'] | null {
+  const types = chart.chartTypes
+  if (types.length === 2 && types.includes('barChart') && types.includes('lineChart'))
+    return 'combo'
+  if (types.length !== 1) return null
+  if (types[0] === 'barChart') return chart.barDirection === 'bar' ? 'bar' : 'column'
+  for (const [kind, plots] of Object.entries(CHART_KIND_TO_TYPES))
+    if (plots.length === 1 && plots[0] === types[0])
+      return kind as BuildChartVisualInput['chartType']
+  return null
+}
+
 /// Shared AI add_chart assembly (demo adapter + lazy visual pipeline): header
 /// and category column are detected from the data, matching the ribbon's
 /// Insert Chart. The default anchor sits two columns right of the data.
-export function buildChartVisual(input: BuildChartVisualInput): SheetVisual {
+export function buildChartVisual(input: BuildChartVisualInput): SheetChartVisual {
   const bounds = parseRange(input.dataRange)
   if (rangeCellCount(bounds) > 2000) {
     throw new Error('add_chart dataRange covers more than 2000 cells.')
   }
-  const parsed = chartDataFromValues(input.values)
+  let parsed = chartDataFromValues(
+    input.values,
+    input.chartType === 'scatter' ? { numericCategoryColumn: true } : undefined,
+  )
+  if (parsed && input.chartType !== 'scatter' && hasNumericYearAxis(parsed))
+    parsed = chartDataFromValues(input.values, { numericCategoryColumn: true }) ?? parsed
   if (!parsed) throw new Error('The chart dataRange needs at least one numeric column.')
   const anchorBase = input.anchorCell === undefined ? null : parseAddress(input.anchorCell)
   const anchor: SheetVisualAnchor =
@@ -818,9 +899,6 @@ export function buildChartVisual(input: BuildChartVisualInput): SheetVisual {
       ...(input.chartType === 'column' || input.chartType === 'bar' || input.chartType === 'combo'
         ? {
             barDirection: input.chartType === 'bar' ? 'bar' : 'col',
-            // Newly created bar/column charts label every bar by default
-            // (file charts keep whatever the source workbook configured).
-            ...(input.chartType === 'combo' ? {} : { dataLabels: 'value' as const }),
           }
         : {}),
       title:

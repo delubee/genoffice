@@ -102,6 +102,7 @@ export const en = {
   appLabelNumberFormat: 'Label Number Format',
   appLabelFormatPlaceholder: 'e.g. 0.0% / #,##0',
   appGridlines: 'Gridlines',
+  appChartAxisRangeInvalid: 'Maximum must be greater than minimum.',
   appAxisMin: 'Minimum',
   appAxisMax: 'Maximum',
   appBarSection: 'Bar',
@@ -627,6 +628,12 @@ export const en = {
   appScopeWorkbook: 'Workbook',
   appNamesNeedFile: 'Open an XLSX file first — defined names save into the file.',
   appNameGone: 'That name no longer exists.',
+  appDefinedNameInvalid: 'Enter a valid, nonreserved name and reference.',
+  appDefinedNameDuplicate: 'That name is already used in this scope.',
+  appDefinedNameBindingConflict: 'This change conflicts with a hidden or sheet-scoped definition.',
+  appAuditPendingValues:
+    'Error checking uses saved formula values; some results await recalculation.',
+  appDefinedNameLabelPending: 'Formula labels are not verified. Use text labels to create names.',
   appNameApplyFailed: 'The name could not be applied.',
   appNamesUpdated: 'Defined names updated — save with ⌘S.',
   appLinkInternal: 'Link points inside the workbook: {location}',
@@ -1568,6 +1575,11 @@ export const en = {
   appVisualFlipV: 'Flip Vertical',
   appVisualFlipH: 'Flip Horizontal',
   appCtxPasteVisual: 'Paste Picture or Shape',
+  appDocumentChangedDuringAction: 'The document changed while preparing this action. Try again.',
+  appClipboardUnsupported: 'This clipboard content cannot be pasted yet. No cells were changed.',
+  appClipboardSelectionChanged: 'The selection changed before pasting. Try again.',
+  appClipboardBusy: 'Wait for the current edit to finish.',
+  appClipboardReadUnavailable: 'Unable to read the clipboard. Use {shortcut} to paste.',
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'Spelling',

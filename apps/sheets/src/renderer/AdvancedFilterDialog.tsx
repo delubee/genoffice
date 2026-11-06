@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { normalizeLang } from '@genoffice/i18n'
+import { useRef, useState } from 'react'
 
-import { Dropdown } from '@genoffice/ui'
+import { Dropdown } from '@genoffice/ui/chrome'
 import { BooleanNumber } from '@univerjs/core'
 import type { IFilterColumn } from '@univerjs/preset-sheets-filter'
 
-import { t, useI18n, type StringKey } from './i18n/locale'
+import { t, tFor, useI18n, type TFunc, type StringKey } from './i18n/locale'
 import { useModalDialog } from './modal-dialog'
 
 /// Excel's custom auto-filter ("Advanced" in Data → Sort & Filter), minimal:
@@ -80,15 +81,23 @@ function toUniverCustomFilter(condition: AdvancedFilterCondition): {
 
 export function AdvancedFilterDialog({
   columns,
+  locale,
   onApply,
   onClose,
 }: {
   readonly columns: readonly AdvancedFilterColumn[]
+  readonly locale?: string
   /// Returns an error message, or null on success.
-  readonly onApply: (criteria: AdvancedFilterCriteria) => string | null
+  readonly onApply: (criteria: AdvancedFilterCriteria) => string | null | Promise<string | null>
   readonly onClose: () => void
 }): React.JSX.Element {
-  const { t } = useI18n()
+  const { t: desktopT } = useI18n()
+  const t: TFunc = locale ? (key, params) => tFor(normalizeLang(locale), key, params) : desktopT
+  const [busy, setBusy] = useState(false)
+  const pending = useRef(false)
+  const close = () => {
+    if (!pending.current) onClose()
+  }
   const [colId, setColId] = useState(columns[0]?.colId ?? 0)
   const [operator1, setOperator1] = useState<AdvancedFilterOperator>('equal')
   const [value1, setValue1] = useState('')
@@ -97,9 +106,39 @@ export function AdvancedFilterDialog({
   const [and, setAnd] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const modal = useModalDialog(onClose)
+  const apply = async () => {
+    if (pending.current) return
+    if (value1 === '') {
+      setError(t('dlgAdvFilterNeedValue1'))
+      return
+    }
+    pending.current = true
+    setBusy(true)
+    setError(null)
+    try {
+      const failure = await onApply({
+        colId,
+        and,
+        filters: [
+          { operator: operator1, val: value1 },
+          ...(value2 === '' ? [] : [{ operator: operator2, val: value2 }]),
+        ],
+      })
+      setError(failure)
+      if (failure === null) {
+        pending.current = false
+        onClose()
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason))
+    } finally {
+      pending.current = false
+      setBusy(false)
+    }
+  }
+  const modal = useModalDialog(close)
   return (
-    <div className="dialog-backdrop" onClick={onClose}>
+    <div className="dialog-backdrop" onClick={close}>
       <div
         className="format-cells-dialog"
         role="dialog"
@@ -111,7 +150,11 @@ export function AdvancedFilterDialog({
         {columns.length === 0 ? (
           <p className="dialog-note">{t('dlgAdvFilterNoColumns')}</p>
         ) : (
-          <div className="dialog-grid">
+          <fieldset
+            className="dialog-grid"
+            disabled={busy}
+            style={{ border: 0, margin: 0, minWidth: 0 }}
+          >
             <label className="dialog-span">
               {t('dlgAdvFilterColumn')}
               <Dropdown
@@ -175,7 +218,7 @@ export function AdvancedFilterDialog({
               <input value={value2} onChange={(event) => setValue2(event.target.value)} />
             </label>
             <p className="dialog-note dialog-span">{t('dlgAdvFilterNote')}</p>
-          </div>
+          </fieldset>
         )}
         {error && (
           <p className="dialog-note" role="alert">
@@ -183,29 +226,11 @@ export function AdvancedFilterDialog({
           </p>
         )}
         <div className="dialog-actions">
-          <button className="secondary" onClick={onClose}>
+          <button className="secondary" disabled={busy} onClick={close}>
             {t('dlgCancel')}
           </button>
           {columns.length > 0 && (
-            <button
-              className="primary-action"
-              onClick={() => {
-                if (value1 === '') {
-                  setError(t('dlgAdvFilterNeedValue1'))
-                  return
-                }
-                const failure = onApply({
-                  colId,
-                  and,
-                  filters: [
-                    { operator: operator1, val: value1 },
-                    ...(value2 === '' ? [] : [{ operator: operator2, val: value2 }]),
-                  ],
-                })
-                setError(failure)
-                if (failure === null) onClose()
-              }}
-            >
+            <button className="primary-action" disabled={busy} onClick={() => void apply()}>
               {t('dlgOk')}
             </button>
           )}

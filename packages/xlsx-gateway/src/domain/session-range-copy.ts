@@ -12,7 +12,7 @@ import type { z } from 'zod'
 
 type TypedCell = z.infer<typeof cellRecordSchema>
 
-/** Copy values and formulas, retaining destination formatting (the DSL contract). */
+/** Copy values/formulas; ribbon fills explicitly request replacement donor formatting. */
 export function copySessionRange(
   book: WorkbookSnapshot,
   op: CopyRangeOperation | FillRangeOperation,
@@ -33,6 +33,9 @@ export function copySessionRange(
   const sourceTemplates = structuredClone(templates.get(sourceId) ?? {}),
     destinationTemplates = templates.get(op.sheetId) ?? {},
     cells: Record<string, CellState> = { ...targetSheet.cells },
+    styles = { ...targetSheet.styles },
+    sourceStyles = structuredClone(sourceSheet.styles ?? {}),
+    copyFormat = op.op === 'fill_range' && op.copyFormat === true,
     height = source.endRow - source.startRow + 1,
     width = source.endColumn - source.startColumn + 1
   for (let row = target.startRow; row <= target.endRow; row++) {
@@ -51,6 +54,11 @@ export function copySessionRange(
           ? { formula: offsetFormulaRefs(donor.formula, row - sourceRow, column - sourceColumn) }
           : {}),
       }
+      if (copyFormat) {
+        // Read from immutable source snapshots, including when the target tiles
+        // the donor itself. Replacement removes destination-only formatting.
+        styles[to] = structuredClone(sourceStyles[from] ?? {})
+      }
       destinationTemplates[to] = {
         ...(destinationTemplates[to] ?? {}),
         kind:
@@ -65,6 +73,11 @@ export function copySessionRange(
                   : 'string',
         rawValue: value,
         ...(template?.dateSystem ? { dateSystem: template.dateSystem } : {}),
+        ...(copyFormat ? { styleReset: true, style: structuredClone(template?.style ?? {}) } : {}),
+      }
+      if (copyFormat) {
+        delete destinationTemplates[to]!.numberFormat
+        if (template?.numberFormat) destinationTemplates[to]!.numberFormat = template.numberFormat
       }
     }
   }
@@ -73,7 +86,9 @@ export function copySessionRange(
     target,
     snapshot: {
       ...book,
-      sheets: book.sheets.map((sheet) => (sheet.id === op.sheetId ? { ...sheet, cells } : sheet)),
+      sheets: book.sheets.map((sheet) =>
+        sheet.id === op.sheetId ? { ...sheet, cells, ...(copyFormat ? { styles } : {}) } : sheet,
+      ),
     },
   }
 }

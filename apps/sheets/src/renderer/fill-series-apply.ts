@@ -4,8 +4,10 @@ import {
   FILL_SERIES_OPEN_ENDED_LIMIT,
   type FillSeriesDirection,
   type FillSeriesOptions,
+  type FillSeriesType,
   planFillSeries,
 } from './fill-series'
+import { numberFormatLabel } from './selection-format'
 import type { TFunc } from './i18n/locale'
 import type { UniverRuntime } from './univer-state'
 
@@ -97,4 +99,9 @@ export function fillSeriesContext(
     direction: active && active.getHeight() > active.getWidth() ? 'columns' : 'rows',
     date1904,
   }
+}
+
+/// Dialog default Type: Date when the selection already shows a date.
+export function fillSeriesDefaultType(numberFormat: string | undefined): FillSeriesType {
+  return numberFormat && numberFormatLabel(numberFormat) === 'Date' ? 'date' : 'linear'
 }

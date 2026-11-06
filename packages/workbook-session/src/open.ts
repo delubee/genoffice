@@ -1,10 +1,13 @@
+import { parsePivotDefinition } from '@genoffice/xlsx-gateway/gateway/xlsx-pivot'
+import { workbookPivotDefinitionSchema } from '@genoffice/xlsx-gateway/shared/workbook-protocol'
 import { constants } from 'node:fs'
-import { copyFile, realpath, stat, chmod } from 'node:fs/promises'
+import { copyFile, stat, chmod } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { assertNotCancelled, WorkbookError, type OriginalBase } from './domain'
 import type { WorkbookSource } from './ports'
 import { hashFile, privateDirectory, RetainedResource } from './resources'
+import { resolveDocumentPath } from './document-path'
 
 export async function openWorkbookSnapshot(input: {
   uri: string
@@ -20,7 +23,7 @@ export async function openWorkbookSnapshot(input: {
       'Only a file on the extension host is supported.',
     )
   const path = fileURLToPath(url),
-    canonicalPath = await realpath(path),
+    canonicalPath = await resolveDocumentPath(path),
     physical = await stat(canonicalPath)
   if (!physical.isFile())
     throw new WorkbookError('unsupported_resource', 'The workbook must be a regular file.')
@@ -39,6 +42,8 @@ export async function openWorkbookSnapshot(input: {
     sidecarId = opened.sessionId
     const manifest = await input.source.archiveManifest(snapshotPath)
     assertNotCancelled(input.signal)
+    const metadata = await withPivotDefinitions(input.source, snapshotPath, opened.metadata)
+    assertNotCancelled(input.signal)
     const original: OriginalBase = Object.freeze({
       path: snapshotPath,
       sha256,
@@ -48,9 +53,9 @@ export async function openWorkbookSnapshot(input: {
     return {
       original,
       metadata:
-        opened.metadata && typeof opened.metadata === 'object'
-          ? { ...opened.metadata, readOnly: (physical.mode & 0o222) === 0 }
-          : opened.metadata,
+        metadata && typeof metadata === 'object'
+          ? { ...metadata, readOnly: (physical.mode & 0o222) === 0 }
+          : metadata,
       archiveManifest: manifest,
       canonicalPath,
       physicalId: `${physical.dev}:${physical.ino}`,
@@ -60,5 +65,46 @@ export async function openWorkbookSnapshot(input: {
   } catch (error) {
     await owner.dispose()
     throw error
+  }
+}
+
+/**
+ * File PivotTables: parsed definitions ride in each sheet's original metadata
+ * so refresh runs on the canonical root without renderer archive access.
+ * A part that cannot be read or parsed records its reason and refresh refuses it.
+ */
+async function withPivotDefinitions(source: WorkbookSource, path: string, metadata: unknown) {
+  if (!source.readArchiveText || !metadata || typeof metadata !== 'object') return metadata
+  const sheets = (metadata as { sheets?: unknown }).sheets
+  if (!Array.isArray(sheets)) return metadata
+  return {
+    ...metadata,
+    sheets: await Promise.all(
+      sheets.map(async (sheet: { pivotTables?: { path: string; cachePath: string | null }[] }) => {
+        const pivots = sheet.pivotTables ?? []
+        if (!pivots.length) return sheet
+        const pivotDefinitions = await Promise.all(
+          pivots.slice(0, 100).map(async ({ path: part, cachePath }) => {
+            if (!cachePath) return { path: part, error: 'missing_cache' }
+            try {
+              const [pivotXml, cacheXml] = await Promise.all([
+                source.readArchiveText!(path, part),
+                source.readArchiveText!(path, cachePath),
+              ])
+              return {
+                path: part,
+                cachePath,
+                definition: workbookPivotDefinitionSchema.parse(
+                  parsePivotDefinition(pivotXml, cacheXml),
+                ),
+              }
+            } catch (error) {
+              return { path: part, error: error instanceof Error ? error.message : String(error) }
+            }
+          }),
+        )
+        return { ...sheet, pivotDefinitions }
+      }),
+    ),
   }
 }

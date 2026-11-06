@@ -18,6 +18,7 @@ const here = dirname(fileURLToPath(import.meta.url))
 const read = (rel: string) => readFileSync(join(here, '..', rel), 'utf8')
 
 const shellSrc = read('src/renderer/ExcelShell.tsx')
+const ribbonSrc = read('src/renderer/SheetsRibbon.tsx')
 const appSrc = read('src/renderer/App.tsx')
 const css = read('src/renderer/styles.css')
 
@@ -41,7 +42,7 @@ describe('formula view indicator', () => {
   })
 
   it('the ribbon button reads as pressed while the mode is on', () => {
-    expect(shellSrc).toMatch(/active=\{showFormulas\}[\s\S]{0,200}?appShowFormulas/)
+    expect(ribbonSrc).toMatch(/active=\{showFormulas\}[\s\S]{0,200}?appShowFormulas/)
   })
 
   it('the app tells the shell which sheet is in formula view', () => {

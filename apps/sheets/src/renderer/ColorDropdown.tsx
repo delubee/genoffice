@@ -10,7 +10,7 @@
  */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ColorPicker } from '@genoffice/ui'
+import { ColorPicker, subscribeChromePressed } from '@genoffice/ui/chrome'
 // module-level t (not useI18n): this dropdown also renders inside Univer's
 // float-DOM React root, which lives outside our LocaleProvider; the module
 // translator is kept in sync on every language switch and re-renders arrive
@@ -92,7 +92,7 @@ export function ColorDropdown({
     // capture phase: the grid canvas stops mousedown propagation, so bubble-phase listeners never fire
     window.addEventListener('pointerdown', onDown, true)
     window.addEventListener('keydown', onKey)
-    const offChrome = window.desktopApi?.onChromePressed?.(() => setOpen(false))
+    const offChrome = subscribeChromePressed(() => setOpen(false))
     return () => {
       window.removeEventListener('pointerdown', onDown, true)
       window.removeEventListener('keydown', onKey)

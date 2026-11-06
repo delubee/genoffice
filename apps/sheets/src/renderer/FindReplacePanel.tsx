@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Observable } from 'rxjs'
+import { EMPTY, type Observable } from 'rxjs'
 import type { Workbook } from '@univerjs/core'
 import {
   createInitFindReplaceState,
   FindBy,
   FindDirection,
   FindScope,
-  type IFindReplaceService,
   type IFindReplaceState,
   type IReplaceAllResult,
 } from '@univerjs/find-replace'
@@ -14,6 +13,7 @@ import type { RangeBounds } from '@genoffice/xlsx-gateway/domain/cell-address'
 
 import { useI18n } from './i18n/locale'
 import {
+  type FindReplacePanelService,
   buildFindAllRows,
   FIND_HISTORY_KEY,
   getSessionMatches,
@@ -43,7 +43,7 @@ function useObservableValue<T>(observable: Observable<T>, initial: T): T {
  * `createInitFindReplaceState`), so the panel reads the service getters —
  * which track the real `_revealed` fields — on every emission.
  */
-function useFindReplaceState(service: IFindReplaceService): IFindReplaceState {
+function useFindReplaceState(service: FindReplacePanelService): IFindReplaceState {
   const [value, setValue] = useState<IFindReplaceState>(() => ({
     ...createInitFindReplaceState(),
     revealed: service.revealed,
@@ -66,7 +66,7 @@ function useFindReplaceState(service: IFindReplaceService): IFindReplaceState {
  * Excel's Find and Replace dialog (Ctrl+F / Ctrl+H): a modeless, draggable
  * panel with Find/Replace tabs, the full option set Univer's service
  * supports, a Find All results table and input history. The stock Univer
- * dialog is suppressed; sessions and matching stay on IFindReplaceService,
+ * dialog is suppressed; sessions and matching stay on FindReplacePanelService,
  * so streamed-workbook coverage and replace semantics are unchanged.
  */
 export function FindReplacePanel({
@@ -76,7 +76,7 @@ export function FindReplacePanel({
   onClose,
   registerContainer,
 }: {
-  readonly service: IFindReplaceService
+  readonly service: FindReplacePanelService
   readonly getWorkbook: () => Workbook | null
   readonly onJumpTo: (sheetId: string, bounds: RangeBounds) => void
   readonly onClose: () => void
@@ -89,6 +89,7 @@ export function FindReplacePanel({
 }): React.JSX.Element | null {
   const { t } = useI18n()
   const state = useFindReplaceState(service)
+  const busy = useObservableValue(service.busy$ ?? EMPTY, false)
   const currentMatch = useObservableValue(service.currentMatch$, null)
   const replaceables = useObservableValue(service.replaceables$, [])
 
@@ -111,6 +112,14 @@ export function FindReplacePanel({
   const panelRef = useRef<HTMLDivElement>(null)
   const composingRef = useRef(false)
   const liveSearchTimer = useRef<number | null>(null)
+
+  useEffect(() => {
+    const subscription = service.focusSignal$?.subscribe(() => {
+      findInputRef.current?.focus()
+      findInputRef.current?.select()
+    })
+    return () => subscription?.unsubscribe()
+  }, [service])
 
   const revealed = state.revealed
   const replaceTab = state.replaceRevealed
@@ -278,11 +287,11 @@ export function FindReplacePanel({
 
   if (!revealed) return null
 
-  const findDisabled = state.inputtingFindString.trim() === ''
+  const findDisabled = busy || state.inputtingFindString.trim() === ''
   const queryPending = hasUncommittedQuery(state)
   const replaceDisabled =
-    queryPending || state.matchesCount === 0 || currentMatch?.replaceable !== true
-  const replaceAllDisabled = queryPending || replaceables.length === 0
+    busy || queryPending || state.matchesCount === 0 || currentMatch?.replaceable !== true
+  const replaceAllDisabled = busy || queryPending || replaceables.length === 0
   const matchesLabel =
     state.matchesCount > 0
       ? t('dlgFrMatches', {
@@ -298,6 +307,7 @@ export function FindReplacePanel({
       ref={panelRef}
       className="find-replace-panel"
       role="dialog"
+      aria-busy={busy}
       aria-label={t('dlgFrTitle')}
       style={position ? { left: position.x, top: position.y, right: 'auto' } : undefined}
       onKeyDown={(event) => {
@@ -343,13 +353,16 @@ export function FindReplacePanel({
             onChange={(event) => onQueryChange(event.target.value)}
             onCompositionStart={() => {
               composingRef.current = true
+              service.setComposing?.(true)
             }}
             onCompositionEnd={(event) => {
               composingRef.current = false
+              service.setComposing?.(false)
               onQueryChange((event.target as HTMLInputElement).value)
             }}
             onKeyDown={(event) => {
-              if (event.key === 'Enter') findStep(event.shiftKey ? 'previous' : 'next')
+              if (event.key === 'Enter' && !composingRef.current && !event.nativeEvent.isComposing)
+                findStep(event.shiftKey ? 'previous' : 'next')
             }}
           />
         </label>
@@ -442,7 +455,9 @@ export function FindReplacePanel({
             (replaceReport.failure > 0
               ? ` (${t('dlgFrReplaceFailed', { count: String(replaceReport.failure) })})`
               : '')
-          : matchesLabel}
+          : busy
+            ? '…'
+            : matchesLabel}
       </div>
       <div className="dialog-actions fr-actions">
         <button type="button" disabled={findDisabled} onClick={onFindAll}>
@@ -482,7 +497,10 @@ export function FindReplacePanel({
               {results.rows.map((row) => (
                 <tr
                   key={`${row.sheetId}:${row.address}`}
-                  onClick={() => onJumpTo(row.sheetId, row.bounds)}
+                  onClick={() => {
+                    service.selectMatch?.(row.sheetId, row.address)
+                    onJumpTo(row.sheetId, row.bounds)
+                  }}
                 >
                   <td>{row.sheetName}</td>
                   <td>{row.address}</td>

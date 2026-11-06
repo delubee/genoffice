@@ -1,3 +1,13 @@
+import { readCurrentOutline } from '@genoffice/workbook-session/read-outline'
+import {
+  outlineReadRequestSchema,
+  outlineReadResultSchema,
+} from '@genoffice/xlsx-gateway/domain/session-outline'
+import { WorkbookGoalSeekController } from '@genoffice/workbook-session/goal-seek-controller'
+import { auditWorkbook } from '@genoffice/workbook-session/audit'
+import { readCurrentMedia } from '@genoffice/workbook-session/media'
+import { randomUUID } from 'node:crypto'
+import { WorkbookSearchController } from '@genoffice/workbook-session/search-controller'
 import type { Webview } from 'vscode'
 import { z } from 'zod'
 import { computeCandidateState } from '@genoffice/xlsx-gateway/domain/session-candidate'
@@ -31,6 +41,8 @@ const candidateResultSchema = z.strictObject({
 /** Local URI/source handles stay on this side of the validated JSON bridge. */
 export class WebviewCandidateBridge implements CandidateInterpreter {
   readonly bridge: JsonBridge
+  private readonly goalSeek: WorkbookGoalSeekController
+  private readonly search: WorkbookSearchController
   private notifyReady!: () => void
   readonly ready = new Promise<void>((resolve) => {
     this.notifyReady = resolve
@@ -44,9 +56,37 @@ export class WebviewCandidateBridge implements CandidateInterpreter {
       getState(): WorkbookState
       getDescriptor(): DocumentDescriptor
       submit(intent: TransactionInput): Promise<unknown>
+      submitStaged?(intent: Omit<TransactionInput, 'operations'>, stages: unknown): Promise<unknown>
       history?(direction: 'undo' | 'redo'): Promise<void>
     },
   ) {
+    this.goalSeek = new WorkbookGoalSeekController({
+      sessionId: input.sessionId,
+      sourceSessionId: input.original.sidecarSessionId,
+      source: input.source,
+      getState: input.getState,
+      getDescriptor: input.getDescriptor,
+      submit: input.submit,
+    })
+    this.search = new WorkbookSearchController({
+      source: input.source,
+      sourceSessionId: input.original.sidecarSessionId,
+      getState: () => input.getState(),
+      replace: async (stateId, operations) => {
+        const descriptor = input.getDescriptor()
+        if (input.getState().stateId !== stateId || descriptor.stateId !== stateId)
+          throw new BridgeError('revision_conflict', 'The document changed before replacement.')
+        return input.submit({
+          schemaVersion: 1,
+          sessionId: input.sessionId,
+          transactionId: randomUUID(),
+          expectedRevision: descriptor.revision,
+          origin: 'manual',
+          summary: 'Replace search results',
+          operations,
+        })
+      },
+    })
     this.bridge = new JsonBridge(input.sessionId, {
       post: (message) => input.webview.postMessage(message),
       subscribe: (listener) => {
@@ -54,6 +94,25 @@ export class WebviewCandidateBridge implements CandidateInterpreter {
         return () => subscription.dispose()
       },
     })
+    this.bridge.handle('source.outline', async (raw) => {
+      const request = outlineReadRequestSchema.parse(raw)
+      const state = input.getState()
+      if (state.stateId !== request.stateId)
+        throw new BridgeError('revision_conflict', 'The outline request is stale.')
+      const result = await readCurrentOutline({
+        state,
+        source: input.source,
+        sessionId: input.original.sidecarSessionId,
+        sheetId: request.sheetId,
+      })
+      if (input.getState().stateId !== state.stateId)
+        throw new BridgeError(
+          'revision_conflict',
+          'The document changed while reading outline metadata.',
+        )
+      return outlineReadResultSchema.parse(result)
+    })
+    this.bridge.handle('source.goalSeek', (raw) => this.goalSeek.handle(raw))
     this.bridge.handle('view.ready', () => {
       this.notifyReady()
       return { descriptor: input.getDescriptor(), state: input.getState() }
@@ -62,6 +121,23 @@ export class WebviewCandidateBridge implements CandidateInterpreter {
       descriptor: input.getDescriptor(),
       state: input.getState(),
     }))
+    this.bridge.handle('source.media', (request) =>
+      readCurrentMedia({
+        request,
+        getState: input.getState,
+        source: input.source,
+        sourceSessionId: input.original.sidecarSessionId,
+      }),
+    )
+    this.bridge.handle('source.audit', (request) =>
+      auditWorkbook({
+        request,
+        getState: input.getState,
+        source: input.source,
+        sourceSessionId: input.original.sidecarSessionId,
+      }),
+    )
+    this.bridge.handle('source.find', (raw) => this.search.handle(raw))
     this.bridge.handle('source.read', async (raw) => {
       const request = sourceReadSchema.parse(raw),
         state = input.getState()
@@ -81,6 +157,20 @@ export class WebviewCandidateBridge implements CandidateInterpreter {
       if (intent.sessionId !== input.sessionId || intent.origin !== 'manual')
         throw new BridgeError('session_mismatch', 'Unexpected manual transaction source.')
       return input.submit(intent)
+    })
+    // Host-bounded stages (CSV import): one manual commit above the ordinary batch ceiling.
+    this.bridge.handle('view.stagedIntent', async (raw) => {
+      const request = z
+        .strictObject({
+          intent: transactionInputSchema.omit({ operations: true }),
+          stages: z.unknown(),
+        })
+        .parse(raw)
+      if (request.intent.sessionId !== input.sessionId || request.intent.origin !== 'manual')
+        throw new BridgeError('session_mismatch', 'Unexpected manual transaction source.')
+      if (!input.submitStaged)
+        throw new BridgeError('unsupported_operation', 'Staged edits are unavailable in this host.')
+      return input.submitStaged(request.intent, request.stages)
     })
     this.bridge.handle('history.request', async (raw) => {
       const request = z.strictObject({ direction: z.enum(['undo', 'redo']) }).parse(raw)
@@ -105,6 +195,19 @@ export class WebviewCandidateBridge implements CandidateInterpreter {
       sourceSessionId: this.input.original.sidecarSessionId,
       signal,
     })
+    // Inline picture roots can approach the transfer limit when repeated as
+    // next/forward/inverse. Execute their shared interpreter authoritatively
+    // here; only the accepted root is projected to the view.
+    // Sheet passwords use Excel's 100,000-round hash: run it once, on the host.
+    if (
+      intent.operations.some((op) => op.op === 'add_picture' || op.op === 'protect_sheet') ||
+      state.sheets.some((sheet) =>
+        (sheet.features?.visuals as { kind?: string }[] | undefined)?.some(
+          (v) => v.kind === 'image',
+        ),
+      )
+    )
+      return computeCandidateState(state, intent, material, { signal })
     const result = await this.bridge.request(
       'candidate.prepare',
       JSON.parse(JSON.stringify({ state, intent, material })),
@@ -123,6 +226,8 @@ export class WebviewCandidateBridge implements CandidateInterpreter {
     return parsed
   }
   dispose() {
+    this.goalSeek.dispose()
+    this.search.dispose()
     this.bridge.dispose()
   }
 }

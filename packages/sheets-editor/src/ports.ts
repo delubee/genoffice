@@ -7,12 +7,37 @@ export interface GridRange {
 
 /** Browser ports contain data only; no extension or Node runtime handles. */
 export interface EditorHost {
+  outline?(sheetId: string, stateId: string): Promise<unknown>
+  goalSeek?(
+    request: import('@genoffice/xlsx-gateway/shared/session-goal-seek').GoalSeekRequest,
+  ): Promise<unknown>
+
+  audit?(
+    request: import('@genoffice/xlsx-gateway/shared/session-audit').WorkbookAuditRequest,
+  ): Promise<unknown>
+  media?(
+    visualId: string,
+    stateId: string,
+  ): Promise<import('@genoffice/xlsx-gateway/shared/workbook-protocol').WorkbookMediaResult>
+  search?(
+    request: import('@genoffice/xlsx-gateway/shared/session-search').SessionSearchRequest,
+  ): Promise<unknown>
+  action?(
+    request: import('@genoffice/xlsx-gateway/shared/office-actions').OfficeAction,
+  ): Promise<void>
   read(sheetId: string, range: GridRange, stateId: string): Promise<unknown>
   submit(intent: {
     transactionId: string
     expectedRevision: number
     operations: readonly unknown[]
   }): Promise<unknown>
+  /** Bounded stages committed as one manual revision (bulk imports). */
+  submitStaged?(
+    intent: { transactionId: string; expectedRevision: number },
+    stages: readonly (readonly unknown[])[],
+  ): Promise<unknown>
+  /** Data → Merge Workbooks: the host picks and reads the source files. */
+  mergeWorkbooks?(): Promise<unknown>
   selection(sheetId: string, range: GridRange | null): void
   history(direction: 'undo' | 'redo'): Promise<void>
 }
@@ -27,6 +52,6 @@ export interface CandidateResult {
 
 export interface EditorProjection {
   install(stateId: string, revision: number, data: unknown): Promise<void>
-  flushEditor(): Promise<boolean>
+  flushEditor(options?: { commitChartDraft?: boolean }): Promise<boolean>
   dispose(): void
 }

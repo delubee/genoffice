@@ -9,8 +9,13 @@ export function workbookHtml(input: {
   language: string
   sessionId: string
   appearance?: 'excel' | 'vscode'
+  /** author for comments, notes and revisions (attribute-escaped) */
+  author?: string
   resource(path: string): string
 }) {
+  const author = (input.author ?? '')
+    .slice(0, 255)
+    .replace(/[&"<>]/g, (c) => ({ '&': '&amp;', '"': '&quot;', '<': '&lt;', '>': '&gt;' })[c]!)
   if (!/^[A-Za-z0-9+/=]+$/.test(input.nonce) || !/^[A-Za-z0-9-]+$/.test(input.sessionId))
     throw new Error('Invalid trusted HTML identity.')
   const csp = `default-src 'none'; img-src ${input.cspSource} data: blob:; style-src ${input.cspSource} 'unsafe-inline'; font-src ${input.cspSource} data:; script-src 'nonce-${input.nonce}' ${input.cspSource}; worker-src blob:; connect-src 'none';`
@@ -27,7 +32,7 @@ export function workbookHtml(input: {
     })
     .replace(
       '<html ',
-      `<html lang="${input.language.replace(/[^a-zA-Z0-9-]/g, '')}" data-session-id="${input.sessionId}" data-workbook-appearance="${input.appearance === 'vscode' ? 'vscode' : 'excel'}" `,
+      `<html lang="${input.language.replace(/[^a-zA-Z0-9-]/g, '')}" data-session-id="${input.sessionId}" data-workbook-appearance="${input.appearance === 'vscode' ? 'vscode' : 'excel'}" data-author="${author}" `,
     )
     .replace('<head>', `<head><meta http-equiv="Content-Security-Policy" content="${csp}">`)
     .replace(/<script /g, `<script nonce="${input.nonce}" `)

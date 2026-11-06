@@ -26,7 +26,6 @@ import {
   pivotOutputArea,
   type PivotArea,
   type PivotLayout,
-  type PivotLayoutErrorCode,
 } from '@genoffice/xlsx-gateway/domain/pivot-layout'
 import type {
   WorkbookPivotAdd,
@@ -44,7 +43,6 @@ import { planFileTableRegistrations } from './file-tables'
 import { areasIntersect, fileTableArea, liveFileTables, optionsOfTableAdd } from './table-design'
 import { DEFAULT_TABLE_STYLE, builtinTablePalette, tableThemeJson } from './table-styles'
 import { t } from './i18n/locale'
-import type { OoXmlPivotConfig, PivotField } from './PivotDialog'
 import type { PivotDefinition } from '@genoffice/xlsx-gateway/gateway/xlsx-pivot'
 import { applyFormatPatchToRange, nextSessionPivotName, nextSessionTableName } from './univer-sync'
 import type { LazyWorkbookState, UniverRuntime, UniverWorksheet } from './univer-state'
@@ -296,27 +294,6 @@ export function readPivotSourceGrid(
   )
 }
 
-const LAYOUT_ERROR_KEYS = {
-  sourceNeedsRows: 'appPivotSourceNeedsRows',
-  sourceRowLimit: 'appPivotSourceRowLimit',
-  sourceColLimit: 'appPivotSourceColLimit',
-  headerBlank: 'appPivotHeaderBlank',
-  headerDuplicate: 'appPivotHeaderDuplicate',
-  fieldNotHeader: 'appPivotFieldNotHeader',
-  calcFieldNameClash: 'appCalcFieldNameClash',
-  calcFieldNameDuplicate: 'appCalcFieldNameDuplicate',
-  valueFilterFieldMissing: 'appValueFilterFieldMissing',
-  tooManyRowItems: 'appPivotTooManyRowItems',
-  tooManyColItems: 'appPivotTooManyColItems',
-  tooManyColLines: 'appPivotTooManyColLines',
-  tooManyRowLines: 'appPivotTooManyRowLines',
-  needsValues: 'appPivotNeedsValues',
-  pageItemMissing: 'appPivotPageItemMissing',
-  baseFieldMissing: 'appPivotBaseFieldMissing',
-  baseFieldNotAxis: 'appPivotBaseFieldNotAxis',
-  baseItemMissing: 'appPivotBaseItemMissing',
-} satisfies Record<PivotLayoutErrorCode, Parameters<typeof t>[0]>
-
 /// Rows the report-filter block occupies above the table body: one per page
 /// field plus Excel's blank separator row.
 export function pivotPageRows(pageFieldCount: number): number {
@@ -559,119 +536,14 @@ export function applyAiPivotAdd(
   return { location, pageRows }
 }
 
-export function pivotConfigToOpParts(
-  config: OoXmlPivotConfig,
-  fields: readonly PivotField[],
-):
-  | string
-  | Pick<
-      AddPivotOperation,
-      'rowFields' | 'columnField' | 'pageFields' | 'groupings' | 'filters' | 'values'
-    > {
-  // Multi-level rows: mapped to field captions in the dialog's order (outer
-  // first).
-  const rowFieldLabels: string[] = []
-  for (const rowFieldIndex of config.rowFieldIndices) {
-    const label = fields[rowFieldIndex]?.label
-    if (!label) return t('appInvalidRowField')
-    rowFieldLabels.push(label)
-  }
-  if (rowFieldLabels.length === 0) return t('appNeedRowField')
-  // Multi-level columns: mapped to field captions in the dialog's order (outer
-  // first); empty array = no column dimension.
-  const columnFieldLabels: string[] = []
-  for (const colFieldIndex of config.colFieldIndices) {
-    const label = fields[colFieldIndex]?.label
-    if (!label) return t('appInvalidColumnField')
-    columnFieldLabels.push(label)
-  }
-  const pageFields: NonNullable<AddPivotOperation['pageFields']> = []
-  for (const page of config.pageFields) {
-    const label = fields[page.fieldIndex]?.label
-    if (!label) return t('appInvalidPageField')
-    pageFields.push(page.item === null ? label : { field: label, item: page.item })
-  }
-  // Grouping modes: field index → field caption (DSL groupings reference
-  // fields by caption).
-  const groupingEntries: NonNullable<AddPivotOperation['groupings']> = []
-  for (const { fieldIndex: groupedField, rule } of config.groupings) {
-    const label = fields[groupedField]?.label
-    if (!label) return t('appInvalidGroupField')
-    groupingEntries.push(
-      rule.kind === 'date'
-        ? { kind: 'date', field: label, dateUnit: rule.dateUnit }
-        : { kind: 'range', field: label, rangeStep: rule.rangeStep },
-    )
-  }
-  // Filters: label filters by field caption; value filters apply to the
-  // level-1 row field.
-  const filterOps: NonNullable<AddPivotOperation['filters']> = []
-  for (const { fieldIndex: filteredField, rule } of config.labelFilters) {
-    const label = fields[filteredField]?.label
-    if (!label) return t('appInvalidLabelFilterField')
-    filterOps.push({ kind: 'label', field: label, op: rule.op, value: rule.value.trim() })
-  }
-  for (const { valueIndex, rule } of config.valueFilters) {
-    filterOps.push({
-      kind: 'value',
-      field: rowFieldLabels[0]!,
-      valueIndex,
-      op: rule.op,
-      ...(rule.count !== undefined ? { count: rule.count } : {}),
-      ...(rule.from !== undefined ? { from: rule.from } : {}),
-      ...(rule.to !== undefined ? { to: rule.to } : {}),
-    })
-  }
-  let valueFields: AddPivotOperation['values']
-  try {
-    valueFields = config.values.map((v) => {
-      // Calculated fields: field is the new field name, aggregation fixed to
-      // sum, formula passed to the DSL verbatim.
-      if (v.formula !== undefined) {
-        return {
-          field: (v.calcName ?? '').trim(),
-          agg: 'sum' as const,
-          formula: v.formula.trim(),
-          ...(v.showDataAs !== undefined ? { showDataAs: v.showDataAs } : {}),
-          ...(v.name?.trim() ? { name: v.name.trim() } : {}),
-        }
-      }
-      const label = fields[v.fieldIndex]?.label
-      if (!label) throw new Error(t('appInvalidValueFieldIndex', { index: v.fieldIndex }))
-      // "Show values as" base fields travel as header names; the base field
-      // must sit on rows or columns for the engine to resolve it.
-      let baseField: string | undefined
-      let baseItem: string | undefined
-      if (v.baseFieldIndex !== undefined) {
-        baseField = fields[v.baseFieldIndex]?.label
-        if (!baseField) throw new Error(t('appInvalidPivotBaseField'))
-        if (!rowFieldLabels.includes(baseField) && !columnFieldLabels.includes(baseField)) {
-          throw new Error(t('appInvalidPivotBaseField'))
-        }
-      }
-      if (baseField === undefined) baseItem = undefined
-      else if (v.baseItem !== undefined) baseItem = v.baseItem
-      return {
-        field: label,
-        agg: v.agg,
-        ...(v.showDataAs !== undefined ? { showDataAs: v.showDataAs } : {}),
-        ...(baseField !== undefined ? { baseField } : {}),
-        ...(baseItem !== undefined ? { baseItem } : {}),
-        ...(v.name?.trim() ? { name: v.name.trim() } : {}),
-      }
-    })
-  } catch (error) {
-    return error instanceof Error ? error.message : t('appInvalidValueField')
-  }
-  return {
-    rowFields: rowFieldLabels,
-    ...(columnFieldLabels.length > 0 ? { columnField: columnFieldLabels } : {}),
-    ...(pageFields.length > 0 ? { pageFields } : {}),
-    ...(groupingEntries.length > 0 ? { groupings: groupingEntries } : {}),
-    ...(filterOps.length > 0 ? { filters: filterOps } : {}),
-    values: valueFields,
-  }
-}
+export { pivotConfigToOpParts } from './pivot-op-parts'
+import {
+  PivotGrowError,
+  grownPivotBlock,
+  pivotColLineLabel as sharedPivotColLineLabel,
+  pivotMemberCaption as sharedPivotMemberCaption,
+} from '@genoffice/xlsx-gateway/domain/pivot-placement'
+import { LAYOUT_ERROR_KEYS } from './pivot-op-parts'
 
 export function renameChartRefsForSheet(
   state: LazyWorkbookState,
@@ -719,34 +591,14 @@ export function pivotMemberCaption(
   field: number,
   member: number,
 ): string {
-  const item = definition.fieldItems[field]?.[member]
-  if (!item || item.x === null) return ''
-  return String(definition.fields[field]?.sharedItems[item.x] ?? '')
+  return sharedPivotMemberCaption(definition, field, member)
 }
 
 export function pivotColLineLabel(
   definition: PivotDefinition,
   line: PivotDefinition['colLines'][number],
 ): string {
-  if (line.t === 'grand') return 'Grand Total'
-  if (line.t === 'blank') return ''
-  const levels = line.t === 'data' ? definition.colFields.length : line.depth
-  const parts: string[] = []
-  for (let level = 0; level < levels; level += 1) {
-    const field = definition.colFields[level]
-    const member = line.members[level]
-    if (field === undefined || member === null || member === undefined) continue
-    parts.push(
-      field === -2
-        ? (definition.dataFields[member]?.name ?? '')
-        : pivotMemberCaption(definition, field, member),
-    )
-  }
-  if (line.t === 'default') parts.push(t('appPivotSubtotal'))
-  // Without column dimensions, the single data column's caption is the
-  // data-field name.
-  if (parts.length === 0) return definition.dataFields[line.dataField]?.name ?? ''
-  return parts.join(' ')
+  return sharedPivotColLineLabel(definition, line, t('appPivotSubtotal'))
 }
 
 export function applyGrownPivotOutput(
@@ -755,20 +607,25 @@ export function applyGrownPivotOutput(
   data: readonly (readonly (number | null)[])[],
   oldBounds: { startRow: number; startColumn: number; endRow: number; endColumn: number },
 ): string {
-  const labelCols = Math.max(1, grown.rowFields.length)
-  if (grown.firstDataRow !== 1 || grown.firstDataCol !== labelCols) {
-    throw new Error(t('appPivotGrowUnsupported'))
+  let output: ReturnType<typeof grownPivotBlock>
+  try {
+    output = grownPivotBlock(grown, data, oldBounds, t('appPivotSubtotal'))
+  } catch (error) {
+    if (error instanceof PivotGrowError)
+      throw new Error(t('appPivotGrowUnsupported'), { cause: error })
+    throw error
   }
-  const width = labelCols + (data[0]?.length ?? 0)
-  const height = 1 + data.length
-
   // Newly occupied areas (the downward/rightward growth) must be empty to
   // avoid overwriting user content.
-  const assertAreaEmpty = (row: number, column: number, rows: number, columns: number): void => {
-    if (rows <= 0 || columns <= 0) return
-    const values = target.getRange(row, column, rows, columns).getValues() as (
-      string | number | boolean | null | undefined
-    )[][]
+  for (const area of output.growth) {
+    const values = target
+      .getRange(
+        area.startRow,
+        area.startColumn,
+        area.endRow - area.startRow + 1,
+        area.endColumn - area.startColumn + 1,
+      )
+      .getValues() as (string | number | boolean | null | undefined)[][]
     if (
       values.some((line) =>
         line.some((value) => value !== null && value !== undefined && value !== ''),
@@ -777,88 +634,17 @@ export function applyGrownPivotOutput(
       throw new Error(t('appPivotGrowConflict'))
     }
   }
-  const newEndRow = oldBounds.startRow + height - 1
-  const newEndColumn = oldBounds.startColumn + width - 1
-  assertAreaEmpty(oldBounds.endRow + 1, oldBounds.startColumn, newEndRow - oldBounds.endRow, width)
-  assertAreaEmpty(
-    oldBounds.startRow,
-    oldBounds.endColumn + 1,
-    Math.min(oldBounds.endRow, newEndRow) - oldBounds.startRow + 1,
-    newEndColumn - oldBounds.endColumn,
-  )
-
-  // Header row: row-field names + each column line's caption.
-  const headerRow: (string | number | null)[] = [
-    ...(grown.rowFields.length === 0
-      ? ['']
-      : grown.rowFields.map((field) =>
-          field === -2 ? 'Values' : (grown.fields[field]?.name ?? ''),
-        )),
-    ...grown.colLines.map((line) => pivotColLineLabel(grown, line)),
-  ]
-
-  // Row labels: data rows match the baked form (prefix members equal to the
-  // previous data row stay blank), subtotal rows write the subtotal label at
-  // their depth, and the grand-total row writes "Grand Total" in column 1.
-  const block: (string | number | null)[][] = [headerRow]
-  let previousMembers: readonly (number | null)[] | null = null
-  grown.rowLines.forEach((line, index) => {
-    const labels: (string | null)[] = new Array(labelCols).fill(null)
-    if (line.t === 'grand') {
-      labels[0] = 'Grand Total'
-      previousMembers = null
-    } else if (line.t === 'default') {
-      for (let level = 0; level < line.depth && level < labelCols; level += 1) {
-        const field = grown.rowFields[level]
-        const member = line.members[level]
-        if (field === undefined || member === null || member === undefined) continue
-        labels[level] =
-          field === -2
-            ? (grown.dataFields[member]?.name ?? '')
-            : pivotMemberCaption(grown, field, member)
-      }
-      if (line.depth < labelCols) labels[line.depth] = t('appPivotSubtotal')
-    } else if (line.t === 'data') {
-      for (let level = 0; level < labelCols; level += 1) {
-        const field = grown.rowFields[level]
-        const member = line.members[level]
-        if (field === undefined || member === null || member === undefined) continue
-        if (previousMembers !== null && level < labelCols - 1) {
-          let samePrefix = true
-          for (let k = 0; k <= level; k += 1) {
-            if (previousMembers[k] !== line.members[k]) {
-              samePrefix = false
-              break
-            }
-          }
-          if (samePrefix) continue
-        }
-        labels[level] =
-          field === -2
-            ? (grown.dataFields[member]?.name ?? '')
-            : pivotMemberCaption(grown, field, member)
-      }
-      previousMembers = line.members
-    }
-    block.push([...labels, ...(data[index] ?? [])])
-  })
-
-  // The write area is the union of old and new: when the layout shrinks, the
-  // old area's extra rows/columns are cleared too.
-  const totalRows = Math.max(height, oldBounds.endRow - oldBounds.startRow + 1)
-  const totalColumns = Math.max(width, oldBounds.endColumn - oldBounds.startColumn + 1)
-  const padded = Array.from({ length: totalRows }, (_, rowIndex) => {
-    const row = block[rowIndex] ?? []
-    return Array.from({ length: totalColumns }, (_, colIndex) => row[colIndex] ?? null)
-  })
   target
-    .getRange(oldBounds.startRow, oldBounds.startColumn, totalRows, totalColumns)
-    .setValues(
-      padded as unknown as Parameters<ReturnType<UniverWorksheet['getRange']>['setValues']>[0],
+    .getRange(
+      oldBounds.startRow,
+      oldBounds.startColumn,
+      output.block.length,
+      output.block[0]!.length,
     )
-
-  return (
-    `${columnLabel(oldBounds.startColumn)}${oldBounds.startRow + 1}` +
-    `:${columnLabel(newEndColumn)}${newEndRow + 1}`
-  )
+    .setValues(
+      output.block as unknown as Parameters<
+        ReturnType<UniverWorksheet['getRange']>['setValues']
+      >[0],
+    )
+  return output.outputRef
 }

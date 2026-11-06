@@ -106,6 +106,7 @@ export const it = {
   appLabelNumberFormat: 'Formato numerico etichetta',
   appLabelFormatPlaceholder: 'es. 0.0% / #,##0',
   appGridlines: 'Griglia',
+  appChartAxisRangeInvalid: 'Il massimo deve essere maggiore del minimo.',
   appAxisMin: 'Minimo',
   appAxisMax: 'Massimo',
   appBarSection: 'Barre',
@@ -683,6 +684,14 @@ export const it = {
   appScopeWorkbook: 'Cartella di lavoro',
   appNamesNeedFile: 'Apri prima un file XLSX — i nomi definiti vengono salvati nel file.',
   appNameGone: 'Quel nome non esiste più.',
+  appDefinedNameInvalid: 'Inserisci un nome non riservato e un riferimento validi.',
+  appDefinedNameDuplicate: 'Questo nome è già usato in questo ambito.',
+  appDefinedNameBindingConflict:
+    'La modifica è in conflitto con una definizione nascosta o locale al foglio.',
+  appAuditPendingValues:
+    'Il controllo usa i valori delle formule salvati; alcuni risultati attendono il ricalcolo.',
+  appDefinedNameLabelPending:
+    'I risultati delle formule delle etichette non sono verificati. Usa etichette di testo.',
   appNameApplyFailed: 'Impossibile applicare il nome.',
   appNamesUpdated: 'Nomi definiti aggiornati — salva con ⌘S.',
   appLinkInternal: "Il collegamento punta all'interno della cartella di lavoro: {location}",
@@ -1636,6 +1645,13 @@ export const it = {
   appVisualFlipV: 'Capovolgi verticalmente',
   appVisualFlipH: 'Capovolgi orizzontalmente',
   appCtxPasteVisual: 'Incolla immagine o forma',
+  appDocumentChangedDuringAction:
+    'Il documento è cambiato durante la preparazione di questa azione. Riprova.',
+  appClipboardUnsupported:
+    'Questo contenuto non può ancora essere incollato. Nessuna cella è stata modificata.',
+  appClipboardSelectionChanged: 'La selezione è cambiata prima di incollare. Riprova.',
+  appClipboardBusy: 'Attendi il completamento della modifica corrente.',
+  appClipboardReadUnavailable: 'Impossibile leggere gli appunti. Usa {shortcut} per incollare.',
 
   // ── Spelling check (F7 / Review ▸ Proofing) ──
   appSpellTitle: 'Ortografia',

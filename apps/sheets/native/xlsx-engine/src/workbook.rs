@@ -12,6 +12,7 @@ pub(crate) fn read_sheet_declarations(
         Option<WorkbookProtectionInfo>,
         usize,
         bool,
+        Option<String>,
     ),
     SidecarError,
 > {
@@ -21,6 +22,7 @@ pub(crate) fn read_sheet_declarations(
     let mut protection = None;
     let mut active_tab = 0usize;
     let mut date_1904 = false;
+    let mut calc_mode = None;
     loop {
         match reader.read_event()? {
             Event::Start(element) | Event::Empty(element)
@@ -28,6 +30,11 @@ pub(crate) fn read_sheet_declarations(
             {
                 date_1904 = attribute_value(&reader, &element, b"date1904")?
                     .is_some_and(|value| value == "1" || value == "true");
+            }
+            Event::Start(element) | Event::Empty(element)
+                if element.local_name().as_ref() == b"calcPr" =>
+            {
+                calc_mode = attribute_value(&reader, &element, b"calcMode")?;
             }
             Event::Start(element) | Event::Empty(element)
                 if element.local_name().as_ref() == b"workbookView" =>
@@ -75,7 +82,7 @@ pub(crate) fn read_sheet_declarations(
             _ => {}
         }
     }
-    Ok((sheets, protection, active_tab, date_1904))
+    Ok((sheets, protection, active_tab, date_1904, calc_mode))
 }
 
 pub(crate) fn read_workbook_relationships(
@@ -659,6 +666,7 @@ pub(crate) fn read_defined_names(
 ) -> Result<
     (
         Vec<DefinedName>,
+        Vec<ReservedDefinedName>,
         HashMap<usize, SheetPrintNames>,
         HashSet<usize>,
     ),
@@ -667,6 +675,7 @@ pub(crate) fn read_defined_names(
     let xml = read_zip_string(archive, "xl/workbook.xml")?;
     let mut reader = Reader::from_str(&xml);
     let mut names = Vec::new();
+    let mut reserved = Vec::new();
     let mut print_names: HashMap<usize, SheetPrintNames> = HashMap::new();
     // Sheets with ANY localSheetId-scoped definedName, including hidden and
     // _xlnm.* built-ins the editor never models — the save's duplicate guard
@@ -714,7 +723,14 @@ pub(crate) fn read_defined_names(
                     if let Some(sheet_index) = defined.sheet_index {
                         scoped_sheets.insert(sheet_index);
                     }
-                    if defined.formula.is_empty() {
+                    if defined.formula.trim().is_empty() {
+                        if !defined.name.is_empty() {
+                            reserved.push(ReservedDefinedName {
+                                name: defined.name,
+                                sheet_index: defined.sheet_index,
+                                sheet_id: None,
+                            });
+                        }
                         continue;
                     }
                     if defined.name.starts_with("_xlnm") {
@@ -734,7 +750,15 @@ pub(crate) fn read_defined_names(
                         }
                     // Hidden names stay file-only (the save preserves them
                     // verbatim; the editor never models them).
-                    } else if !defined.hidden {
+                    } else if defined.hidden {
+                        if !defined.name.is_empty() {
+                            reserved.push(ReservedDefinedName {
+                                name: defined.name,
+                                sheet_index: defined.sheet_index,
+                                sheet_id: None,
+                            });
+                        }
+                    } else {
                         names.push(DefinedName {
                             name: defined.name,
                             formula: strip_future_function_markers(&defined.formula),
@@ -743,9 +767,24 @@ pub(crate) fn read_defined_names(
                     }
                 }
             }
+            Event::Empty(element) if element.local_name().as_ref() == b"definedName" => {
+                let name = attribute_value(&reader, &element, b"name")?.unwrap_or_default();
+                let sheet_index = attribute_value(&reader, &element, b"localSheetId")?
+                    .and_then(|value| value.parse::<usize>().ok());
+                if let Some(index) = sheet_index {
+                    scoped_sheets.insert(index);
+                }
+                if !name.is_empty() {
+                    reserved.push(ReservedDefinedName {
+                        name,
+                        sheet_index,
+                        sheet_id: None,
+                    });
+                }
+            }
             Event::Eof => break,
             _ => {}
         }
     }
-    Ok((names, print_names, scoped_sheets))
+    Ok((names, reserved, print_names, scoped_sheets))
 }

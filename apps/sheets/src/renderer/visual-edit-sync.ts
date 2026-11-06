@@ -186,11 +186,13 @@ async function runChartDataSync(ctx: VisualSyncContext): Promise<void> {
           ),
         }))
     : ctx.adapterRef.current.getSnapshot().sheets.flatMap((sheet) =>
-        (sheet.visuals ?? []).map((visual) => ({
-          editKey: visual.id,
-          visualId: visual.id,
-          chart: visual.chart,
-        })),
+        (sheet.visuals ?? [])
+          .filter((visual) => visual.kind === 'chart')
+          .map((visual) => ({
+            editKey: visual.id,
+            visualId: visual.id,
+            chart: visual.chart,
+          })),
       )
   let changed = false
   for (const { editKey, visualId, chart } of charts) {
@@ -248,7 +250,7 @@ async function runChartDataSync(ctx: VisualSyncContext): Promise<void> {
     const edit: ChartEditData = { series: seriesEdits }
     if (!state) {
       const before = ctx.adapterRef.current.findVisual(visualId)
-      if (before) {
+      if (before?.kind === 'chart') {
         ctx.adapterRef.current.replaceVisual(visualId, {
           ...before,
           chart: applyChartStateEdit(before.chart, edit),
@@ -340,7 +342,7 @@ export function applyChartEdit(ctx: VisualSyncContext, editKey: string, edit: Ch
   if (!state) {
     const applied = applyDemoVisualChange(ctx, editKey, (before) =>
       before.chart
-        ? { ...before, chart: applyChartStateEdit(before.chart, edit) as SheetVisual['chart'] }
+        ? { ...before, chart: applyChartStateEdit(before.chart, edit) as ChartVisualState }
         : before,
     )
     ctx.setMessage(applied ? t('appChartUpdated') : t('appChartNotEditable'))

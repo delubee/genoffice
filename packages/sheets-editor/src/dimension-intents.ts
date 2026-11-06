@@ -33,7 +33,7 @@ export function dimensionIntents(
                 sheetId,
                 row: start + 1,
                 count,
-                heightPoints: Math.max(2, Math.min(409, Math.round(pixels * 0.75 * 100) / 100)),
+                heightPoints: Math.max(2, Math.min(409.5, Math.round(pixels * 0.75 * 100) / 100)),
               }
             : {
                 op: 'set_col_width',

@@ -257,7 +257,13 @@ export function Dropdown<K extends string>({
                 // can't blur focus-scoped hosts (the PDF text editor commits its
                 // draft on focus leaving the edit bar)
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => pick(o)}
+                onClick={(event) => {
+                  // Closing removes this button before the label's default
+                  // activation runs. A wrapping label can then click the
+                  // trigger again and reopen the just-picked list.
+                  event.preventDefault()
+                  pick(o)
+                }}
               >
                 {o.render ?? o.label}
               </button>

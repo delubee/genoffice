@@ -1,4 +1,9 @@
+import { authorName } from './author-name'
+import type { WorkbookViewCommand } from '@genoffice/xlsx-gateway/shared/workbook-view-command'
 import * as vscode from 'vscode'
+import { nativeOfficeActions } from './office-actions'
+import { captureWorkbookBinding } from './commands/bind-selection'
+import { flushCurrentEditor } from './tools/current-state'
 import { randomBytes } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -69,6 +74,32 @@ export class WorkbookEditorProvider
   }
   getDocument(uri: vscode.Uri) {
     return this.documents.get(uri.toString())
+  }
+  private activeWorkbookView() {
+    const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input
+    if (!(input instanceof vscode.TabInputCustom) || input.viewType !== EDITOR_ID) return null
+    const document = this.getDocument(input.uri)
+    const panel = document && this.panels.get(document)
+    return document && panel?.active && !document.isClosed ? { document, panel } : null
+  }
+  async viewCommand(command: WorkbookViewCommand) {
+    const target = this.activeWorkbookView()
+    if (!target) return false
+    const sessionId = target.document.sessionId
+    await target.document.whenViewReady()
+    const current = this.activeWorkbookView()
+    if (
+      current?.document !== target.document ||
+      current.panel !== target.panel ||
+      target.document.sessionId !== sessionId
+    )
+      throw new WorkbookError(
+        'view_closed',
+        'The active workbook changed before opening the dialog.',
+      )
+    target.panel.reveal(target.panel.viewColumn, false)
+    await target.document.bridge!.request('view.command', { command })
+    return true
   }
   openDocuments() {
     return [...this.documents.values()]
@@ -206,6 +237,41 @@ export class WorkbookEditorProvider
     panel.webview.options = { enableScripts: true, localResourceRoots: [root] }
     this.panelDetach.get(panel)?.()
     this.panelDetach.set(panel, document.attach(panel.webview))
+    const actionSession = document.sessionId
+    document.bridge!.handle(
+      'office.action',
+      nativeOfficeActions({
+        uri: document.uri,
+        available: () =>
+          this.getDocument(document.uri) === document && document.sessionId === actionSession,
+        active: () => panel.active,
+        flush: () => flushCurrentEditor(document),
+        bind: async (scope) => {
+          const binding = await captureWorkbookBinding(this, document.uri, scope)
+          return {
+            kind: 'xlsx',
+            scope,
+            documentUri: binding.documentUri,
+            bindingId: binding.bindingId,
+            revision: binding.boundRevision,
+            sheetId: binding.logicalSheetId,
+            range: binding.frozenRange,
+          }
+        },
+      }),
+    )
+    document.bridge!.handle('workbook.mergeWorkbooks', async () => {
+      if (this.getDocument(document.uri) !== document || document.sessionId !== actionSession)
+        throw new Error('The workbook view is no longer current.')
+      // The requesting view flushes its own editor first; a nested view.flush would wait on itself.
+      const files = await vscode.window.showOpenDialog({
+        canSelectMany: true,
+        openLabel: 'Merge',
+        filters: { 'Excel Workbook': ['xlsx'] },
+      })
+      if (!files?.length) return { canceled: true }
+      return document.mergeWorkbooks(files)
+    })
     const configuration = () =>
       vscode.workspace.getConfiguration('genoffice.workbook', document.uri)
     document.bridge!.handle('appearance.change', async (raw) => {
@@ -259,6 +325,7 @@ export class WorkbookEditorProvider
       cspSource: webview.cspSource,
       language: vscode.env.language,
       sessionId: document.sessionId,
+      author: await authorName(),
       appearance: workbookAppearance(
         vscode.workspace.getConfiguration('genoffice.workbook', document.uri).get('appearance'),
       ),
