@@ -1539,6 +1539,8 @@ pub(crate) mod tests {
     /// link's own cell and its dependents keep their caches instead of
     /// cascading `#ERROR!`; a text cache reports its text; and a `[1]…`
     /// spelling inside a string literal stays text.
+    // the fixture URI is built from the temp dir, which is only POSIX-absolute on unix
+    #[cfg(unix)]
     #[test]
     fn update_pins_the_cache_through_a_partial_rewrite() {
         let dir = tempfile::tempdir().unwrap();
